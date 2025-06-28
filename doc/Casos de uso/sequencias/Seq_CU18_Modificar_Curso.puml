@@ -1,0 +1,23 @@
+
+@startuml
+actor Administrador
+participant InterfazCurso
+participant ControladorCursos
+database BD
+
+Administrador -> InterfazCurso : Seleccionar curso a modificar
+InterfazCurso -> ControladorCursos : Solicitar datos del curso
+ControladorCursos -> BD : SELECT * FROM curso WHERE id = ?
+BD --> ControladorCursos : Datos del curso
+ControladorCursos --> InterfazCurso : Mostrar datos
+InterfazCurso --> Administrador : Formulario editable
+
+Administrador -> InterfazCurso : Modificar datos
+InterfazCurso -> ControladorCursos : Enviar datos modificados
+ControladorCursos -> ControladorCursos : Validar datos
+ControladorCursos -> BD : UPDATE curso SET ... WHERE id = ?
+BD --> ControladorCursos : Confirmación
+ControladorCursos --> InterfazCurso : Curso actualizado
+InterfazCurso --> Administrador : Mostrar mensaje de éxito
+
+@enduml

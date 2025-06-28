@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazInformes
+participant ControladorInformes
+database BD
+
+Administrador -> InterfazInformes : Solicitar informe de inscripciones
+InterfazInformes -> ControladorInformes : Solicitud recibida
+ControladorInformes -> BD : SELECT * FROM inscripcion
+BD --> ControladorInformes : Datos de inscripciones
+ControladorInformes -> InterfazInformes : Generar informe
+InterfazInformes --> Administrador : Mostrar resultados
+
+@enduml

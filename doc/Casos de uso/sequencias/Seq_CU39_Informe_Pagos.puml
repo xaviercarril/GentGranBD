@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazInformes
+participant ControladorInformes
+database BD
+
+Administrador -> InterfazInformes : Solicitar informe de pagos
+InterfazInformes -> ControladorInformes : Procesar petición
+ControladorInformes -> BD : SELECT * FROM pago
+BD --> ControladorInformes : Resultados
+ControladorInformes -> InterfazInformes : Formatear datos
+InterfazInformes --> Administrador : Descargar/mostrar informe
+
+@enduml

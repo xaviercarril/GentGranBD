@@ -1,0 +1,18 @@
+
+@startuml
+actor Administrador
+participant InterfazFichaSocio
+participant ControladorSocios
+database BD
+
+== Solicitud de ficha ==
+Administrador -> InterfazFichaSocio : Seleccionar socio
+InterfazFichaSocio -> ControladorSocios : Solicitar ficha completa
+ControladorSocios -> BD : SELECT * FROM socio WHERE id = ?
+BD --> ControladorSocios : Datos del socio
+ControladorSocios -> BD : SELECT cursos, pagos, asistencia WHERE socio_id = ?
+BD --> ControladorSocios : Datos relacionados (cursos, pagos, asistencia)
+ControladorSocios --> InterfazFichaSocio : Datos completos del socio
+InterfazFichaSocio --> Administrador : Mostrar ficha detallada del socio
+
+@enduml

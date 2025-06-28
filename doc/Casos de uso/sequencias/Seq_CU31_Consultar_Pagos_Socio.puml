@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazPago
+participant ControladorPagos
+database BD
+
+Administrador -> InterfazPago : Seleccionar socio
+InterfazPago -> ControladorPagos : Solicitar pagos del socio
+ControladorPagos -> BD : SELECT * FROM pago WHERE socio_id = ?
+BD --> ControladorPagos : Lista de pagos
+ControladorPagos --> InterfazPago : Devolver datos
+InterfazPago --> Administrador : Mostrar listado
+
+@enduml

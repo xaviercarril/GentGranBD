@@ -1,0 +1,12 @@
+
+@startuml
+
+class InterfazSocio
+class ControladorSocios
+class Socio
+
+Administrador --> InterfazSocio
+InterfazSocio --> ControladorSocios
+ControladorSocios --> Socio
+
+@enduml

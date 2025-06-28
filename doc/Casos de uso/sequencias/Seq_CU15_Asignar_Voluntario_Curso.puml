@@ -1,0 +1,23 @@
+
+@startuml
+actor Administrador
+participant InterfazVoluntario
+participant ControladorVoluntarios
+participant ControladorCursos
+database BD
+
+Administrador -> InterfazVoluntario : Seleccionar voluntario
+InterfazVoluntario -> ControladorVoluntarios : Solicitar datos del voluntario
+ControladorVoluntarios -> BD : SELECT * FROM voluntario WHERE id = ?
+BD --> ControladorVoluntarios : Datos del voluntario
+ControladorVoluntarios --> InterfazVoluntario : Datos recibidos
+InterfazVoluntario --> Administrador : Mostrar cursos disponibles
+
+Administrador -> InterfazVoluntario : Seleccionar curso para asignación
+InterfazVoluntario -> ControladorCursos : Asignar voluntario al curso
+ControladorCursos -> BD : UPDATE curso SET voluntario_id = ? WHERE id = ?
+BD --> ControladorCursos : Confirmación
+ControladorCursos --> InterfazVoluntario : Éxito
+InterfazVoluntario --> Administrador : Mostrar mensaje de confirmación
+
+@enduml

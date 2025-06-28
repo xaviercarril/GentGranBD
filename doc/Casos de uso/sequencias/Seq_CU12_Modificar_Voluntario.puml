@@ -1,0 +1,23 @@
+
+@startuml
+actor Administrador
+participant InterfazVoluntario
+participant ControladorVoluntarios
+database BD
+
+Administrador -> InterfazVoluntario : Buscar voluntario
+InterfazVoluntario -> ControladorVoluntarios : Solicitar datos del voluntario
+ControladorVoluntarios -> BD : SELECT * FROM voluntario WHERE id = ?
+BD --> ControladorVoluntarios : Datos del voluntario
+ControladorVoluntarios --> InterfazVoluntario : Devolver datos
+InterfazVoluntario --> Administrador : Mostrar formulario de edición
+
+Administrador -> InterfazVoluntario : Modificar datos
+InterfazVoluntario -> ControladorVoluntarios : Enviar datos modificados
+ControladorVoluntarios -> ControladorVoluntarios : Validar datos
+ControladorVoluntarios -> BD : UPDATE voluntario SET ... WHERE id = ?
+BD --> ControladorVoluntarios : Confirmación
+ControladorVoluntarios --> InterfazVoluntario : Modificación exitosa
+InterfazVoluntario --> Administrador : Mostrar mensaje
+
+@enduml

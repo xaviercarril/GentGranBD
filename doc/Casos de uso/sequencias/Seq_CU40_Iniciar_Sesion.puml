@@ -1,0 +1,16 @@
+
+@startuml
+actor Administrador
+participant InterfazAcceso
+participant ControladorAcceso
+database BD
+
+Administrador -> InterfazAcceso : Introducir usuario y contraseña
+InterfazAcceso -> ControladorAcceso : Enviar credenciales
+ControladorAcceso -> BD : SELECT * FROM usuario WHERE usuario = ?
+BD --> ControladorAcceso : Datos del usuario
+ControladorAcceso -> ControladorAcceso : Verificar contraseña
+ControladorAcceso --> InterfazAcceso : Autenticación correcta
+InterfazAcceso --> Administrador : Acceso concedido
+
+@enduml

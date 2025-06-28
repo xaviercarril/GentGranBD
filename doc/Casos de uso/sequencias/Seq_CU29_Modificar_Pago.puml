@@ -1,0 +1,21 @@
+
+@startuml
+actor Administrador
+participant InterfazPago
+participant ControladorPagos
+database BD
+
+Administrador -> InterfazPago : Seleccionar pago
+InterfazPago -> ControladorPagos : Solicitar datos
+ControladorPagos -> BD : SELECT * FROM pago WHERE id = ?
+BD --> ControladorPagos : Datos del pago
+ControladorPagos --> InterfazPago : Mostrar formulario
+
+Administrador -> InterfazPago : Modificar datos
+InterfazPago -> ControladorPagos : Enviar cambios
+ControladorPagos -> BD : UPDATE pago SET ... WHERE id = ?
+BD --> ControladorPagos : Confirmación
+ControladorPagos --> InterfazPago : Actualización realizada
+InterfazPago --> Administrador : Mostrar mensaje
+
+@enduml

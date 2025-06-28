@@ -1,0 +1,21 @@
+
+@startuml
+actor Administrador
+participant InterfazAsistencia
+participant ControladorAsistencia
+database BD
+
+Administrador -> InterfazAsistencia : Seleccionar curso y sesión
+InterfazAsistencia -> ControladorAsistencia : Solicitar lista de inscritos
+ControladorAsistencia -> BD : SELECT socios WHERE curso_id = ?
+BD --> ControladorAsistencia : Lista de socios
+ControladorAsistencia --> InterfazAsistencia : Mostrar formulario
+
+Administrador -> InterfazAsistencia : Marcar asistentes
+InterfazAsistencia -> ControladorAsistencia : Enviar asistencia
+ControladorAsistencia -> BD : INSERT INTO asistencia (...)
+BD --> ControladorAsistencia : Confirmación
+ControladorAsistencia --> InterfazAsistencia : Asistencia registrada
+InterfazAsistencia --> Administrador : Mostrar resultado
+
+@enduml

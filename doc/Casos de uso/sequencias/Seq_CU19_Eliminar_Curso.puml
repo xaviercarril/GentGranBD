@@ -1,0 +1,22 @@
+
+@startuml
+actor Administrador
+participant InterfazCurso
+participant ControladorCursos
+database BD
+
+Administrador -> InterfazCurso : Seleccionar curso
+InterfazCurso -> ControladorCursos : Solicitar datos
+ControladorCursos -> BD : SELECT * FROM curso WHERE id = ?
+BD --> ControladorCursos : Datos del curso
+ControladorCursos --> InterfazCurso : Mostrar datos
+InterfazCurso --> Administrador : Confirmar eliminación
+
+Administrador -> InterfazCurso : Confirmar
+InterfazCurso -> ControladorCursos : Confirmación
+ControladorCursos -> BD : DELETE FROM curso WHERE id = ?
+BD --> ControladorCursos : Curso eliminado
+ControladorCursos --> InterfazCurso : Éxito
+InterfazCurso --> Administrador : Mostrar mensaje
+
+@enduml

@@ -1,0 +1,16 @@
+
+@startuml
+actor Administrador
+participant InterfazConsulta
+participant ControladorSocios
+database BD
+
+== Inicio de búsqueda ==
+Administrador -> InterfazConsulta : Introducir criterio de búsqueda (ID, DNI, nombre, etc.)
+InterfazConsulta -> ControladorSocios : Enviar criterio de búsqueda
+ControladorSocios -> BD : SELECT * FROM socio WHERE criterio = ?
+BD --> ControladorSocios : Resultado(s) de la consulta
+ControladorSocios --> InterfazConsulta : Devolver datos
+InterfazConsulta --> Administrador : Mostrar datos del socio o listado
+
+@enduml

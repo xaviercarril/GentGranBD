@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazPago
+participant ControladorPagos
+database BD
+
+Administrador -> InterfazPago : Seleccionar curso
+InterfazPago -> ControladorPagos : Solicitar pagos del curso
+ControladorPagos -> BD : SELECT * FROM pago WHERE curso_id IN (SELECT curso_id FROM inscripcion WHERE curso_id = ?)
+BD --> ControladorPagos : Lista de pagos
+ControladorPagos --> InterfazPago : Devolver datos
+InterfazPago --> Administrador : Mostrar pagos del curso
+
+@enduml

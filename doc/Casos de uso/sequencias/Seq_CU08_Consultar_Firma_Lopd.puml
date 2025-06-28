@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazSocio
+participant ControladorSocios
+database BD
+
+Administrador -> InterfazSocio : Consultar estado de firma LOPD
+InterfazSocio -> ControladorSocios : Solicitar estado de firma
+ControladorSocios -> BD : SELECT firma_lopd FROM socio WHERE id = ?
+BD --> ControladorSocios : true/false
+ControladorSocios --> InterfazSocio : Resultado
+InterfazSocio --> Administrador : Mostrar estado de firma
+
+@enduml

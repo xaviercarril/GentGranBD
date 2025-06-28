@@ -1,0 +1,74 @@
+
+@startuml
+skinparam classAttributeIconSize 0
+
+class Administrador <<actor>>
+
+' Interfaces de usuario como <<interface>>
+interface InterfazSocio
+interface InterfazVoluntario
+interface InterfazCurso
+interface InterfazInscripcion
+interface InterfazAsistencia
+interface InterfazPago
+interface InterfazImportacion
+interface InterfazInformes
+interface InterfazAcceso
+
+' Controladores como class
+class ControladorSocios
+class ControladorVoluntarios
+class ControladorCursos
+class ControladorInscripciones
+class ControladorAsistencia
+class ControladorPagos
+class ControladorImportacion
+class ControladorExportacion
+class ControladorInformes
+class ControladorAcceso
+
+' Entidades como <<entity>>
+entity Socio
+entity Voluntario
+entity Curso
+entity Inscripcion
+entity Asistencia
+entity Pago
+
+' Relaciones entre actor y interfaces
+Administrador --> InterfazSocio
+Administrador --> InterfazVoluntario
+Administrador --> InterfazCurso
+Administrador --> InterfazInscripcion
+Administrador --> InterfazAsistencia
+Administrador --> InterfazPago
+Administrador --> InterfazImportacion
+Administrador --> InterfazInformes
+Administrador --> InterfazAcceso
+
+' Interfaces llaman a controladores
+InterfazSocio --> ControladorSocios
+InterfazVoluntario --> ControladorVoluntarios
+InterfazCurso --> ControladorCursos
+InterfazInscripcion --> ControladorInscripciones
+InterfazAsistencia --> ControladorAsistencia
+InterfazPago --> ControladorPagos
+InterfazImportacion --> ControladorImportacion
+InterfazInformes --> ControladorInformes
+InterfazAcceso --> ControladorAcceso
+
+' Controladores acceden a entidades
+ControladorSocios --> Socio
+ControladorVoluntarios --> Voluntario
+ControladorCursos --> Curso
+ControladorInscripciones --> Inscripcion
+ControladorAsistencia --> Asistencia
+ControladorPagos --> Pago
+ControladorInformes --> Socio
+ControladorInformes --> Curso
+ControladorInformes --> Inscripcion
+ControladorInformes --> Pago
+ControladorImportacion --> Socio
+ControladorExportacion --> Socio
+
+@enduml

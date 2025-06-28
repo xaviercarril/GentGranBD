@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazInscripcion
+participant ControladorInscripciones
+database BD
+
+Administrador -> InterfazInscripcion : Seleccionar curso
+InterfazInscripcion -> ControladorInscripciones : Solicitar participantes
+ControladorInscripciones -> BD : SELECT * FROM inscripcion WHERE curso_id = ?
+BD --> ControladorInscripciones : Lista de participantes
+ControladorInscripciones --> InterfazInscripcion : Datos de participantes
+InterfazInscripcion --> Administrador : Mostrar lista
+
+@enduml

@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazVoluntario
+participant ControladorVoluntarios
+database BD
+
+Administrador -> InterfazVoluntario : Introducir criterio de búsqueda
+InterfazVoluntario -> ControladorVoluntarios : Solicitar búsqueda
+ControladorVoluntarios -> BD : SELECT * FROM voluntario WHERE criterio = ?
+BD --> ControladorVoluntarios : Resultados
+ControladorVoluntarios --> InterfazVoluntario : Lista de voluntarios
+InterfazVoluntario --> Administrador : Mostrar resultados
+
+@enduml

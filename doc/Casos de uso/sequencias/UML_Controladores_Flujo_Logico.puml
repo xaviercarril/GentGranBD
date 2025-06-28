@@ -1,0 +1,80 @@
+
+@startuml
+skinparam style strictuml
+skinparam classAttributeIconSize 0
+
+package "Controladores" {
+  class ControladorSocios {
+    +registrarSocio()
+    +modificarSocio()
+    +eliminarSocio()
+    +consultarSocio()
+    +verFichaSocio()
+    +capturarFoto()
+    +registrarFirmaLOPD()
+    +consultarFirmaLOPD()
+    +generarCarnet()
+    +imprimirCarnet()
+  }
+
+  class ControladorVoluntarios {
+    +registrarVoluntario()
+    +modificarVoluntario()
+    +eliminarVoluntario()
+    +consultarVoluntario()
+    +asignarMonitor()
+    +listarCursosPorVoluntario()
+  }
+
+  class ControladorCursos {
+    +crearCurso()
+    +modificarCurso()
+    +eliminarCurso()
+    +consultarCurso()
+  }
+
+  class ControladorInscripciones {
+    +inscribirSocio()
+    +modificarParticipantes()
+    +listarParticipantes()
+  }
+
+  class ControladorAsistencia {
+    +registrarAsistencia()
+    +modificarAsistencia()
+    +consultarAsistencia()
+    +generarInformeAsistencia()
+  }
+
+  class ControladorPagos {
+    +registrarPago()
+    +modificarPago()
+    +eliminarPago()
+    +consultarPagosSocio()
+    +consultarPagosCurso()
+  }
+
+  class ControladorImportacion {
+    +importarDesdeExcel()
+  }
+
+  class ControladorExportacion {
+    +exportarAExcel()
+  }
+
+  class ControladorInformes {
+    +informeSocios()
+    +informeActividades()
+    +informeProfesores()
+    +informeInscripciones()
+    +informePagos()
+  }
+
+  class ControladorAcceso {
+    +iniciarSesion()
+    +cerrarSesion()
+    +recuperarContrasena()
+  }
+}
+
+@enduml

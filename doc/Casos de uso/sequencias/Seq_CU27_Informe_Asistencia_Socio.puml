@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazAsistencia
+participant ControladorAsistencia
+database BD
+
+Administrador -> InterfazAsistencia : Seleccionar socio y curso
+InterfazAsistencia -> ControladorAsistencia : Solicitar informe
+ControladorAsistencia -> BD : SELECT * FROM asistencia WHERE socio_id = ? AND curso_id = ?
+BD --> ControladorAsistencia : Datos de asistencia
+ControladorAsistencia -> InterfazAsistencia : Calcular estadísticas
+InterfazAsistencia --> Administrador : Mostrar informe detallado
+
+@enduml

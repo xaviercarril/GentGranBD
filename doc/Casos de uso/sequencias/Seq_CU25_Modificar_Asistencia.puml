@@ -1,0 +1,21 @@
+
+@startuml
+actor Administrador
+participant InterfazAsistencia
+participant ControladorAsistencia
+database BD
+
+Administrador -> InterfazAsistencia : Seleccionar sesión de asistencia
+InterfazAsistencia -> ControladorAsistencia : Solicitar datos existentes
+ControladorAsistencia -> BD : SELECT * FROM asistencia WHERE curso_id = ? AND fecha = ?
+BD --> ControladorAsistencia : Registros de asistencia
+ControladorAsistencia --> InterfazAsistencia : Mostrar datos
+
+Administrador -> InterfazAsistencia : Modificar registros
+InterfazAsistencia -> ControladorAsistencia : Enviar cambios
+ControladorAsistencia -> BD : UPDATE asistencia SET ... WHERE id = ?
+BD --> ControladorAsistencia : Confirmación
+ControladorAsistencia --> InterfazAsistencia : Asistencia actualizada
+InterfazAsistencia --> Administrador : Mostrar mensaje
+
+@enduml

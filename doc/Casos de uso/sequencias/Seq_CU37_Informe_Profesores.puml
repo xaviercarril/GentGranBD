@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazInformes
+participant ControladorInformes
+database BD
+
+Administrador -> InterfazInformes : Solicitar informe de voluntarios
+InterfazInformes -> ControladorInformes : Procesar solicitud
+ControladorInformes -> BD : SELECT * FROM voluntario
+BD --> ControladorInformes : Datos de voluntarios
+ControladorInformes -> InterfazInformes : Generar informe
+InterfazInformes --> Administrador : Ver informe
+
+@enduml

@@ -1,0 +1,112 @@
+
+@startuml
+
+class Socio {
+  +id: int
+  +dniNie: string
+  +nombre: string
+  +apellido1: string
+  +apellido2: string
+  +direccion: string
+  +telefonoFijo: string
+  +telefonoMovil: string
+  +email: string
+  +grupoDifusion: string
+  +fechaAlta: date
+  +fechaBaja: date
+  +observaciones: text
+  +foto: blob
+}
+
+abstract class Personal {
+    +id: int
+    +nombre: string
+    +apellido1: string
+    +apellido2: string
+    +dni_nie: string
+}
+
+class Voluntario
+class Profesor
+
+Personal <|-- Voluntario
+Personal <|-- Profesor
+
+enum Trimestre {
+  Q1
+  Q2
+  Q3
+  Q4
+}
+
+class Actividad {
+    +id: int
+    +nombre: string
+    +numero_maximo_alumnos: int
+    +duracion: int
+    +lugar: string
+    +precio_matricula: decimal
+    +observaciones: text
+}
+
+class Curso {
+    +trimestre: Trimestre
+    +dias_semana: string
+}
+class Taller {
+    +fecha: date
+    +hora_inicio: time
+}
+
+Actividad <|-- Curso
+Actividad <|-- Taller
+
+enum estadoInscripcion {
+    INSCRITO
+    RESERVA
+}
+class InscripcionSocio {
+    +id: int
+    +fecha_inscripcion: date
+    +estado: estadoInscripcion
+    +observaciones: text
+}
+
+class Asistencia {
+    +id: int
+    +fecha: date
+    +presente: bool
+    +observaciones: text
+}
+
+enum estadoPago {
+    PENDIENTE
+    PAGADO
+    ANULADO
+}
+
+class Pago {
+    +id: int
+    +fecha: date
+    +importe: decimal
+    +estado: estadoPago
+    +observaciones: text
+}
+
+class matriculaPago {
+}
+class mensualidadPago {
+}
+
+Pago <|-- matriculaPago
+Pago <|-- mensualidadPago
+
+Socio "1" -- "0..*" InscripcionSocio
+InscripcionSocio "0..*" -- "1" Actividad
+InscripcionSocio "1" -- "0..*" Asistencia
+InscripcionSocio "1" -- "0..1" matriculaPago
+InscripcionSocio "1" -- "0..*" mensualidadPago
+
+Actividad "0..*" -- "1" Personal : impartida_por
+
+@enduml

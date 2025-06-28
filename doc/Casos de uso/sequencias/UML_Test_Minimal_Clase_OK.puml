@@ -1,0 +1,16 @@
+
+@startuml
+
+skinparam classAttributeIconSize 0
+
+actor Administrador
+
+class InterfazSocio
+class ControladorSocios
+class Socio
+
+Administrador --> InterfazSocio
+InterfazSocio --> ControladorSocios
+ControladorSocios --> Socio
+
+@enduml

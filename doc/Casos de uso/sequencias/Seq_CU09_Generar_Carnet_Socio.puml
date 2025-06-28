@@ -1,0 +1,16 @@
+
+@startuml
+actor Administrador
+participant InterfazCarnet
+participant ControladorSocios
+database BD
+
+Administrador -> InterfazCarnet : Solicitar generación de carnet
+InterfazCarnet -> ControladorSocios : Solicitar datos del socio
+ControladorSocios -> BD : SELECT nombre, id, foto FROM socio WHERE id = ?
+BD --> ControladorSocios : Datos del socio
+ControladorSocios --> InterfazCarnet : Enviar datos
+InterfazCarnet -> InterfazCarnet : Generar diseño de carnet (8x5cm)
+InterfazCarnet --> Administrador : Mostrar carnet generado
+
+@enduml

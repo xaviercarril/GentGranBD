@@ -1,0 +1,19 @@
+
+@startuml
+actor Administrador
+participant InterfazCurso
+participant ControladorCursos
+database BD
+
+Administrador -> InterfazCurso : Solicitar formulario de curso
+InterfazCurso -> Administrador : Mostrar formulario
+
+Administrador -> InterfazCurso : Introducir datos del curso
+InterfazCurso -> ControladorCursos : Enviar datos del curso
+ControladorCursos -> ControladorCursos : Validar datos
+ControladorCursos -> BD : INSERT INTO curso (...)
+BD --> ControladorCursos : Confirmación
+ControladorCursos --> InterfazCurso : Curso creado
+InterfazCurso --> Administrador : Mostrar mensaje de éxito
+
+@enduml

@@ -1,0 +1,27 @@
+
+@startuml
+actor Administrador
+participant InterfazRegistro
+participant ControladorSocios
+database BD
+
+== Inicio del registro ==
+Administrador -> InterfazRegistro : Solicitar formulario de alta
+InterfazRegistro -> Administrador : Mostrar formulario
+
+== Introducción de datos ==
+Administrador -> InterfazRegistro : Introducir datos del socio
+
+== Envío y validación ==
+InterfazRegistro -> ControladorSocios : Enviar datos del socio
+ControladorSocios -> ControladorSocios : Validar datos
+
+== Registro en base de datos ==
+ControladorSocios -> BD : INSERT nuevo socio
+BD --> ControladorSocios : Confirmación de alta
+
+== Confirmación al usuario ==
+ControladorSocios --> InterfazRegistro : Registro exitoso
+InterfazRegistro --> Administrador : Mostrar mensaje de éxito
+
+@enduml

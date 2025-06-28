@@ -1,0 +1,17 @@
+
+@startuml
+actor Administrador
+participant InterfazLOPD
+participant ControladorSocios
+database BD
+
+Administrador -> InterfazLOPD : Abrir formulario de consentimiento
+InterfazLOPD -> Administrador : Mostrar documento LOPD
+Administrador -> InterfazLOPD : Registrar firma digital
+InterfazLOPD -> ControladorSocios : Enviar firma del socio
+ControladorSocios -> BD : UPDATE socio SET firma_lopd = true WHERE id = ?
+BD --> ControladorSocios : Confirmación
+ControladorSocios --> InterfazLOPD : Registro exitoso
+InterfazLOPD --> Administrador : Confirmación de firma guardada
+
+@enduml

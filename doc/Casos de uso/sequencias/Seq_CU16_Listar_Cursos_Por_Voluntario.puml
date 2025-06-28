@@ -1,0 +1,21 @@
+
+@startuml
+actor Administrador
+participant InterfazVoluntario
+participant ControladorVoluntarios
+participant ControladorCursos
+database BD
+
+Administrador -> InterfazVoluntario : Seleccionar voluntario
+InterfazVoluntario -> ControladorVoluntarios : Solicitar datos del voluntario
+ControladorVoluntarios -> BD : SELECT * FROM voluntario WHERE id = ?
+BD --> ControladorVoluntarios : Datos del voluntario
+ControladorVoluntarios --> InterfazVoluntario : Mostrar datos
+
+InterfazVoluntario -> ControladorCursos : Solicitar cursos del voluntario
+ControladorCursos -> BD : SELECT * FROM curso WHERE voluntario_id = ?
+BD --> ControladorCursos : Lista de cursos
+ControladorCursos --> InterfazVoluntario : Cursos impartidos
+InterfazVoluntario --> Administrador : Mostrar listado de cursos
+
+@enduml

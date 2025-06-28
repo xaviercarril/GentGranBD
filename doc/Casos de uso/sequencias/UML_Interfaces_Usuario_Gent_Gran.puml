@@ -1,0 +1,87 @@
+
+@startuml
+skinparam style strictuml
+skinparam classAttributeIconSize 0
+
+package "Interfaces de Usuario" {
+  class InterfazRegistro {
+    // CU01: Registrar socio
+  }
+
+  class InterfazSocio {
+    // CU02: Modificar socio
+    // CU03: Eliminar socio
+    // CU04: Consultar socio
+    // CU05: Ver ficha de socio
+    // CU08: Consultar firma de protección de datos
+  }
+
+  class InterfazCamara {
+    // CU06: Capturar foto del socio
+  }
+
+  class InterfazLOPD {
+    // CU07: Registrar firma de protección de datos
+  }
+
+  class InterfazCarnet {
+    // CU09: Generar carnet
+    // CU10: Imprimir carnet
+  }
+
+  class InterfazVoluntario {
+    // CU11: Registrar voluntario
+    // CU12: Modificar voluntario
+    // CU13: Eliminar voluntario
+    // CU14: Consultar voluntario
+  }
+
+  class InterfazCurso {
+    // CU17: Crear curso
+    // CU18: Modificar curso
+    // CU19: Eliminar curso
+    // CU20: Consultar curso
+  }
+
+  class InterfazInscripcion {
+    // CU21: Inscribir socio en curso
+    // CU22: Modificar participantes del curso
+    // CU23: Listar participantes del curso
+  }
+
+  class InterfazAsistencia {
+    // CU24: Registrar asistencia
+    // CU25: Modificar asistencia
+    // CU26: Consultar asistencia
+    // CU27: Generar informe de asistencia
+  }
+
+  class InterfazPago {
+    // CU28: Registrar pago
+    // CU29: Modificar pago
+    // CU30: Eliminar pago
+    // CU31: Consultar pagos de socio
+    // CU32: Consultar pagos de actividad
+  }
+
+  class InterfazImportacion {
+    // CU33: Importar datos desde Excel
+    // CU34: Exportar listados a Excel
+  }
+
+  class InterfazInformes {
+    // CU35: Informe de socios
+    // CU36: Informe de actividades
+    // CU37: Informe de profesores
+    // CU38: Informe de inscripciones
+    // CU39: Informe de pagos
+  }
+
+  class InterfazAcceso {
+    // CU40: Iniciar sesión
+    // CU41: Cerrar sesión
+    // CU42: Recuperar contraseña
+  }
+}
+
+@enduml

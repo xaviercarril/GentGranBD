@@ -1,0 +1,16 @@
+
+@startuml
+actor Administrador
+participant InterfazImportacion
+participant ControladorExportacion
+database BD
+
+Administrador -> InterfazImportacion : Solicitar exportación (socios, cursos, pagos, etc.)
+InterfazImportacion -> ControladorExportacion : Enviar tipo de exportación
+ControladorExportacion -> BD : SELECT * FROM entidad
+BD --> ControladorExportacion : Datos seleccionados
+ControladorExportacion -> ControladorExportacion : Generar archivo Excel
+ControladorExportacion --> InterfazImportacion : Archivo generado
+InterfazImportacion --> Administrador : Descargar archivo
+
+@enduml

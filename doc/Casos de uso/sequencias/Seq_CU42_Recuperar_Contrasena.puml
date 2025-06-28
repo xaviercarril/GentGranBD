@@ -1,0 +1,18 @@
+
+@startuml
+actor Administrador
+participant InterfazAcceso
+participant ControladorAcceso
+database BD
+participant ServidorCorreo
+
+Administrador -> InterfazAcceso : Solicitar recuperación de contraseña
+InterfazAcceso -> ControladorAcceso : Enviar solicitud con email
+ControladorAcceso -> BD : SELECT email FROM usuario WHERE email = ?
+BD --> ControladorAcceso : Verificado
+ControladorAcceso -> ServidorCorreo : Enviar email con enlace/token
+ServidorCorreo --> ControladorAcceso : Confirmación de envío
+ControladorAcceso --> InterfazAcceso : Mostrar mensaje de recuperación enviada
+InterfazAcceso --> Administrador : Confirmación mostrada
+
+@enduml

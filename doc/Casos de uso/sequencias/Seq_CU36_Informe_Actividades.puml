@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazInformes
+participant ControladorInformes
+database BD
+
+Administrador -> InterfazInformes : Solicitar informe de actividades
+InterfazInformes -> ControladorInformes : Petición recibida
+ControladorInformes -> BD : SELECT * FROM curso
+BD --> ControladorInformes : Lista de cursos
+ControladorInformes -> InterfazInformes : Generar informe
+InterfazInformes --> Administrador : Mostrar/descargar informe
+
+@enduml

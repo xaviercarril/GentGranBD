@@ -1,0 +1,12 @@
+
+@startuml
+actor Administrador
+participant InterfazCarnet
+participant Impresora
+
+Administrador -> InterfazCarnet : Seleccionar carnet generado
+InterfazCarnet -> Impresora : Enviar carnet a impresión
+Impresora --> InterfazCarnet : Confirmación de impresión
+InterfazCarnet --> Administrador : Carnet impreso con éxito
+
+@enduml

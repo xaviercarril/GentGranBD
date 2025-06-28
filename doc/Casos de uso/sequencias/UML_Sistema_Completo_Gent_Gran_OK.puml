@@ -1,0 +1,75 @@
+@startuml
+!define CLASS_DIAGRAM
+skinparam classAttributeIconSize 0
+actor Administrador
+rectangle "Interfaces de Usuario" {
+  class InterfazSocio
+  class InterfazVoluntario
+  class InterfazCurso
+  class InterfazInscripcion
+  class InterfazAsistencia
+  class InterfazPago
+  class InterfazImportacion
+  class InterfazInformes
+  class InterfazAcceso
+}
+
+rectangle "Controladores" {
+  class ControladorSocios
+  class ControladorVoluntarios
+  class ControladorCursos
+  class ControladorInscripciones
+  class ControladorAsistencia
+  class ControladorPagos
+  class ControladorImportacion
+  class ControladorExportacion
+  class ControladorInformes
+  class ControladorAcceso
+}
+
+rectangle "Entidades" {
+  class Socio
+  class Voluntario
+  class Curso
+  class Inscripcion
+  class Asistencia
+  class Pago
+}
+
+' Relaciones entre Administrador y interfaces
+Administrador --> InterfazSocio
+Administrador --> InterfazVoluntario
+Administrador --> InterfazCurso
+Administrador --> InterfazInscripcion
+Administrador --> InterfazAsistencia
+Administrador --> InterfazPago
+Administrador --> InterfazImportacion
+Administrador --> InterfazInformes
+Administrador --> InterfazAcceso
+
+' Interfaces llaman a controladores
+InterfazSocio --> ControladorSocios
+InterfazVoluntario --> ControladorVoluntarios
+InterfazCurso --> ControladorCursos
+InterfazInscripcion --> ControladorInscripciones
+InterfazAsistencia --> ControladorAsistencia
+InterfazPago --> ControladorPagos
+InterfazImportacion --> ControladorImportacion
+InterfazInformes --> ControladorInformes
+InterfazAcceso --> ControladorAcceso
+
+' Controladores acceden a entidades
+ControladorSocios --> Socio
+ControladorVoluntarios --> Voluntario
+ControladorCursos --> Curso
+ControladorInscripciones --> Inscripcion
+ControladorAsistencia --> Asistencia
+ControladorPagos --> Pago
+ControladorInformes --> Socio
+ControladorInformes --> Curso
+ControladorInformes --> Inscripcion
+ControladorInformes --> Pago
+ControladorImportacion --> Socio
+ControladorExportacion --> Socio
+
+@enduml

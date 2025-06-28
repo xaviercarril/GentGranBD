@@ -1,0 +1,22 @@
+
+@startuml
+actor Administrador
+participant InterfazPago
+participant ControladorPagos
+database BD
+
+Administrador -> InterfazPago : Seleccionar pago a eliminar
+InterfazPago -> ControladorPagos : Solicitar confirmación
+ControladorPagos -> BD : SELECT * FROM pago WHERE id = ?
+BD --> ControladorPagos : Datos del pago
+ControladorPagos --> InterfazPago : Mostrar datos
+InterfazPago --> Administrador : Confirmar eliminación
+
+Administrador -> InterfazPago : Confirmar
+InterfazPago -> ControladorPagos : Confirmación recibida
+ControladorPagos -> BD : DELETE FROM pago WHERE id = ?
+BD --> ControladorPagos : Confirmación
+ControladorPagos --> InterfazPago : Eliminación completada
+InterfazPago --> Administrador : Mostrar mensaje
+
+@enduml

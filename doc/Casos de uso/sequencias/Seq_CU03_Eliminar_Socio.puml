@@ -1,0 +1,36 @@
+
+@startuml
+actor Administrador
+participant InterfazSocio
+participant ControladorSocios
+database BD
+
+== Inicio de modificación ==
+Administrador -> InterfazSocio : Buscar socio por ID/DNI
+InterfazSocio -> ControladorSocios : Solicitar datos del socio
+ControladorSocios -> BD : SELECT socio WHERE id = ?
+BD --> ControladorSocios : Datos del socio
+ControladorSocios --> InterfazSocio : Devolver datos
+InterfazSocio --> Administrador : Mostrar formulario con datos
+
+== Selección del socio ==
+Administrador -> InterfazSocio : Seleccionar socio a eliminar
+InterfazSocio -> ControladorSocios : Solicitar datos del socio
+ControladorSocios -> BD : SELECT socio WHERE id = ?
+BD --> ControladorSocios : Datos del socio
+ControladorSocios --> InterfazSocio : Mostrar datos para confirmar
+InterfazSocio --> Administrador : Mostrar confirmación de eliminación
+
+== Confirmación ==
+Administrador -> InterfazSocio : Confirmar eliminación
+InterfazSocio -> ControladorSocios : Confirmación recibida
+
+== Eliminación en base de datos ==
+ControladorSocios -> BD : DELETE FROM socio WHERE id = ?
+BD --> ControladorSocios : Confirmación de eliminación
+
+== Resultado ==
+ControladorSocios --> InterfazSocio : Socio eliminado correctamente
+InterfazSocio --> Administrador : Mostrar mensaje de éxito
+
+@enduml

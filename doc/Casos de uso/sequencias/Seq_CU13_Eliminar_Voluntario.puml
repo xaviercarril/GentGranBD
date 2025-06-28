@@ -1,0 +1,22 @@
+
+@startuml
+actor Administrador
+participant InterfazVoluntario
+participant ControladorVoluntarios
+database BD
+
+Administrador -> InterfazVoluntario : Seleccionar voluntario a eliminar
+InterfazVoluntario -> ControladorVoluntarios : Solicitar datos
+ControladorVoluntarios -> BD : SELECT * FROM voluntario WHERE id = ?
+BD --> ControladorVoluntarios : Datos del voluntario
+ControladorVoluntarios --> InterfazVoluntario : Mostrar datos para confirmar
+InterfazVoluntario --> Administrador : Confirmar eliminación
+
+Administrador -> InterfazVoluntario : Confirmar
+InterfazVoluntario -> ControladorVoluntarios : Confirmación recibida
+ControladorVoluntarios -> BD : DELETE FROM voluntario WHERE id = ?
+BD --> ControladorVoluntarios : Confirmación de eliminación
+ControladorVoluntarios --> InterfazVoluntario : Eliminación exitosa
+InterfazVoluntario --> Administrador : Mostrar mensaje
+
+@enduml

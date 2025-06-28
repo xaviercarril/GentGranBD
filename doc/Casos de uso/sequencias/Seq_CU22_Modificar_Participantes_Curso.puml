@@ -1,0 +1,22 @@
+
+@startuml
+actor Administrador
+participant InterfazInscripcion
+participant ControladorInscripciones
+database BD
+
+Administrador -> InterfazInscripcion : Seleccionar curso
+InterfazInscripcion -> ControladorInscripciones : Solicitar lista de inscritos
+ControladorInscripciones -> BD : SELECT socios WHERE curso_id = ?
+BD --> ControladorInscripciones : Lista de socios
+ControladorInscripciones --> InterfazInscripcion : Mostrar lista
+InterfazInscripcion --> Administrador : Modificar inscripciones
+
+Administrador -> InterfazInscripcion : Añadir/eliminar socio
+InterfazInscripcion -> ControladorInscripciones : Actualizar inscripciones
+ControladorInscripciones -> BD : INSERT/DELETE inscripcion
+BD --> ControladorInscripciones : Confirmación
+ControladorInscripciones --> InterfazInscripcion : Modificación realizada
+InterfazInscripcion --> Administrador : Mostrar resultado
+
+@enduml

@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazAsistencia
+participant ControladorAsistencia
+database BD
+
+Administrador -> InterfazAsistencia : Seleccionar socio
+InterfazAsistencia -> ControladorAsistencia : Solicitar asistencias
+ControladorAsistencia -> BD : SELECT * FROM asistencia WHERE socio_id = ?
+BD --> ControladorAsistencia : Datos de asistencia
+ControladorAsistencia --> InterfazAsistencia : Mostrar historial
+InterfazAsistencia --> Administrador : Ver historial de asistencia
+
+@enduml

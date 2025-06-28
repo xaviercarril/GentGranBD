@@ -1,0 +1,16 @@
+
+@startuml
+actor Administrador
+participant InterfazImportacion
+participant ControladorImportacion
+database BD
+
+Administrador -> InterfazImportacion : Seleccionar archivo Excel
+InterfazImportacion -> ControladorImportacion : Enviar archivo
+ControladorImportacion -> ControladorImportacion : Procesar datos (parseo)
+ControladorImportacion -> BD : INSERT/UPDATE registros
+BD --> ControladorImportacion : Confirmación
+ControladorImportacion --> InterfazImportacion : Mostrar resumen
+InterfazImportacion --> Administrador : Confirmar importación exitosa
+
+@enduml

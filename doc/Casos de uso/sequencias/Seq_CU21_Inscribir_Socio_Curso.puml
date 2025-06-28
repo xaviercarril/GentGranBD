@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazInscripcion
+participant ControladorInscripciones
+database BD
+
+Administrador -> InterfazInscripcion : Seleccionar socio y curso
+InterfazInscripcion -> ControladorInscripciones : Enviar datos de inscripción
+ControladorInscripciones -> BD : INSERT INTO inscripcion (socio_id, curso_id, fecha)
+BD --> ControladorInscripciones : Confirmación
+ControladorInscripciones --> InterfazInscripcion : Inscripción realizada
+InterfazInscripcion --> Administrador : Mostrar mensaje de éxito
+
+@enduml

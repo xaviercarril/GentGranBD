@@ -1,0 +1,15 @@
+
+@startuml
+actor Administrador
+participant InterfazCurso
+participant ControladorCursos
+database BD
+
+Administrador -> InterfazCurso : Buscar curso (por ID, temática, etc.)
+InterfazCurso -> ControladorCursos : Enviar criterio de búsqueda
+ControladorCursos -> BD : SELECT * FROM curso WHERE criterio = ?
+BD --> ControladorCursos : Resultados
+ControladorCursos --> InterfazCurso : Datos del curso
+InterfazCurso --> Administrador : Mostrar resultados
+
+@enduml

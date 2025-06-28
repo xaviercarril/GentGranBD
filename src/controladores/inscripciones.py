@@ -1,0 +1,93 @@
+
+from sqlalchemy.orm import Session
+from models import InscripcionSocio, Actividad, EstadoInscripcion, matriculaPago, EstadoPago
+from controladores.pagos import registrar_pago
+from sqlalchemy.exc import IntegrityError
+from datetime import date
+
+def actualizar_estado_inscripciones(session: Session, actividad_id: int):
+    actividad = session.query(Actividad).filter_by(id=actividad_id).first()
+    if not actividad:
+        print("Actividad no encontrada.")
+        return False
+
+    inscripciones = session.query(InscripcionSocio).filter_by(actividad_id=actividad.id).order_by(InscripcionSocio.fecha_inscripcion).all()
+
+    for i, inscripcion in enumerate(inscripciones, start=1):
+        if actividad.numero_maximo_alumnos is not None and i > actividad.numero_maximo_alumnos:
+            inscripcion.estado = EstadoInscripcion.RESERVA
+        else:
+            inscripcion.estado = EstadoInscripcion.INSCRITO
+        session.add(inscripcion)
+
+    try:
+        session.commit()
+        return True
+    except IntegrityError:
+        session.rollback()
+        return False
+    
+def registrar_inscripcion(session: Session, datos: dict):
+    actividad = session.query(Actividad).filter_by(id=datos['actividad_id']).first()
+    if not actividad:
+        print("Actividad no encontrada.")
+        return None
+    
+
+    inscripcion = InscripcionSocio(
+        socio_id=datos['socio_id'],
+        actividad_id=datos['actividad_id'],
+        fecha_inscripcion=datos['fecha_inscripcion'],
+        estado=EstadoInscripcion.RESERVA,
+        observaciones=datos.get('observaciones'),
+        fecha_baja=datos.get('fecha_baja')
+    )
+
+    session.add(inscripcion)
+    session.commit()
+    actualizar_estado_inscripciones(session, actividad.id)
+    return inscripcion.id
+
+def eliminar_inscripcion(session: Session, inscripcion_id: int):
+    inscripcion = session.query(InscripcionSocio).filter(InscripcionSocio.id == inscripcion_id).first()
+    if not inscripcion:
+        return False
+    session.delete(inscripcion)
+    session.commit()
+    return True
+
+def consultar_inscripcion(session: Session, inscripcion_id: int):
+    return session.query(InscripcionSocio).filter(InscripcionSocio.id == inscripcion_id).first()
+
+def consultar_actividad(session: Session, actividad_id: int):
+    return session.query(Actividad).filter(Actividad.id == actividad_id).first()
+
+def generar_matricula(session: Session, inscripcion_id: int, fecha_matricula: date, estado: EstadoPago):
+    inscripcion = session.query(InscripcionSocio).filter(InscripcionSocio.id == inscripcion_id).first()
+    actividad = session.query(Actividad).filter(Actividad.id == inscripcion.actividad_id).first()
+    if not inscripcion:
+        print("Inscripción no encontrada.")
+        return None
+
+    print(f"Generando matrícula para la inscripción ID: {inscripcion_id}, actividad: {actividad.nombre}, fecha: {fecha_matricula}, estado: {estado.value}")
+    # Registrar el pago de matrícula
+    matricula_id = registrar_pago(session, {
+        'inscripcion_id': inscripcion_id,
+        'fecha': fecha_matricula,
+        'importe': actividad.precio_matricula,
+        'estado': estado
+    }, tipo='matricula')
+    
+    return matricula_id
+
+def consultar_matricula(session: Session, inscripcion_id: int):
+    return session.query(matriculaPago).filter(matriculaPago.inscripcion_id == inscripcion_id).first()
+
+def editar_matricula(session: Session, inscripcion_id: int, nuevos_datos: dict):
+    matricula = session.query(matriculaPago).filter(matriculaPago.inscripcion_id == inscripcion_id).first()
+    if not matricula:
+        return False
+    for clave, valor in nuevos_datos.items():
+        setattr(matricula, clave, valor)
+    session.commit()
+    return True

@@ -1,0 +1,10 @@
+
+@startuml
+actor Administrador
+participant InterfazAcceso
+
+Administrador -> InterfazAcceso : Cerrar sesión
+InterfazAcceso -> InterfazAcceso : Invalidar sesión activa
+InterfazAcceso --> Administrador : Redirigir a pantalla de login
+
+@enduml

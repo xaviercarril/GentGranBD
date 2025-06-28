@@ -1,0 +1,17 @@
+
+@startuml
+actor Administrador
+participant InterfazCamara
+participant ControladorSocios
+database BD
+
+Administrador -> InterfazCamara : Abrir cámara
+InterfazCamara --> Administrador : Mostrar vista previa
+Administrador -> InterfazCamara : Tomar foto
+InterfazCamara -> ControladorSocios : Enviar imagen capturada
+ControladorSocios -> BD : UPDATE socio SET foto = blob WHERE id = ?
+BD --> ControladorSocios : Confirmación de guardado
+ControladorSocios --> InterfazCamara : Éxito
+InterfazCamara --> Administrador : Confirmación visual
+
+@enduml

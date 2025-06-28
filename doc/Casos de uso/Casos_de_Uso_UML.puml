@@ -1,0 +1,115 @@
+
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+actor Administrador
+
+package "Gestión de Socios" {
+  usecase "CU01 Registrar socio" as UC01
+  usecase "CU02 Modificar socio" as UC02
+  usecase "CU03 Eliminar socio" as UC03
+  usecase "CU04 Consultar socio" as UC04
+  usecase "CU05 Ver ficha de socio" as UC05
+  usecase "CU06 Capturar foto" as UC06
+  usecase "CU07 Registrar firma LOPD" as UC07
+  usecase "CU08 Consultar firma LOPD" as UC08
+  usecase "CU09 Generar carnet" as UC09
+  usecase "CU10 Imprimir carnet" as UC10
+}
+
+package "Gestión de Voluntarios" {
+  usecase "CU11 Registrar voluntario" as UC11
+  usecase "CU12 Modificar voluntario" as UC12
+  usecase "CU13 Eliminar voluntario" as UC13
+  usecase "CU14 Consultar voluntario" as UC14
+  usecase "CU15 Asignar monitor" as UC15
+  usecase "CU16 Listar cursos impartidos" as UC16
+}
+
+package "Gestión de Cursos" {
+  usecase "CU17 Crear curso" as UC17
+  usecase "CU18 Modificar curso" as UC18
+  usecase "CU19 Eliminar curso" as UC19
+  usecase "CU20 Consultar curso" as UC20
+  usecase "CU21 Inscribir socio" as UC21
+  usecase "CU22 Modificar participantes" as UC22
+  usecase "CU23 Listar participantes" as UC23
+}
+
+package "Gestión de Asistencia" {
+  usecase "CU24 Registrar asistencia" as UC24
+  usecase "CU25 Modificar asistencia" as UC25
+  usecase "CU26 Consultar asistencia" as UC26
+  usecase "CU27 Informe asistencia" as UC27
+}
+
+package "Gestión de Pagos" {
+  usecase "CU28 Registrar pago" as UC28
+  usecase "CU29 Modificar pago" as UC29
+  usecase "CU30 Eliminar pago" as UC30
+  usecase "CU31 Consultar pagos socio" as UC31
+  usecase "CU32 Consultar pagos curso" as UC32
+}
+
+package "Importación y Exportación" {
+  usecase "CU33 Importar desde Excel" as UC33
+  usecase "CU34 Exportar a Excel" as UC34
+}
+
+package "Informes" {
+  usecase "CU35 Informe socios" as UC35
+  usecase "CU36 Informe actividades" as UC36
+  usecase "CU37 Informe profesores" as UC37
+  usecase "CU38 Informe inscripciones" as UC38
+  usecase "CU39 Informe pagos" as UC39
+}
+
+package "Acceso" {
+  usecase "CU40 Iniciar sesión" as UC40
+  usecase "CU41 Cerrar sesión" as UC41
+  usecase "CU42 Recuperar contraseña" as UC42
+}
+
+Administrador --> UC01
+Administrador --> UC02
+Administrador --> UC03
+Administrador --> UC04
+Administrador --> UC05
+Administrador --> UC06
+Administrador --> UC07
+Administrador --> UC08
+Administrador --> UC09
+Administrador --> UC10
+Administrador --> UC11
+Administrador --> UC12
+Administrador --> UC13
+Administrador --> UC14
+Administrador --> UC15
+Administrador --> UC16
+Administrador --> UC17
+Administrador --> UC18
+Administrador --> UC19
+Administrador --> UC20
+Administrador --> UC21
+Administrador --> UC22
+Administrador --> UC23
+Administrador --> UC24
+Administrador --> UC25
+Administrador --> UC26
+Administrador --> UC27
+Administrador --> UC28
+Administrador --> UC29
+Administrador --> UC30
+Administrador --> UC31
+Administrador --> UC32
+Administrador --> UC33
+Administrador --> UC34
+Administrador --> UC35
+Administrador --> UC36
+Administrador --> UC37
+Administrador --> UC38
+Administrador --> UC39
+Administrador --> UC40
+Administrador --> UC41
+Administrador --> UC42
+@enduml

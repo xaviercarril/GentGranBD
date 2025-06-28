@@ -1,0 +1,21 @@
+
+@startuml
+actor Administrador
+participant InterfazPago
+participant ControladorPagos
+database BD
+
+Administrador -> InterfazPago : Seleccionar inscripción
+InterfazPago -> ControladorPagos : Solicitar formulario de pago
+ControladorPagos -> BD : SELECT datos inscripción WHERE id = ?
+BD --> ControladorPagos : Datos inscripción
+ControladorPagos --> InterfazPago : Mostrar formulario
+
+Administrador -> InterfazPago : Introducir datos del pago
+InterfazPago -> ControladorPagos : Enviar datos de pago
+ControladorPagos -> BD : INSERT INTO pago (...)
+BD --> ControladorPagos : Confirmación
+ControladorPagos --> InterfazPago : Registro exitoso
+InterfazPago --> Administrador : Mostrar mensaje de éxito
+
+@enduml

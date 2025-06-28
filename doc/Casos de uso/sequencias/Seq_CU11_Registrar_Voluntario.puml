@@ -1,0 +1,23 @@
+
+@startuml
+actor Administrador
+participant InterfazVoluntario
+participant ControladorVoluntarios
+database BD
+
+== Inicio de registro ==
+Administrador -> InterfazVoluntario : Solicitar formulario de alta
+InterfazVoluntario -> Administrador : Mostrar formulario
+
+== Introducción de datos ==
+Administrador -> InterfazVoluntario : Introducir datos del voluntario
+
+== Validación y alta ==
+InterfazVoluntario -> ControladorVoluntarios : Enviar datos del voluntario
+ControladorVoluntarios -> ControladorVoluntarios : Validar datos
+ControladorVoluntarios -> BD : INSERT INTO voluntario (...)
+BD --> ControladorVoluntarios : Confirmación
+ControladorVoluntarios --> InterfazVoluntario : Registro exitoso
+InterfazVoluntario --> Administrador : Mostrar mensaje de éxito
+
+@enduml
