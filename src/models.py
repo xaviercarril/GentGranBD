@@ -14,7 +14,7 @@ class Trimestre(enum.Enum):
     Q4 = "Q4"
 
 class EstadoInscripcion(enum.Enum):
-    INSCRITO = "INSCRIT"
+    INSCRIT = "INSCRIT"
     RESERVA = "RESERVA"
 
 class EstadoPago(enum.Enum):
@@ -117,7 +117,7 @@ class InscripcionSocio(Base):
     fecha_inscripcion = Column(Date, nullable=False)
     estado = Column(Enum(EstadoInscripcion), nullable=False)
     observaciones = Column(Text)
-    posicion = Column(Integer)
+
     fecha_baja = Column(Date)
 
     __table_args__ = (
@@ -128,7 +128,7 @@ class InscripcionSocio(Base):
     actividad = relationship("Actividad", back_populates="inscripciones")
     asistencias = relationship("Asistencia", back_populates="inscripcion")
     mensualidades = relationship("mensualidadPago", back_populates="inscripcion")
-    matricula = relationship("matriculaPago", back_populates="inscripcion", uselist=False)
+    matricula = relationship("matriculaPago", back_populates="inscripcion", uselist=False, foreign_keys="[matriculaPago.inscripcion_id]")
 
 class Asistencia(Base):
     __tablename__ = 'asistencias'
@@ -160,11 +160,12 @@ class Pago(Base):
 class matriculaPago(Pago):
     __tablename__ = 'matricula_pagos'
 
-    id = Column(Integer, ForeignKey('pagos.id'), primary_key=True)  # Establish FK relationship
-    inscripcion = relationship("InscripcionSocio", back_populates="matricula")
+    id = Column(Integer, ForeignKey('pagos.id'), primary_key=True)
+
+    inscripcion = relationship("InscripcionSocio", back_populates="matricula", foreign_keys="[Pago.inscripcion_id]")
 
     __mapper_args__ = {
-        'polymorphic_identity': 'matricula',  # Ensure this matches the 'tipo' value
+         'polymorphic_identity': 'matricula',
     }
 
 class mensualidadPago(Pago):

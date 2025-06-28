@@ -17,7 +17,7 @@ def actualizar_estado_inscripciones(session: Session, actividad_id: int):
         if actividad.numero_maximo_alumnos is not None and i > actividad.numero_maximo_alumnos:
             inscripcion.estado = EstadoInscripcion.RESERVA
         else:
-            inscripcion.estado = EstadoInscripcion.INSCRITO
+            inscripcion.estado = EstadoInscripcion.INSCRIT
         session.add(inscripcion)
 
     try:
@@ -67,6 +67,9 @@ def generar_matricula(session: Session, inscripcion_id: int, fecha_matricula: da
     actividad = session.query(Actividad).filter(Actividad.id == inscripcion.actividad_id).first()
     if not inscripcion:
         print("Inscripción no encontrada.")
+        return None
+    if consultar_matricula(session, inscripcion_id):
+        print("Ya existe una matrícula para esta inscripción.")
         return None
 
     print(f"Generando matrícula para la inscripción ID: {inscripcion_id}, actividad: {actividad.nombre}, fecha: {fecha_matricula}, estado: {estado.value}")
