@@ -34,3 +34,14 @@ def consultar_pagos_por_inscripcion(session: Session, inscripcion_id: int):
 
 def consultar_matricula_por_inscripcion(session: Session, inscripcion_id: int):
     return session.query(matriculaPago).filter(matriculaPago.inscripcion_id == inscripcion_id).first()
+
+def consultar_pago(session: Session, pago_id: int):
+    return session.query(Pago).filter(Pago.id == pago_id).first()
+
+def eliminar_pago(session: Session, pago_id: int):
+    pago = session.query(Pago).filter(Pago.id == pago_id).first()
+    if not pago:
+        return False
+    session.delete(pago)
+    session.commit()
+    return True

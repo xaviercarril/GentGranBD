@@ -7,7 +7,7 @@ import enum
 
 Base = declarative_base()
 
-class Trimestre(enum.Enum):
+class TrimestreEnum(enum.Enum):
     Q1 = "Q1"
     Q2 = "Q2"
     Q3 = "Q3"
@@ -76,15 +76,16 @@ class Actividad(Base):
     id = Column(Integer, primary_key=True)
     nombre = Column(String(100), nullable=False)
     numero_maximo_alumnos = Column(Integer)
-    duracion = Column(Integer)  # Duración en minutos
     tipo = Column(String(50))
     lugar = Column(String(100))
     precio_matricula = Column(DECIMAL(10, 2), default=0.0)
+    descripcion_fecha = Column(String(255))
     observaciones = Column(Text)
     personal_id = Column(Integer, ForeignKey('personal.id'))
 
     personal = relationship("Personal", back_populates="actividades")
     inscripciones = relationship("InscripcionSocio", back_populates="actividad")
+    fechas = relationship("Fecha", back_populates="actividad")
 
     __mapper_args__ = {
         'polymorphic_identity': 'actividad',
@@ -92,21 +93,34 @@ class Actividad(Base):
     }
 
 class Curso(Actividad):
-    trimestre = Column(Enum(Trimestre))
-    dias_semana = Column(String(50))
-    curso = Column(String(50))
+    __tablename__ = 'cursos'
+    id = Column(Integer, ForeignKey('actividades.id'), primary_key=True)
+
+    curso_academico = Column(String(20))
+    trimestres = relationship("Trimestre", back_populates="curso", cascade="all, delete-orphan")
 
     __mapper_args__ = {
-        'polymorphic_identity': 'curso'
+        'polymorphic_identity': 'curso',
     }
 
 class Taller(Actividad):
-    fecha = Column(Date)
-    hora_inicio = Column(DateTime)
+    __tablename__ = 'talleres'
+    id = Column(Integer, ForeignKey('actividades.id'), primary_key=True)
 
     __mapper_args__ = {
         'polymorphic_identity': 'taller'
     }
+
+class Trimestre(Base):
+    __tablename__ = 'trimestres'
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(Enum(TrimestreEnum), nullable=False)
+    fecha_inicio = Column(Date, nullable=False)
+    fecha_fin = Column(Date, nullable=False)
+    curso_id = Column(Integer, ForeignKey('cursos.id'), nullable=False)
+
+    curso = relationship("Curso", back_populates="trimestres")
 
 class InscripcionSocio(Base):
     __tablename__ = 'inscripciones'
@@ -135,11 +149,26 @@ class Asistencia(Base):
 
     id = Column(Integer, primary_key=True)
     inscripcion_id = Column(Integer, ForeignKey('inscripciones.id'))
-    fecha = Column(Date)
+    fecha_id = Column(Integer, ForeignKey('fechas.id'))
     presente = Column(Boolean)
     observaciones = Column(Text)
 
     inscripcion = relationship("InscripcionSocio", back_populates="asistencias")
+    fecha = relationship("Fecha", back_populates="asistencias")
+
+class Fecha(Base):
+    __tablename__ = 'fechas'
+
+    id = Column(Integer, primary_key=True)
+    actividad_id = Column(Integer, ForeignKey('actividades.id'), nullable=False)
+    fecha = Column(Date, nullable=False)
+    hora_inicio = Column(DateTime)
+    hora_fin = Column(DateTime)
+    duracion = Column(Integer)  # Duración en minutos
+    observaciones = Column(Text)
+
+    actividad = relationship("Actividad", back_populates="fechas")
+    asistencias = relationship("Asistencia", back_populates="fecha")
 
 class Pago(Base):
     __tablename__ = 'pagos'

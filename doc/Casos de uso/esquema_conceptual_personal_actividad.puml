@@ -32,30 +32,33 @@ class Profesor
 Personal <|-- Voluntario
 Personal <|-- Profesor
 
-enum Trimestre {
-  Q1
-  Q2
-  Q3
-  Q4
+enum TrimestreEnum {
+    Q1
+    Q2
+    Q3
+    Q4
 }
 
 class Actividad {
     +id: int
     +nombre: string
     +numero_maximo_alumnos: int
-    +duracion: int
     +lugar: string
     +precio_matricula: decimal
     +observaciones: text
 }
 
 class Curso {
-    +trimestre: Trimestre
-    +dias_semana: string
+    +curso_academico: string
 }
 class Taller {
-    +fecha: date
-    +hora_inicio: time
+}
+
+class Trimestre {
+    +id: int
+    +nombre: TrimestreEnum
+    +fecha_inicio: date
+    +fecha_fin: date
 }
 
 Actividad <|-- Curso
@@ -72,9 +75,16 @@ class InscripcionSocio {
     +observaciones: text
 }
 
+class Fecha 
+{
+    +fecha: date
+    +hora_inicio: time
+    +hora_fin: time
+    +duracion: int
+}
+
 class Asistencia {
     +id: int
-    +fecha: date
     +presente: bool
     +observaciones: text
 }
@@ -102,10 +112,13 @@ Pago <|-- matriculaPago
 Pago <|-- mensualidadPago
 
 Socio "1" -- "0..*" InscripcionSocio
-InscripcionSocio "0..*" -- "1" Actividad
+InscripcionSocio "0..*" -- "1" Actividad : inscrito_en
 InscripcionSocio "1" -- "0..*" Asistencia
 InscripcionSocio "1" -- "0..1" matriculaPago
 InscripcionSocio "1" -- "0..*" mensualidadPago
+Actividad "1" -- "0..*" Fecha
+Fecha "1" -- "0..*" Asistencia
+Curso "1" -- "0..*" Trimestre
 
 Actividad "0..*" -- "1" Personal : impartida_por
 

@@ -17,8 +17,8 @@ def generar_pdf_inscripciones(session: Session, actividad_id: int, ruta_pdf: str
     width, height = A4
 
     c.setFont("Helvetica-Bold", 14)
-    if actividad.curso is not None:
-        c.drawString(20*mm, height - 20*mm, f"Inscripcions - {actividad.nombre} (Curso {actividad.curso})")
+    if actividad.curso_academico is not None:
+        c.drawString(20*mm, height - 20*mm, f"Inscripcions - {actividad.nombre} (Curso {actividad.curso_academico})")
     else:
         c.drawString(20*mm, height - 20*mm, f"Inscripcions - {actividad.nombre}")
     c.drawString(20*mm, height - 27*mm, f"Profesor: {actividad.personal.nombre} {actividad.personal.apellido1}" if actividad.personal else 'No asignado')

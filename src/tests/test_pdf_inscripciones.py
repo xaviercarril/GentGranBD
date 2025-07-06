@@ -19,8 +19,8 @@ def test_generar_pdf_inscripciones(session):
         'nombre': 'Piscina',
         'tipo': 'curso',
         'numero_maximo_alumnos': 9,
+        'curso_academico': '2025-2026',
         'personal_id': personal_id,
-        'curso': '2025-2026',
         'duracion': 60
     })
 
@@ -40,7 +40,6 @@ def test_generar_pdf_inscripciones(session):
             'actividad_id': actividad_id,
             'fecha_inscripcion': datetime(2025, 6, 20-i, 14, 30)
         })
-        print(f"Inscripción creada: socio_id={socio_id}, actividad_id={actividad_id}, inscripcion_id={inscripcion_id}")
         if ( i % 2 == 0):
             generar_matricula(session, inscripcion_id, date(2025, 6, 20-i), EstadoPago.PAGAT)
 
