@@ -42,3 +42,15 @@ def eliminar_socio(session: Session, socio_id: int):
 
 def consultar_socio(session: Session, socio_id: int):
     return session.query(Socio).filter(Socio.id == socio_id).first()
+
+def adjuntar_foto_socio(session: Session, socio_id: int, filename: str):
+    with open(filename, 'rb') as file:
+        foto = file.read()
+    if not foto:
+        return False
+    socio = session.query(Socio).filter(Socio.id == socio_id).first()
+    if not socio:
+        return False
+    socio.foto = foto
+    session.commit()
+    return True
