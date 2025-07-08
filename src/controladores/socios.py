@@ -21,7 +21,7 @@ class SocioDTO:
     id: int
     dni_nie: str
     nombre: str
-    apellido1: str | None
+    apellido1: str
     apellido2: str | None
     direccion: str | None
     telefonoFijo: str | None
@@ -136,3 +136,16 @@ def adjuntar_foto_socio(socio_id: int, filename: str) -> None:
             raise ValueError("Soci inexistent")
         socio.foto = foto_bytes
         db.commit()
+
+def generar_carnet_pdf(socio_id: int, ruta_pdf: str) -> None:
+    """
+    Genera un carnet de soci en format PDF.
+    Implementació simplificada, no inclou logo ni foto.
+    """
+    from exportador.pdf_carnet import generar_carnet_socio
+    import os
+    logo_path = "./extra/logo.png"  # Ruta del logo opcional
+    if not os.path.exists(logo_path):
+        raise FileNotFoundError(f"El archivo de logo no existe en la ruta: {logo_path}")
+    with SessionLocal() as db:
+        generar_carnet_socio(db, socio_id, ruta_pdf, logo_path=logo_path)

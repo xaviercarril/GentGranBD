@@ -47,13 +47,13 @@ def _fons(c: canvas.Canvas, logo_path: str | None):
     c.drawCentredString(
         CARD_W / 2,
         2.5 * mm,
-        "Associació Gent Gran · www.gentgran.cat · Telf: 644042557"
+        "Associació Gent Gran · www.gentgrancastelldefels.com · Telf: 644 042 557"
     )
 
     # Logo opcional a dalt dreta
     if logo_path:
         try:
-            logo_w, logo_h = 18 * mm, 12 * mm
+            logo_w, logo_h = 18 * mm, 10 * mm
             x_logo = CARD_W - logo_w - 2 * mm        # 2 mm marge dret
             y_logo = CARD_H - logo_h - 2 * mm        # 2 mm marge top
             c.drawImage(

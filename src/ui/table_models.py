@@ -30,9 +30,14 @@ class DictTableModel(QAbstractTableModel):
     def columnCount(self, *_): return len(self.keys)
 
     def data(self, idx, role=Qt.DisplayRole):
-        if role == Qt.DisplayRole:
-            key = self.keys[idx.column()]
-            return str(self.rows[idx.row()].get(key, ""))
+        if role != Qt.DisplayRole:
+            return None
+
+        key = self.keys[idx.column()]
+        value = self.rows[idx.row()].get(key, "")
+
+        # Mostra cel·la buida quan el valor és None
+        return "----" if value is None else str(value)
         
     def headerData(self, sec, orient, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and orient == Qt.Horizontal:
