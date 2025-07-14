@@ -99,6 +99,8 @@ def modificar_socio(socio_id: int, cambios: dict) -> None:
 
         try:
             for k, v in cambios.items():
+                if not hasattr(socio, k):
+                    raise AttributeError(k)
                 setattr(socio, k, v)
             db.commit()
         except AttributeError as e:
