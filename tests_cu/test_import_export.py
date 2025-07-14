@@ -1,4 +1,4 @@
-from base import ControllerTestCase
+from tests_cu.base import ControllerTestCase
 
 class TestImportExport(ControllerTestCase):
     def test_cu35_importar_socios_excel(self):

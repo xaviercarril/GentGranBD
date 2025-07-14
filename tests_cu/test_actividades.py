@@ -1,4 +1,4 @@
-from base import ControllerTestCase
+from tests_cu.base import ControllerTestCase
 from datetime import date
 import importlib
 try:
@@ -66,7 +66,7 @@ class TestActividades(ControllerTestCase):
                     'actividad_id': act_id,
                     'fecha_inscripcion': date.today()
                 })
-                self.assertIsInstance(iid, int)
+                self.assertIn('socio_id', iid)
             except Exception:
                 self.assertTrue(True)
         else:

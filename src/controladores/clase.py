@@ -1,6 +1,6 @@
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import date, timedelta
-from sqlite3 import IntegrityError
+from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 from database import SessionLocal
@@ -10,6 +10,7 @@ from models import Clase, Actividad
 class ClaseDTO(BaseModel):
     id: int | None = None
     actividad_id: int
+    trimestre_id: int
     fecha: date
     hora_inicio: str
     hora_fin: str
@@ -22,11 +23,13 @@ class ClaseUpdateDTO(BaseModel):
     hora_fin: str | None = None
     duracion: timedelta | None = None
     observaciones: str | None = None
+    trimestre_id: int | None = None
 
 def _to_dto(clase: Clase) -> ClaseDTO:
     return ClaseDTO(
         id=clase.id,
         actividad_id=clase.actividad_id,
+        trimestre_id=clase.trimestre_id,
         fecha=clase.fecha,
         hora_inicio=clase.hora_inicio,
         hora_fin=clase.hora_fin,
@@ -48,6 +51,7 @@ def registrar_clase(data: dict) -> int:
 
     nueva_clase = Clase(
         actividad_id=dto.actividad_id,
+        trimestre_id=dto.trimestre_id,
         fecha=dto.fecha,
         hora_inicio=dto.hora_inicio,
         hora_fin=dto.hora_fin,
@@ -68,7 +72,7 @@ def listar_clases(actividad_id: int) -> list[dict]:
     try:
         with SessionLocal() as db:
             clases = db.query(Clase).filter(Clase.actividad_id == actividad_id).all()
-            return [asdict(_to_dto(c)) for c in clases]
+            return [_to_dto(c).model_dump() for c in clases]
     except Exception as e:
         raise ValueError(f"Error al listar clases: {e}")
     
@@ -78,7 +82,7 @@ def consultar_clase(clase_id: int) -> dict | None:
         with SessionLocal() as db:
             clase = db.query(Clase).filter(Clase.id == clase_id).first()
             if clase:
-                return asdict(_to_dto(clase))
+                return _to_dto(clase).model_dump()
             return None
     except Exception as e:
         raise ValueError(f"Error al consultar clase: {e}")
@@ -167,18 +171,3 @@ def generar_clases(
 
     session.commit()
     return [clase.id for clase in clases_creadas]
-
-def eliminar_clase(session: Session, clase_id: int):
-    clase_obj = session.query(Clase).filter(Clase.id == clase_id).first()
-    if not clase_obj:
-        print("Clase no encontrada.")
-        return False
-    session.delete(clase_obj)
-    session.commit()
-    return True
-
-def consultar_clases(session: Session, actividad_id: int):
-    return session.query(Clase).filter_by(actividad_id=actividad_id).order_by(Clase.fecha).all()
-
-def consultar_clase(session: Session, clase_id: int):
-    return session.query(Clase).filter(Clase.id == clase_id).first()
