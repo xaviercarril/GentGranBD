@@ -6,10 +6,12 @@ usan SessionLocal internamente.  La UI nunca ve objetos ORM.
 
 from __future__ import annotations
 
+
 from dataclasses import asdict
 from datetime import date
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
+
 
 from database import SessionLocal  # fábrica de sesiones
 from models import Socio
@@ -19,6 +21,7 @@ from models import Socio
 # DTO
 # ────────────────────────────────────────────────
 class SocioDTO(BaseModel):
+
     id: int | None = None
     dni_nie: str
     nombre: str
@@ -47,6 +50,7 @@ class SocioUpdateDTO(BaseModel):
     grupo_difusion: str | None = None
     fecha_alta: date | None = None
     fecha_baja: date | None = None
+
     observaciones: str | None = None
     foto: bytes | None = None
 
@@ -135,6 +139,7 @@ def modificar_socio(socio_id: int, cambios: dict) -> None:
         try:
             for k, v in dto.model_dump(exclude_unset=True).items():
                 setattr(socio, mapping.get(k, k), v)
+
             db.commit()
         except AttributeError as e:
             db.rollback()

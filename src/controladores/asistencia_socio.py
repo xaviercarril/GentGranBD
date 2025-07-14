@@ -30,8 +30,7 @@ def registrar_asistenciaSocio(
     try:
         dto = AsistenciaSocioDTO(**datos)
     except ValidationError as e:
-        print(f"Datos inválidos: {e}")
-        return None
+        raise ValueError(f"Datos inválidos: {e}")
 
     inscripcion = session.get(InscripcionSocio, dto.inscripcion_id)
     if not inscripcion:
