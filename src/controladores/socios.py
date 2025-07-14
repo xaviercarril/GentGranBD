@@ -3,13 +3,17 @@ Controlador de SOCIOS — capa de negocio
 Solo expone funciones que reciben/retornan dicts (DTOs) y
 usan SessionLocal internamente.  La UI nunca ve objetos ORM.
 """
+
 from __future__ import annotations
 
+
+from dataclasses import asdict
 from datetime import date
 from sqlalchemy.exc import IntegrityError
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
-from database import SessionLocal          # fábrica de sesiones
+
+from database import SessionLocal  # fábrica de sesiones
 from models import Socio
 
 
@@ -17,18 +21,36 @@ from models import Socio
 # DTO
 # ────────────────────────────────────────────────
 class SocioDTO(BaseModel):
-    id: int
+
+    id: int | None = None
     dni_nie: str
     nombre: str
-    apellido1: str
+    apellido1: str | None = None
     apellido2: str | None = None
     direccion: str | None = None
-    telefonoFijo: str | None = None
-    telefonoMovil: str | None = None
+    telefono_fijo: str | None = None
+    telefono_movil: str | None = None
     email: str | None = None
-    grupoDifusion: str | None = None
-    fechaAlta: date | None = None
-    fechaBaja: date | None = None
+    grupo_difusion: str | None = None
+    fecha_alta: date | None = None
+    fecha_baja: date | None = None
+    observaciones: str | None = None
+    foto: bytes | None = None
+
+
+class SocioUpdateDTO(BaseModel):
+    dni_nie: str | None = None
+    nombre: str | None = None
+    apellido1: str | None = None
+    apellido2: str | None = None
+    direccion: str | None = None
+    telefono_fijo: str | None = None
+    telefono_movil: str | None = None
+    email: str | None = None
+    grupo_difusion: str | None = None
+    fecha_alta: date | None = None
+    fecha_baja: date | None = None
+
     observaciones: str | None = None
     foto: bytes | None = None
 
@@ -41,12 +63,12 @@ def _to_dto(obj: Socio) -> SocioDTO:
         apellido1=obj.apellido1,
         apellido2=obj.apellido2,
         direccion=obj.direccion,
-        telefonoFijo=obj.telefonoFijo,
-        telefonoMovil=obj.telefonoMovil,
+        telefono_fijo=obj.telefonoFijo,
+        telefono_movil=obj.telefonoMovil,
         email=obj.email,
-        grupoDifusion=obj.grupoDifusion,
-        fechaAlta=obj.fechaAlta,
-        fechaBaja=obj.fechaBaja,
+        grupo_difusion=obj.grupoDifusion,
+        fecha_alta=obj.fechaAlta,
+        fecha_baja=obj.fechaBaja,
         observaciones=obj.observaciones,
         foto=obj.foto,
     )
@@ -64,20 +86,25 @@ def listar_socios() -> list[dict]:
 
 def registrar_socio(datos: dict) -> int:
     """Crea un socio y devuelve su ID."""
+    try:
+        dto = SocioDTO(**datos)
+    except ValidationError as e:
+        raise ValueError(f"Datos inválidos: {e}")
+
     nuevo = Socio(
-        dni_nie=datos.get("dni_nie"),
-        nombre=datos.get("nombre"),
-        apellido1=datos.get("apellido1"),
-        apellido2=datos.get("apellido2"),
-        direccion=datos.get("direccion"),
-        telefonoFijo=datos.get("telefonoFijo"),
-        telefonoMovil=datos.get("telefonoMovil"),
-        email=datos.get("email"),
-        grupoDifusion=datos.get("grupoDifusion"),
-        fechaAlta=datos.get("fecha_alta", date.today()),
-        fechaBaja=datos.get("fechaBaja"),
-        observaciones=datos.get("observaciones"),
-        foto=datos.get("foto"),
+        dni_nie=dto.dni_nie,
+        nombre=dto.nombre,
+        apellido1=dto.apellido1,
+        apellido2=dto.apellido2,
+        direccion=dto.direccion,
+        telefonoFijo=dto.telefono_fijo,
+        telefonoMovil=dto.telefono_movil,
+        email=dto.email,
+        grupoDifusion=dto.grupo_difusion,
+        fechaAlta=dto.fecha_alta or date.today(),
+        fechaBaja=dto.fecha_baja,
+        observaciones=dto.observaciones,
+        foto=dto.foto,
     )
     with SessionLocal() as db:
         db.add(nuevo)
@@ -91,16 +118,28 @@ def registrar_socio(datos: dict) -> int:
 
 
 def modificar_socio(socio_id: int, cambios: dict) -> None:
+    try:
+        dto = SocioUpdateDTO(**cambios)
+    except ValidationError as e:
+        raise ValueError(f"Datos inválidos: {e}")
+
     with SessionLocal() as db:
         socio = db.get(Socio, socio_id)
         if not socio:
             raise ValueError("Soci inexistent")
 
+        mapping = {
+            "telefono_fijo": "telefonoFijo",
+            "telefono_movil": "telefonoMovil",
+            "grupo_difusion": "grupoDifusion",
+            "fecha_alta": "fechaAlta",
+            "fecha_baja": "fechaBaja",
+        }
+
         try:
-            for k, v in cambios.items():
-                if not hasattr(socio, k):
-                    raise AttributeError(k)
-                setattr(socio, k, v)
+            for k, v in dto.model_dump(exclude_unset=True).items():
+                setattr(socio, mapping.get(k, k), v)
+
             db.commit()
         except AttributeError as e:
             db.rollback()
@@ -138,6 +177,7 @@ def adjuntar_foto_socio(socio_id: int, filename: str) -> None:
         socio.foto = foto_bytes
         db.commit()
 
+
 def generar_carnet_pdf(socio_id: int, ruta_pdf: str) -> None:
     """
     Genera un carnet de soci en format PDF.
@@ -145,6 +185,7 @@ def generar_carnet_pdf(socio_id: int, ruta_pdf: str) -> None:
     """
     from exportador.pdf_carnet import generar_carnet_socio
     import os
+
     logo_path = "./extra/logo.png"  # Ruta del logo opcional
     if not os.path.exists(logo_path):
         raise FileNotFoundError(f"El archivo de logo no existe en la ruta: {logo_path}")
