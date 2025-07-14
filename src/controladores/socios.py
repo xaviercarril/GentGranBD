@@ -5,9 +5,9 @@ usan SessionLocal internamente.  La UI nunca ve objetos ORM.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
 from datetime import date
 from sqlalchemy.exc import IntegrityError
+from pydantic import BaseModel
 
 from database import SessionLocal          # fábrica de sesiones
 from models import Socio
@@ -16,22 +16,21 @@ from models import Socio
 # ────────────────────────────────────────────────
 # DTO
 # ────────────────────────────────────────────────
-@dataclass(slots=True)
-class SocioDTO:
+class SocioDTO(BaseModel):
     id: int
     dni_nie: str
     nombre: str
     apellido1: str
-    apellido2: str | None
-    direccion: str | None
-    telefonoFijo: str | None
-    telefonoMovil: str | None
-    email: str | None
-    grupoDifusion: str | None
-    fechaAlta: date | None
-    fechaBaja: date | None
-    observaciones: str | None
-    foto: bytes | None
+    apellido2: str | None = None
+    direccion: str | None = None
+    telefonoFijo: str | None = None
+    telefonoMovil: str | None = None
+    email: str | None = None
+    grupoDifusion: str | None = None
+    fechaAlta: date | None = None
+    fechaBaja: date | None = None
+    observaciones: str | None = None
+    foto: bytes | None = None
 
 
 def _to_dto(obj: Socio) -> SocioDTO:
@@ -60,7 +59,7 @@ def listar_socios() -> list[dict]:
     """Devuelve todos los socios como lista de dicts ordenados por nombre."""
     with SessionLocal() as db:
         socios = db.query(Socio).order_by(Socio.nombre).all()
-        return [asdict(_to_dto(s)) for s in socios]
+        return [_to_dto(s).model_dump() for s in socios]
 
 
 def registrar_socio(datos: dict) -> int:
@@ -119,7 +118,7 @@ def consultar_socio(socio_id: int) -> dict | None:
     """Retorna TOT el soci (inclosa foto) com a dict o None."""
     with SessionLocal() as db:
         s = db.get(Socio, socio_id)
-        return asdict(_to_dto(s)) if s else None
+        return _to_dto(s).model_dump() if s else None
 
 
 def adjuntar_foto_socio(socio_id: int, filename: str) -> None:

@@ -4,7 +4,6 @@ No expone objetos SQLAlchemy a la UI; devuelve y recibe dicts/DTOs.
 """
 from __future__ import annotations
 
-from dataclasses import asdict
 from pydantic import BaseModel, ValidationError
 from datetime import date, timedelta
 from pytest import Session
@@ -70,7 +69,7 @@ def listar_actividades() -> list[dict]:
     try:
         with SessionLocal() as db:
             acts = db.query(Actividad).order_by(Actividad.nombre).all()
-            return [asdict(_to_dto(a)) for a in acts]
+            return [_to_dto(a).model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades: {e}")
 
@@ -109,7 +108,7 @@ def eliminar_actividad(actividad_id: int) -> None:
 def consultar_actividad(actividad_id: int) -> dict | None:
     with SessionLocal() as db:
         act = db.get(Actividad, actividad_id)
-        return asdict(_to_dto(act)) if act else None
+        return _to_dto(act).model_dump() if act else None
 
 
 # ────────────────── CRUD API ──────────────────
@@ -118,7 +117,7 @@ def listar_actividades_por_CursoAcademico(curso_id: int) -> list[dict]:
     try:
         with SessionLocal() as db:
             acts = db.query(Actividad).filter(Actividad.curso_academico_id == curso_id).all()
-            return [asdict(_to_dto(a)) for a in acts]
+            return [_to_dto(a).model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por curso: {e}")
     
