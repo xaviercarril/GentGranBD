@@ -1,5 +1,5 @@
 @startuml
-
+' ------------- CORE ENTITIES -------------
 class Socio {
     +id: int
     +dniNie: string
@@ -17,6 +17,15 @@ class Socio {
     +foto: blob
 }
 
+' GDPR consent (one-to-one with Socio)
+class FirmaProteccionDatos {
+    +socio_id: int
+    +fecha_firma: date
+    +documento: blob
+}
+
+Socio "1" -- "0..1" FirmaProteccionDatos : tiene
+
 abstract class Personal {
     +id: int
     +nombre: string
@@ -27,10 +36,10 @@ abstract class Personal {
 
 class Voluntario
 class Profesor
-
 Personal <|-- Voluntario
 Personal <|-- Profesor
 
+' ------------- ACADEMIC CALENDAR -------------
 enum TrimestreEnum {
     T1
     T2
@@ -45,76 +54,106 @@ class CursoAcademico {
     +fecha_fin: date
 }
 
-class Actividad {
-    +id: int
-    +nombre: string
-    +numero_maximo_alumnos: int
-    +lugar: string
-    +precio_matricula: decimal
-    +observaciones: text
-}
-
 class Trimestre {
     +id: int
+    +curso_academico_id: int
     +nombre: TrimestreEnum
     +fecha_inicio: date
     +fecha_fin: date
 }
 
+CursoAcademico "1" -- "4" Trimestre
+
+' ------------- ACTIVIDADES -------------
+class Lugar {
+    +id: int
+    +nombre: string
+    +direccion: string
+}
+
+class Actividad {
+    +id: int
+    +curso_academico_id: int
+    +nombre: string
+    +numero_maximo_alumnos: int
+    +lugar_id: int
+    +precio_matricula: decimal
+    +observaciones: text
+}
+
+CursoAcademico "1" -- "0..*" Actividad
+Lugar "1" -- "0..*" Actividad
+
+' Bridge table to handle multiple monitors and historical replacements
+class ActividadPersonal {
+    +actividad_id: int   ' PK/FK
+    +personal_id: int    ' PK/FK
+    +rol: string
+    +fecha_inicio: date
+    +fecha_fin: date
+}
+
+Actividad "1" -- "0..*" ActividadPersonal
+Personal  "1" -- "0..*" ActividadPersonal
+
+' ------------- INSCRIPCIÓN DE SOCIOS -------------
 enum estadoInscripcion {
     INSCRITO
     RESERVA
 }
 
 class InscripcionSocio {
-    +id: int
+    +socio_id: int       ' PK/FK
+    +actividad_id: int   ' PK/FK
     +fecha_inscripcion: date
     +fecha_baja: date
     +estado: estadoInscripcion
     +observaciones: text
 }
 
+Socio     "1" -- "0..*" InscripcionSocio
+Actividad "1" -- "0..*" InscripcionSocio
+
+' ------------- CLASES Y ASISTENCIA -------------
 class Clase {
+    +id: int
+    +actividad_id: int
+    +trimestre_id: int
     +fecha: date
     +hora_inicio: time
     +hora_fin: time
     +duracion: int
 }
 
+Actividad "1" -- "0..*" Clase
+Trimestre "1" -- "0..*" Clase
+
+class AsistenciaSocio {
+    +socio_id: int   ' PK/FK
+    +clase_id: int   ' PK/FK
+    +presente: bool
+    +observaciones: text
+}
+
+Socio "1" -- "0..*" AsistenciaSocio
+Clase "1" -- "0..*" AsistenciaSocio
+
+' ------------- PAGOS -------------
 enum estadoPago {
     PENDIENTE
     PAGADO
     ANULADO
 }
 
-class matriculaPago {
-    +id: int
+class MatriculaPago {
+    +socio_id: int      ' PK/FK to InscripcionSocio
+    +actividad_id: int  ' PK/FK to InscripcionSocio
     +fecha: date
     +importe: decimal
     +estado: estadoPago
     +observaciones: text
 }
 
-<> diamond
-InscripcionSocio . diamond
-diamond - "1" CursoAcademico
-diamond - "0..*" Actividad 
-diamond - "0..*" Socio
-
-InscripcionSocio "1" -- "0..1" matriculaPago
-CursoAcademico "1" -- "0..*" Actividad
-CursoAcademico "1" -- "4" Trimestre
-Actividad "1" -- "0..*" Clase
-Clase "0..*" -- "1" Trimestre : impartida_en
-
-(InscripcionSocio, Clase) "0..*" .. "0..*" AsistenciaSocio : registra
-
-class AsistenciaSocio {
-    +id: int
-    +presente: bool
-    +observaciones: text
-}
-
-Actividad "0..*" -- "1" Personal : impartida_por
+InscripcionSocio "1" -- "0..*" MatriculaPago
 
 @enduml
