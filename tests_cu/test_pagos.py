@@ -1,4 +1,4 @@
-from base import ControllerTestCase
+from tests_cu.base import ControllerTestCase
 
 class TestPagos(ControllerTestCase):
     def test_cu28_registrar_pago(self):

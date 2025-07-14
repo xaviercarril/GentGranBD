@@ -1,4 +1,4 @@
-from base import ControllerTestCase
+from tests_cu.base import ControllerTestCase
 import controladores.asistencia_socio as asis
 
 class TestAsistencia(ControllerTestCase):

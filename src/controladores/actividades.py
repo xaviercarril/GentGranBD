@@ -6,12 +6,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel, ValidationError
 from datetime import date, timedelta
-from pytest import Session
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal
 from models import (
-    Actividad, Clase, CursoAcademico
+    Actividad, CursoAcademico, Lugar
 )
 
 # ───────────────────── DTO ─────────────────────
@@ -19,14 +19,16 @@ class ActividadDTO(BaseModel):
     id: int | None = None
     nombre: str
     max_alumnos: int = 1
-    lugar: str | None = None
+    curso_id: int | None = None
+    lugar_id: int | None = None
     precio_matricula: float = 0.0
     observaciones: str | None = None
 
 class ActividadUpdateDTO(BaseModel):
     nombre: str | None = None
     max_alumnos: int | None = None
-    lugar: str | None = None
+    curso_id: int | None = None
+    lugar_id: int | None = None
     precio_matricula: float | None = None
     observaciones: str | None = None
 
@@ -35,7 +37,8 @@ def _to_dto(a: Actividad) -> ActividadDTO:
         id=a.id,
         nombre=a.nombre,
         max_alumnos=a.numero_maximo_alumnos,
-        lugar=a.lugar,
+        curso_id=a.curso_id,
+        lugar_id=a.lugar_id,
         precio_matricula=a.precio_matricula,
         observaciones=a.observaciones
     )
@@ -52,9 +55,10 @@ def registrar_actividad(data: dict) -> int:
         nueva = Actividad(
             nombre=dto.nombre,
             numero_maximo_alumnos=dto.max_alumnos,
-            lugar=dto.lugar,
+            curso_id=dto.curso_id,
+            lugar_id=dto.lugar_id,
             precio_matricula=dto.precio_matricula,
-            observaciones=dto.observaciones
+            observaciones=dto.observaciones,
         )
         with SessionLocal() as db:
             db.add(nueva)
@@ -116,7 +120,7 @@ def listar_actividades_por_CursoAcademico(curso_id: int) -> list[dict]:
     """Devuelve actividades de un curso académico."""
     try:
         with SessionLocal() as db:
-            acts = db.query(Actividad).filter(Actividad.curso_academico_id == curso_id).all()
+            acts = db.query(Actividad).filter(Actividad.curso_id == curso_id).all()
             return [_to_dto(a).model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por curso: {e}")

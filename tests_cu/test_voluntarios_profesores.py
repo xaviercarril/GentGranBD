@@ -1,4 +1,4 @@
-from base import ControllerTestCase
+from tests_cu.base import ControllerTestCase
 import controladores.voluntarios as vol
 import controladores.personal as personal
 

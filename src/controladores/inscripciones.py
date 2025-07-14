@@ -1,6 +1,6 @@
 
 from sqlalchemy.orm import Session
-from models import InscripcionSocio, Actividad, EstadoInscripcion, matriculaPago, EstadoPago
+from models import InscripcionSocio, Actividad, EstadoInscripcion, MatriculaPago, EstadoPago
 from controladores.pagos import registrar_pago
 from sqlalchemy.exc import IntegrityError
 from datetime import date
@@ -46,36 +46,37 @@ def registrar_inscripcion(session: Session, datos: dict):
     session.add(inscripcion)
     session.commit()
     actualizar_estado_inscripciones(session, actividad.id)
-    return inscripcion.id
+    return {'socio_id': inscripcion.socio_id, 'actividad_id': inscripcion.actividad_id}
 
-def eliminar_inscripcion(session: Session, inscripcion_id: int):
-    inscripcion = session.query(InscripcionSocio).filter(InscripcionSocio.id == inscripcion_id).first()
+def eliminar_inscripcion(session: Session, socio_id: int, actividad_id: int):
+    inscripcion = session.get(InscripcionSocio, {'socio_id': socio_id, 'actividad_id': actividad_id})
     if not inscripcion:
         return False
     session.delete(inscripcion)
     session.commit()
     return True
 
-def consultar_inscripcion(session: Session, inscripcion_id: int):
-    return session.query(InscripcionSocio).filter(InscripcionSocio.id == inscripcion_id).first()
+def consultar_inscripcion(session: Session, socio_id: int, actividad_id: int):
+    return session.get(InscripcionSocio, {'socio_id': socio_id, 'actividad_id': actividad_id})
 
 def consultar_actividad(session: Session, actividad_id: int):
     return session.query(Actividad).filter(Actividad.id == actividad_id).first()
 
-def generar_matricula(session: Session, inscripcion_id: int, fecha_matricula: date, estado: EstadoPago):
-    inscripcion = session.query(InscripcionSocio).filter(InscripcionSocio.id == inscripcion_id).first()
-    actividad = session.query(Actividad).filter(Actividad.id == inscripcion.actividad_id).first()
+def generar_matricula(session: Session, socio_id: int, actividad_id: int, fecha_matricula: date, estado: EstadoPago):
+    inscripcion = session.get(InscripcionSocio, {'socio_id': socio_id, 'actividad_id': actividad_id})
+    actividad = session.get(Actividad, actividad_id)
     if not inscripcion:
         print("Inscripción no encontrada.")
         return None
-    if consultar_matricula(session, inscripcion_id):
+    if consultar_matricula(session, socio_id, actividad_id):
         print("Ya existe una matrícula para esta inscripción.")
         return None
 
-    print(f"Generando matrícula para la inscripción ID: {inscripcion_id}, actividad: {actividad.nombre}, fecha: {fecha_matricula}, estado: {estado.value}")
+    print(f"Generando matrícula para la inscripción socio:{socio_id} act:{actividad_id}, fecha: {fecha_matricula}, estado: {estado.value}")
     # Registrar el pago de matrícula
     matricula_id = registrar_pago(session, {
-        'inscripcion_id': inscripcion_id,
+        'socio_id': socio_id,
+        'actividad_id': actividad_id,
         'fecha': fecha_matricula,
         'importe': actividad.precio_matricula,
         'estado': estado
@@ -83,11 +84,17 @@ def generar_matricula(session: Session, inscripcion_id: int, fecha_matricula: da
     
     return matricula_id
 
-def consultar_matricula(session: Session, inscripcion_id: int):
-    return session.query(matriculaPago).filter(matriculaPago.inscripcion_id == inscripcion_id).first()
+def consultar_matricula(session: Session, socio_id: int, actividad_id: int):
+    return session.query(MatriculaPago).filter(
+        MatriculaPago.socio_id == socio_id,
+        MatriculaPago.actividad_id == actividad_id
+    ).first()
 
-def editar_matricula(session: Session, inscripcion_id: int, nuevos_datos: dict):
-    matricula = session.query(matriculaPago).filter(matriculaPago.inscripcion_id == inscripcion_id).first()
+def editar_matricula(session: Session, socio_id: int, actividad_id: int, nuevos_datos: dict):
+    matricula = session.query(MatriculaPago).filter(
+        MatriculaPago.socio_id == socio_id,
+        MatriculaPago.actividad_id == actividad_id
+    ).first()
     if not matricula:
         return False
     for clave, valor in nuevos_datos.items():

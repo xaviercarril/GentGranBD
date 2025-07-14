@@ -7,7 +7,6 @@ usan SessionLocal internamente.  La UI nunca ve objetos ORM.
 from __future__ import annotations
 
 
-from dataclasses import asdict
 from datetime import date
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
@@ -63,12 +62,12 @@ def _to_dto(obj: Socio) -> SocioDTO:
         apellido1=obj.apellido1,
         apellido2=obj.apellido2,
         direccion=obj.direccion,
-        telefono_fijo=obj.telefonoFijo,
-        telefono_movil=obj.telefonoMovil,
+        telefono_fijo=obj.telefono_fijo,
+        telefono_movil=obj.telefono_movil,
         email=obj.email,
-        grupo_difusion=obj.grupoDifusion,
-        fecha_alta=obj.fechaAlta,
-        fecha_baja=obj.fechaBaja,
+        grupo_difusion=obj.grupo_difusion,
+        fecha_alta=obj.fecha_alta,
+        fecha_baja=obj.fecha_baja,
         observaciones=obj.observaciones,
         foto=obj.foto,
     )
@@ -97,12 +96,12 @@ def registrar_socio(datos: dict) -> int:
         apellido1=dto.apellido1,
         apellido2=dto.apellido2,
         direccion=dto.direccion,
-        telefonoFijo=dto.telefono_fijo,
-        telefonoMovil=dto.telefono_movil,
+        telefono_fijo=dto.telefono_fijo,
+        telefono_movil=dto.telefono_movil,
         email=dto.email,
-        grupoDifusion=dto.grupo_difusion,
-        fechaAlta=dto.fecha_alta or date.today(),
-        fechaBaja=dto.fecha_baja,
+        grupo_difusion=dto.grupo_difusion,
+        fecha_alta=dto.fecha_alta or date.today(),
+        fecha_baja=dto.fecha_baja,
         observaciones=dto.observaciones,
         foto=dto.foto,
     )
@@ -129,11 +128,11 @@ def modificar_socio(socio_id: int, cambios: dict) -> None:
             raise ValueError("Soci inexistent")
 
         mapping = {
-            "telefono_fijo": "telefonoFijo",
-            "telefono_movil": "telefonoMovil",
-            "grupo_difusion": "grupoDifusion",
-            "fecha_alta": "fechaAlta",
-            "fecha_baja": "fechaBaja",
+            "telefono_fijo": "telefono_fijo",
+            "telefono_movil": "telefono_movil",
+            "grupo_difusion": "grupo_difusion",
+            "fecha_alta": "fecha_alta",
+            "fecha_baja": "fecha_baja",
         }
 
         try:

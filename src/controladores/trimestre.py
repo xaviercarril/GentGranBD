@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal
 from models import (
-    Trimestre, TrimestreEnum, Curso
+    Trimestre, TrimestreEnum, CursoAcademico
 )
 
 @dataclass(slots=True)

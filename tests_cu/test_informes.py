@@ -1,4 +1,4 @@
-from base import ControllerTestCase
+from tests_cu.base import ControllerTestCase
 
 class TestInformes(ControllerTestCase):
     def test_cu38_generar_informe_socios(self):
