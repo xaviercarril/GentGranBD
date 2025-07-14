@@ -1,4 +1,4 @@
-from controladores.fecha import (
+from controladores.clase import (
     generar_fechas,
     generar_fechas_custom,
     agregar_fecha,

@@ -4,82 +4,106 @@ No expone objetos SQLAlchemy a la UI; devuelve y recibe dicts/DTOs.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, asdict
-from datetime import date
+from dataclasses import asdict
+from pydantic import BaseModel, ValidationError
+from datetime import date, timedelta
+from pytest import Session
 from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal
 from models import (
-    Actividad, Curso, Taller,
-    Trimestre, TrimestreEnum
+    Actividad, Clase, CursoAcademico
 )
 
 # ───────────────────── DTO ─────────────────────
-@dataclass(slots=True)
-class ActividadDTO:
-    id: int
+class ActividadDTO(BaseModel):
+    id: int | None = None
     nombre: str
-    tipo: str
-    max_alumnos: int | None
+    max_alumnos: int = 1
+    lugar: str | None = None
+    precio_matricula: float = 0.0
+    observaciones: str | None = None
 
+class ActividadUpdateDTO(BaseModel):
+    nombre: str | None = None
+    max_alumnos: int | None = None
+    lugar: str | None = None
+    precio_matricula: float | None = None
+    observaciones: str | None = None
 
 def _to_dto(a: Actividad) -> ActividadDTO:
     return ActividadDTO(
         id=a.id,
         nombre=a.nombre,
-        tipo=a.tipo,
         max_alumnos=a.numero_maximo_alumnos,
+        lugar=a.lugar,
+        precio_matricula=a.precio_matricula,
+        observaciones=a.observaciones
     )
 
 
-# ───────────────── API pública ─────────────────
+# ───────────────── CRUD ─────────────────
+def registrar_actividad(data: dict) -> int:
+    """Crea actividad; recibe dict, valida con DTO y devuelve ID."""
+    try:
+        dto = ActividadDTO(**data)
+    except ValidationError as e:
+        raise ValueError(f"Datos de entrada inválidos: {e}")
+    try:
+        nueva = Actividad(
+            nombre=dto.nombre,
+            numero_maximo_alumnos=dto.max_alumnos,
+            lugar=dto.lugar,
+            precio_matricula=dto.precio_matricula,
+            observaciones=dto.observaciones
+        )
+        with SessionLocal() as db:
+            db.add(nueva)
+            db.commit()
+            db.refresh(nueva)
+            return nueva.id
+    except IntegrityError as e:
+        raise ValueError(f"Error al registrar actividad: {e.orig}")
+    
 def listar_actividades() -> list[dict]:
     """Devuelve todas las actividades como lista de dicts."""
-    with SessionLocal() as db:
-        acts = db.query(Actividad).order_by(Actividad.nombre).all()
-        return [asdict(_to_dto(a)) for a in acts]
+    try:
+        with SessionLocal() as db:
+            acts = db.query(Actividad).order_by(Actividad.nombre).all()
+            return [asdict(_to_dto(a)) for a in acts]
+    except Exception as e:
+        raise ValueError(f"Error al listar actividades: {e}")
 
 
-def registrar_actividad(datos: dict) -> int:
-    """Crea curso, taller o actividad genérica; devuelve ID."""
-    tipo = datos.get("tipo")
-    clase = {"curso": Curso, "taller": Taller}.get(tipo, Actividad)
-
-    nueva = clase(
-        nombre=datos["nombre"],
-        numero_maximo_alumnos=datos.get("numero_maximo_alumnos"),
-        lugar=datos.get("lugar"),
-        observaciones=datos.get("observaciones"),
-        personal_id=datos.get("personal_id"),
-        precio_matricula=datos.get("precio_matricula", 0.0),
-        descripcion_fecha=datos.get("descripcion_fecha"),
-        curso_academico=datos.get("curso_academico"),
-        tipo=tipo
-    )
-    with SessionLocal() as db:
-        db.add(nueva)
-        db.commit()
-        db.refresh(nueva)
-        return nueva.id
-
-
-def modificar_actividad(actividad_id: int, cambios: dict) -> None:
+def modificar_actividad(actividad_id: int, newData: dict) -> None:
+    try:
+        dto = ActividadUpdateDTO(**newData)
+    except ValidationError as e:
+        raise ValueError(f"Datos inválidos al modificar clase: {e}")
+    
     with SessionLocal() as db:
         act = db.get(Actividad, actividad_id)
         if not act:
             raise ValueError("Actividad no encontrada")
-        for k, v in cambios.items():
-            setattr(act, k, v)
-        db.commit()
+        try:
+            for k, v in dto.model_dump(exclude_unset=True).items():
+                setattr(act, k, v)
+            db.commit()
+        except AttributeError as e:
+            db.rollback()
+            raise ValueError(f"Campo no válido: {e}")
 
 
 def eliminar_actividad(actividad_id: int) -> None:
-    with SessionLocal() as db:
-        act = db.get(Actividad, actividad_id)
-        if not act:
-            raise ValueError("Actividad no encontrada")
-        db.delete(act)
-        db.commit()
+    try:
+        with SessionLocal() as db:
+            act = db.get(Actividad, actividad_id)
+            if not act:
+                raise ValueError("Actividad no encontrada")
+            db.delete(act)
+            db.commit()
+    except IntegrityError as e:
+        raise ValueError(f"Error al eliminar actividad: {e.orig}")
 
 
 def consultar_actividad(actividad_id: int) -> dict | None:
@@ -88,60 +112,14 @@ def consultar_actividad(actividad_id: int) -> dict | None:
         return asdict(_to_dto(act)) if act else None
 
 
-# ───────────────── Trimestres (sólo para Curso) ─────────────────
-@dataclass(slots=True)
-class TrimestreDTO:
-    id: int
-    nombre: TrimestreEnum
-    fecha_inicio: date
-    fecha_fin: date
+# ────────────────── CRUD API ──────────────────
+def listar_actividades_por_CursoAcademico(curso_id: int) -> list[dict]:
+    """Devuelve actividades de un curso académico."""
+    try:
+        with SessionLocal() as db:
+            acts = db.query(Actividad).filter(Actividad.curso_academico_id == curso_id).all()
+            return [asdict(_to_dto(a)) for a in acts]
+    except Exception as e:
+        raise ValueError(f"Error al listar actividades por curso: {e}")
+    
 
-
-def crear_trimestre(
-    curso_id: int,
-    nombre: TrimestreEnum,
-    fecha_inicio: date,
-    fecha_fin: date
-) -> int:
-    with SessionLocal() as db:
-        curso = db.get(Curso, curso_id)
-        if not curso:
-            raise ValueError("Curso no encontrado")
-
-        tri = Trimestre(
-            nombre=nombre,
-            fecha_inicio=fecha_inicio,
-            fecha_fin=fecha_fin,
-            curso_id=curso_id
-        )
-        db.add(tri)
-        db.commit()
-        db.refresh(tri)
-        return tri.id
-
-
-def consultar_trimestres(
-    curso_id: int,
-    nombre: TrimestreEnum | None = None
-) -> list[dict]:
-    with SessionLocal() as db:
-        q = db.query(Trimestre).filter(Trimestre.curso_id == curso_id)
-        if nombre:
-            q = q.filter(Trimestre.nombre == nombre)
-        trs = q.all()
-        return [
-            asdict(
-                TrimestreDTO(
-                    id=t.id,
-                    nombre=t.nombre,
-                    fecha_inicio=t.fecha_inicio,
-                    fecha_fin=t.fecha_fin
-                )
-            ) for t in trs
-        ]
-
-
-def consultar_curso_academico(curso_id: int) -> str | None:
-    with SessionLocal() as db:
-        curso = db.get(Curso, curso_id)
-        return curso.curso_academico if curso else None

@@ -1,6 +1,6 @@
 from controladores.actividades import registrar_actividad
-from controladores.asistencia import registrar_asistencia
-from controladores.fecha import agregar_fecha
+from controladores.asistencia_socio import registrar_asistencia
+from controladores.clase import agregar_fecha
 from controladores.socios import registrar_socio
 from controladores.inscripciones import registrar_inscripcion
 from datetime import date
@@ -34,7 +34,7 @@ def test_registrar_y_consultar_asistencia(session):
     )
 
     # Consultar por ID directo
-    from controladores.asistencia import consultar_asistencia, modificar_asistencia, eliminar_asistencia, consultar_asistencia_por_inscripcion
+    from controladores.asistencia_socio import consultar_asistencia, modificar_asistencia, eliminar_asistencia, consultar_asistencia_por_inscripcion
 
     registro = consultar_asistencia(session, asistencia_id)
     assert registro is not None

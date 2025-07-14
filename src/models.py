@@ -70,46 +70,52 @@ class Profesor(Personal):
         'polymorphic_identity': 'profesor'
     }
 
+class CursoAcademico(Base):
+    __tablename__ = 'curso_academico'
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(100), nullable=False)
+    fecha_inicio = Column(Date, nullable=False)
+    fecha_fin = Column(Date, nullable=False)
+
+    actividades = relationship("Actividad", back_populates="curso")
+    trimestres = relationship("Trimestre", back_populates="curso")
+
 class Actividad(Base):
     __tablename__ = 'actividades'
 
     id = Column(Integer, primary_key=True)
     nombre = Column(String(100), nullable=False)
     numero_maximo_alumnos = Column(Integer)
-    tipo = Column(String(50))
     lugar = Column(String(100))
     precio_matricula = Column(DECIMAL(10, 2), default=0.0)
-    descripcion_fecha = Column(String(255))
     observaciones = Column(Text)
+
+    curso_id = Column(Integer, ForeignKey('curso_academico.id'))
+    curso = relationship("CursoAcademico", back_populates="actividades")
+
     personal_id = Column(Integer, ForeignKey('personal.id'))
-
     personal = relationship("Personal", back_populates="actividades")
+
+    clases = relationship("Clase", back_populates="actividad")
     inscripciones = relationship("InscripcionSocio", back_populates="actividad")
-    fechas = relationship("Fecha", back_populates="actividad")
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'actividad',
-        'polymorphic_on': tipo
-    }
+class Clase(Base):
+    __tablename__ = 'clases'
 
-class Curso(Actividad):
-    __tablename__ = 'cursos'
-    id = Column(Integer, ForeignKey('actividades.id'), primary_key=True)
+    id = Column(Integer, primary_key=True)
+    fecha = Column(Date, nullable=False)
+    hora_inicio = Column(DateTime)
+    hora_fin = Column(DateTime)
+    duracion = Column(Integer)
 
-    curso_academico = Column(String(20))
-    trimestres = relationship("Trimestre", back_populates="curso", cascade="all, delete-orphan")
+    trimestre_id = Column(Integer, ForeignKey('trimestres.id'))
+    trimestre = relationship("Trimestre", back_populates="clases")
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'curso',
-    }
+    actividad_id = Column(Integer, ForeignKey('actividades.id'))
+    actividad = relationship("Actividad", back_populates="clases")
 
-class Taller(Actividad):
-    __tablename__ = 'talleres'
-    id = Column(Integer, ForeignKey('actividades.id'), primary_key=True)
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'taller'
-    }
+    asistencias = relationship("AsistenciaSocio", back_populates="clase")
 
 class Trimestre(Base):
     __tablename__ = 'trimestres'
@@ -118,9 +124,11 @@ class Trimestre(Base):
     nombre = Column(Enum(TrimestreEnum), nullable=False)
     fecha_inicio = Column(Date, nullable=False)
     fecha_fin = Column(Date, nullable=False)
-    curso_id = Column(Integer, ForeignKey('cursos.id'), nullable=False)
 
-    curso = relationship("Curso", back_populates="trimestres")
+    curso_id = Column(Integer, ForeignKey('curso_academico.id'), nullable=False)
+    curso = relationship("CursoAcademico", back_populates="trimestres")
+
+    clases = relationship("Clase", back_populates="trimestre")
 
 class InscripcionSocio(Base):
     __tablename__ = 'inscripciones'
@@ -129,6 +137,7 @@ class InscripcionSocio(Base):
     socio_id = Column(Integer, ForeignKey('socios.id'), nullable=False)
     actividad_id = Column(Integer, ForeignKey('actividades.id'), nullable=False)
     fecha_inscripcion = Column(Date, nullable=False)
+    fecha_baja = Column(Date)
     estado = Column(Enum(EstadoInscripcion), nullable=False)
     observaciones = Column(Text)
 
@@ -140,37 +149,23 @@ class InscripcionSocio(Base):
 
     socio = relationship("Socio", back_populates="inscripciones")
     actividad = relationship("Actividad", back_populates="inscripciones")
-    asistencias = relationship("Asistencia", back_populates="inscripcion")
+    asistencias = relationship("AsistenciaSocio", back_populates="inscripcion")
     mensualidades = relationship("mensualidadPago", back_populates="inscripcion")
     matricula = relationship("matriculaPago", back_populates="inscripcion", uselist=False, foreign_keys="[matriculaPago.inscripcion_id]")
 
-class Asistencia(Base):
-    __tablename__ = 'asistencias'
+class AsistenciaSocio(Base):
+    __tablename__ = 'asistencias_socio'
 
     id = Column(Integer, primary_key=True)
     inscripcion_id = Column(Integer, ForeignKey('inscripciones.id'))
-    fecha_id = Column(Integer, ForeignKey('fechas.id'))
+    clase_id = Column(Integer, ForeignKey('clases.id'))
     presente = Column(Boolean)
     observaciones = Column(Text)
 
     inscripcion = relationship("InscripcionSocio", back_populates="asistencias")
-    fecha = relationship("Fecha", back_populates="asistencias")
+    clase = relationship("Clase", back_populates="asistencias")
 
-class Fecha(Base):
-    __tablename__ = 'fechas'
-
-    id = Column(Integer, primary_key=True)
-    actividad_id = Column(Integer, ForeignKey('actividades.id'), nullable=False)
-    fecha = Column(Date, nullable=False)
-    hora_inicio = Column(DateTime)
-    hora_fin = Column(DateTime)
-    duracion = Column(Integer)  # Duración en minutos
-    observaciones = Column(Text)
-
-    actividad = relationship("Actividad", back_populates="fechas")
-    asistencias = relationship("Asistencia", back_populates="fecha")
-
-class Pago(Base):
+class MatriculaPago(Base):
     __tablename__ = 'pagos'
 
     id = Column(Integer, primary_key=True)
@@ -179,28 +174,28 @@ class Pago(Base):
     importe = Column(DECIMAL(10, 2))
     estado = Column(Enum(EstadoPago), nullable=False)
     observaciones = Column(Text)
-    tipo = Column(String(50))
+    # tipo = Column(String(50))
 
-    __mapper_args__ = {
-        'polymorphic_identity': 'pagos',
-        'polymorphic_on': tipo
-    }
+    # __mapper_args__ = {
+    #     'polymorphic_identity': 'pagos',
+    #     'polymorphic_on': tipo
+    # }
 
-class matriculaPago(Pago):
-    __tablename__ = 'matricula_pagos'
+# class matriculaPago(Pago):
+#     __tablename__ = 'matricula_pagos'
 
-    id = Column(Integer, ForeignKey('pagos.id'), primary_key=True)
+#     id = Column(Integer, ForeignKey('pagos.id'), primary_key=True)
 
-    inscripcion = relationship("InscripcionSocio", back_populates="matricula", foreign_keys="[Pago.inscripcion_id]")
+#     inscripcion = relationship("InscripcionSocio", back_populates="matricula", foreign_keys="[Pago.inscripcion_id]")
 
-    __mapper_args__ = {
-         'polymorphic_identity': 'matricula',
-    }
+#     __mapper_args__ = {
+#          'polymorphic_identity': 'matricula',
+#     }
 
-class mensualidadPago(Pago):
-    __tablename__ = 'mensualidad_pagos'
-    id = Column(Integer, ForeignKey('pagos.id'), primary_key=True)  # Establish FK relationship
-    inscripcion = relationship("InscripcionSocio", back_populates="mensualidades")
-    __mapper_args__ = {
-        'polymorphic_identity': 'mensualidades'
-    }
+# class mensualidadPago(Pago):
+#     __tablename__ = 'mensualidad_pagos'
+#     id = Column(Integer, ForeignKey('pagos.id'), primary_key=True)  # Establish FK relationship
+#     inscripcion = relationship("InscripcionSocio", back_populates="mensualidades")
+#     __mapper_args__ = {
+#         'polymorphic_identity': 'mensualidades'
+#     }

@@ -3,8 +3,8 @@ from exportador.pdf_asistencias import generar_pdf_parrilla_asistencias
 from controladores.actividades import registrar_actividad
 from controladores.inscripciones import registrar_inscripcion
 from controladores.socios import registrar_socio
-from controladores.asistencia import registrar_asistencia
-from controladores.fecha import agregar_fecha
+from controladores.asistencia_socio import registrar_asistencia
+from controladores.clase import agregar_fecha
 from controladores.personal import registrar_personal
 from datetime import date, timedelta
 
