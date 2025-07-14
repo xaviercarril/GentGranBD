@@ -1,21 +1,20 @@
-
 @startuml
 
 class Socio {
-  +id: int
-  +dniNie: string
-  +nombre: string
-  +apellido1: string
-  +apellido2: string
-  +direccion: string
-  +telefonoFijo: string
-  +telefonoMovil: string
-  +email: string
-  +grupoDifusion: string
-  +fechaAlta: date
-  +fechaBaja: date
-  +observaciones: text
-  +foto: blob
+    +id: int
+    +dniNie: string
+    +nombre: string
+    +apellido1: string
+    +apellido2: string
+    +direccion: string
+    +telefonoFijo: string
+    +telefonoMovil: string
+    +email: string
+    +grupoDifusion: string
+    +fechaAlta: date
+    +fechaBaja: date
+    +observaciones: text
+    +foto: blob
 }
 
 abstract class Personal {
@@ -33,10 +32,17 @@ Personal <|-- Voluntario
 Personal <|-- Profesor
 
 enum TrimestreEnum {
-    Q1
-    Q2
-    Q3
-    Q4
+    T1
+    T2
+    T3
+    T4
+}
+
+class CursoAcademico {
+    +id: int
+    +nombre: string
+    +fecha_inicio: date
+    +fecha_fin: date
 }
 
 class Actividad {
@@ -48,12 +54,6 @@ class Actividad {
     +observaciones: text
 }
 
-class Curso {
-    +curso_academico: string
-}
-class Taller {
-}
-
 class Trimestre {
     +id: int
     +nombre: TrimestreEnum
@@ -61,32 +61,24 @@ class Trimestre {
     +fecha_fin: date
 }
 
-Actividad <|-- Curso
-Actividad <|-- Taller
-
 enum estadoInscripcion {
     INSCRITO
     RESERVA
 }
+
 class InscripcionSocio {
     +id: int
     +fecha_inscripcion: date
+    +fecha_baja: date
     +estado: estadoInscripcion
     +observaciones: text
 }
 
-class Fecha 
-{
+class Clase {
     +fecha: date
     +hora_inicio: time
     +hora_fin: time
     +duracion: int
-}
-
-class Asistencia {
-    +id: int
-    +presente: bool
-    +observaciones: text
 }
 
 enum estadoPago {
@@ -95,7 +87,7 @@ enum estadoPago {
     ANULADO
 }
 
-class Pago {
+class matriculaPago {
     +id: int
     +fecha: date
     +importe: decimal
@@ -103,22 +95,25 @@ class Pago {
     +observaciones: text
 }
 
-class matriculaPago {
-}
-class mensualidadPago {
-}
+<> diamond
+InscripcionSocio . diamond
+diamond - "1" CursoAcademico
+diamond - "0..*" Actividad 
+diamond - "0..*" Socio
 
-Pago <|-- matriculaPago
-Pago <|-- mensualidadPago
-
-Socio "1" -- "0..*" InscripcionSocio
-InscripcionSocio "0..*" -- "1" Actividad : inscrito_en
-InscripcionSocio "1" -- "0..*" Asistencia
 InscripcionSocio "1" -- "0..1" matriculaPago
-InscripcionSocio "1" -- "0..*" mensualidadPago
-Actividad "1" -- "0..*" Fecha
-Fecha "1" -- "0..*" Asistencia
-Curso "1" -- "0..*" Trimestre
+CursoAcademico "1" -- "0..*" Actividad
+CursoAcademico "1" -- "4" Trimestre
+Actividad "1" -- "0..*" Clase
+Clase "0..*" -- "1" Trimestre : impartida_en
+
+(InscripcionSocio, Clase) "0..*" .. "0..*" AsistenciaSocio : registra
+
+class AsistenciaSocio {
+    +id: int
+    +presente: bool
+    +observaciones: text
+}
 
 Actividad "0..*" -- "1" Personal : impartida_por
 
