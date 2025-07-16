@@ -13,7 +13,7 @@ def test_crud_curso_con_trimestres(session):
     curso_id = registrar_actividad({
         'nombre': 'Anglès Inicial',
         'tipo': 'curso',
-        'numero_maximo_alumnos': 12,
+        'numMaxAlumnos': 12,
         'lugar': 'Aula 2',
         'curso_academico': '2025-2026',
         'precio_matricula': 25.0,
@@ -25,19 +25,21 @@ def test_crud_curso_con_trimestres(session):
     assert curso.nombre == 'Anglès Inicial'
 
     # Crear trimestres asociados al curso
+
     trimestre1_id = registrar_trimestre({
         'nombre': TrimestreEnum.T1,
         'fecha_inicio': date(2025, 1, 1),
         'fecha_fin': date(2025, 3, 31),
-        'cursoA_id': curso_id
+        'cursoAcademicoID': curso_id
     })
 
     trimestre2_id = registrar_trimestre({
         'nombre': TrimestreEnum.T2,
         'fecha_inicio': date(2025, 4, 1),
         'fecha_fin': date(2025, 6, 30),
-        'cursoA_id': curso_id
+        'cursoAcademicoID': curso_id
     })
+
 
     # Verificar que se asocian correctamente
     curso = session.get(Curso,curso_id)
@@ -48,8 +50,9 @@ def test_crud_curso_con_trimestres(session):
 
     # Modificar
     modificar_actividad(curso_id, {'numero_maximo_alumnos': 15})
+
     curso = session.get(Curso,curso_id)
-    assert curso.numero_maximo_alumnos == 15
+    assert curso.numMaxAlumnos == 15
 
     # Eliminar curso (cascade)
     eliminado = eliminar_actividad(curso_id)
@@ -60,7 +63,7 @@ def test_crud_taller(session):
     taller_id = registrar_actividad({
         'nombre': 'Ceràmica Creativa',
         'tipo': 'taller',
-        'numero_maximo_alumnos': 8,
+        'numMaxAlumnos': 8,
         'lugar': 'Aula Manualitats',
         'duracion': 90,
         'precio_matricula': 12.0
@@ -70,9 +73,11 @@ def test_crud_taller(session):
     assert taller is not None
     assert taller.nombre == 'Ceràmica Creativa'
 
-    modificar_actividad(taller_id, {'numero_maximo_alumnos': 10})
+
+    modificar_actividad(taller_id, {'numMaxAlumnos': 10})
+
     taller = session.get(Taller,taller_id)
-    assert taller.numero_maximo_alumnos == 10
+    assert taller.numMaxAlumnos == 10
 
     eliminado = eliminar_actividad(taller_id)
     assert eliminado is True
@@ -85,14 +90,16 @@ def test_crear_trimestre_unit(session):
         'tipo': 'curso'
     })
 
+
     trimestre_id = registrar_trimestre({
         'nombre': TrimestreEnum.T3,
-        'fecha_inicio': date(2025, 7, 1),
-        'fecha_fin': date(2025, 9, 30),
-        'cursoA_id': curso_id
+        'fechaInicio': date(2025, 7, 1),
+        'fechaFin': date(2025, 9, 30),
+        'cursoAcademicoID': curso_id
     })
 
-    trimestre = session.get(Trimestre,trimestre_id)
+
+    trimestre = session.get(Trimestre,trimestreID)
     assert trimestre is not None
     assert trimestre.nombre == TrimestreEnum.T3
     assert trimestre.curso_id == curso_id

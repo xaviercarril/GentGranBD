@@ -16,24 +16,24 @@ from models import EstadoPago
 
 def test_crud_matricula(session):
     # Crear socio y actividad
-    socio_id = registrar_socio(session, {
-        'dni_nie': 'MAT002',
+    socioID = registrar_socio(session, {
+        'dniNie': 'MAT002',
         'nombre': 'Marc',
-        'fecha_alta': date.today()
+        'fechaAlta': date.today()
     })
 
-    actividad_id = registrar_actividad(session, {
+    actividadID = registrar_actividad(session, {
         'nombre': 'Ioga Avançat',
         'tipo': 'curso',
-        'numero_maximo_alumnos': 5,
+        'numMaxAlumnos': 5,
         'duracion': 60,
         'precio_matricula': 75.0
     })
 
     inscripcion_id = registrar_inscripcion(session, {
-        'socio_id': socio_id,
-        'actividad_id': actividad_id,
-        'fecha_inscripcion': date.today()
+        'socioID': socioID,
+        'actividadID': actividadID,
+        'fechaInscripcion': date.today()
     })
 
     # 1️⃣ Generar matrícula

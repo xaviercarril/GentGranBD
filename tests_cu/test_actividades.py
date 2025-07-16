@@ -60,13 +60,13 @@ class TestActividades(ControllerTestCase):
         if actividades and insc:
             try:
                 act_id = actividades.registrar_actividad({'nombre': 'Dansa'})
-                sid = socios.registrar_socio({'dni_nie':'S1','nombre':'Laura'})
+                sid = socios.registrar_socio({'dniNie':'S1','nombre':'Laura'})
                 iid = insc.registrar_inscripcion(self.session, {
-                    'socio_id': sid,
-                    'actividad_id': act_id,
-                    'fecha_inscripcion': date.today()
+                    'socioID': sid,
+                    'actividadID': act_id,
+                    'fechaInscripcion': date.today()
                 })
-                self.assertIn('socio_id', iid)
+                self.assertIn('socioID', iid)
             except Exception:
                 self.assertTrue(True)
         else:

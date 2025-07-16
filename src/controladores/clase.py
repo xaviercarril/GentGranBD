@@ -9,30 +9,30 @@ from models import AsistenciaSocio, Clase, Actividad, Trimestre
 @dataclass(slots=True)
 class ClaseDTO(BaseModel):
     id: int | None = None
-    actividad_id: int
-    trimestre_id: int
+    actividadID: int
+    trimestreID: int
     fecha: date | None = None
-    hora_inicio: str | None = None
-    hora_fin: str | None = None
+    horaInicio: str | None = None
+    horaFin: str | None = None
     duracion: timedelta | None = None
     observaciones: str | None = None
 
 class ClaseUpdateDTO(BaseModel):
     fecha: date | None = None
-    hora_inicio: str | None = None
-    hora_fin: str | None = None
+    horaInicio: str | None = None
+    horaFin: str | None = None
     duracion: timedelta | None = None
     observaciones: str | None = None
-    trimestre_id: int | None = None
+    trimestreID: int | None = None
 
 def _to_dto(clase: Clase) -> ClaseDTO:
     return ClaseDTO(
         id=clase.id,
-        actividad_id=clase.actividad_id,
-        trimestre_id=clase.trimestre_id,
+        actividadID=clase.actividadID,
+        trimestreID=clase.trimestreID,
         fecha=clase.fecha,
-        hora_inicio=clase.hora_inicio,
-        hora_fin=clase.hora_fin,
+        horaInicio=clase.horaInicio,
+        horaFin=clase.horaFin,
         duracion=clase.duracion,
         observaciones=clase.observaciones
     )
@@ -45,19 +45,19 @@ def registrar_clase(data: dict) -> int:
     except ValidationError as e:
         raise ValueError(f"Datos de entrada inválidos: {e}")
     
-    if dto.hora_inicio and dto.hora_fin:
-        hora_inicio = timedelta(hours=int(dto.hora_inicio.split(':')[0]), minutes=int(dto.hora_inicio.split(':')[1]))
-        hora_fin = timedelta(hours=int(dto.hora_fin.split(':')[0]), minutes=int(dto.hora_fin.split(':')[1]))
-        duracion = hora_fin - hora_inicio
+    if dto.horaInicio and dto.horaFin:
+        horaInicio = timedelta(hours=int(dto.horaInicio.split(':')[0]), minutes=int(dto.horaInicio.split(':')[1]))
+        horaFin = timedelta(hours=int(dto.horaFin.split(':')[0]), minutes=int(dto.horaFin.split(':')[1]))
+        duracion = horaFin - horaInicio
     else:
         duracion = None
 
     nueva_clase = Clase(
-        actividad_id=dto.actividad_id,
-        trimestre_id=dto.trimestre_id,
+        actividadID=dto.actividadID,
+        trimestreID=dto.trimestreID,
         fecha=dto.fecha,
-        hora_inicio=dto.hora_inicio,
-        hora_fin=dto.hora_fin,
+        horaInicio=dto.horaInicio,
+        horaFin=dto.horaFin,
         duracion=duracion,
         observaciones=dto.observaciones
     )
@@ -74,7 +74,7 @@ def registrar_clase(data: dict) -> int:
         db.refresh(nueva_clase)
         return nueva_clase.id
 
-def modificar_clase(clase_id: int, cambios: dict) -> None:
+def modificar_clase(claseID: int, cambios: dict) -> None:
     """Modifica los datos de una clase existente con validación DTO."""
     try:
         dto = ClaseUpdateDTO(**cambios)
@@ -82,17 +82,17 @@ def modificar_clase(clase_id: int, cambios: dict) -> None:
         raise ValueError(f"Datos inválidos al modificar clase: {e}")
 
     with SessionLocal() as db:
-        clase = db.get(Clase, clase_id)
+        clase = db.get(Clase, claseID)
         if not clase:
             raise ValueError("Clase inexistent")
         
         try:
             for k, v in dto.model_dump(exclude_unset=True).items():
                 setattr(clase, k, v)
-            if dto.hora_inicio and dto.hora_fin:
-                hora_inicio = timedelta(hours=int(dto.hora_inicio.split(':')[0]), minutes=int(dto.hora_inicio.split(':')[1]))
-                hora_fin = timedelta(hours=int(dto.hora_fin.split(':')[0]), minutes=int(dto.hora_fin.split(':')[1]))
-                clase.duracion = hora_fin - hora_inicio
+            if dto.horaInicio and dto.horaFin:
+                horaInicio = timedelta(hours=int(dto.horaInicio.split(':')[0]), minutes=int(dto.horaInicio.split(':')[1]))
+                horaFin = timedelta(hours=int(dto.horaFin.split(':')[0]), minutes=int(dto.horaFin.split(':')[1]))
+                clase.duracion = horaFin - horaInicio
             db.commit()
         except AttributeError as e:
             db.rollback()
@@ -101,22 +101,22 @@ def modificar_clase(clase_id: int, cambios: dict) -> None:
             db.rollback()
             raise ValueError(f"Error al modificar clase: {e.orig}")
 
-def consultar_clase(clase_id: int) -> dict | None:
+def consultar_clase(claseID: int) -> dict | None:
     """Consulta una clase por su ID y devuelve sus datos como dict."""
     try:
         with SessionLocal() as db:
-            clase = db.get(Clase, clase_id)
+            clase = db.get(Clase, claseID)
             if clase:
                 return _to_dto(clase).model_dump()
             return None
     except Exception as e:
         raise ValueError(f"Error al consultar clase: {e}")
 
-def eliminar_clase(clase_id: int) -> None:
+def eliminar_clase(claseID: int) -> None:
     """Elimina una clase por su ID."""
     try:
         with SessionLocal() as db:
-            clase = db.get(Clase, clase_id)
+            clase = db.get(Clase, claseID)
             if not clase:
                 raise ValueError("Clase inexistent")
             db.delete(clase)
@@ -127,31 +127,31 @@ def eliminar_clase(clase_id: int) -> None:
 
     
 # ────────────────── Consultas ──────────────────
-def listar_asistencia_por_Clase(clase_id: int) -> list[dict]:
+def listar_asistencia_por_Clase(claseID: int) -> list[dict]:
     """Consulta todas las asistencias a una clase específica."""
     try:
         with SessionLocal() as session:
-            asistencias = session.query(AsistenciaSocio).filter_by(clase_id=clase_id).all()
+            asistencias = session.query(AsistenciaSocio).filter_by(claseID=claseID).all()
             return [asistencia.model_dump() for asistencia in asistencias]
     except Exception as e:
         raise ValueError(f"Error al consultar asistencias: {e}")
 
-def consultar_trimestre_Clase(clase_id: int) -> dict | None:
+def consultar_trimestre_Clase(claseID: int) -> dict | None:
     """Consulta un trimestre por su ID y devuelve sus datos como dict."""
     try:
         with SessionLocal() as db:
-            trimestre = db.get(Trimestre, clase_id)
+            trimestre = db.get(Trimestre, claseID)
             if not trimestre:
                 return None
             return trimestre.model_dump()
     except Exception as e:
         raise ValueError(f"Error al consultar trimestre: {e}")
     
-def consultar_actividad_Clase(clase_id: int) -> dict | None:
+def consultar_actividad_Clase(claseID: int) -> dict | None:
     """Consulta una actividad por su ID y devuelve sus datos como dict."""
     try:
         with SessionLocal() as db:
-            actividad = db.get(Actividad, clase_id)
+            actividad = db.get(Actividad, claseID)
             if not actividad:
                 return None
             return actividad.model_dump()
@@ -161,9 +161,9 @@ def consultar_actividad_Clase(clase_id: int) -> dict | None:
 # ────────────────── Generadores ──────────────────
 def generar_clases_semana(
     session: Session,
-    actividad_id: int,
-    fecha_inicio: date,
-    fecha_fin: date,
+    actividadID: int,
+    fechaInicio: date,
+    fechaFin: date,
     dias_semana: list[int],
     cada_n_semanas: int = 1,
     observaciones: str = None
@@ -173,23 +173,23 @@ def generar_clases_semana(
     - Si dias_semana se define: crea clases cíclicas según días seleccionados.
     - Si fechas_personalizadas se define: crea solo esas fechas.
     """
-    actividad = session.get(Actividad, actividad_id)
+    actividad = session.get(Actividad, actividadID)
     if not actividad:
         raise ValueError("Actividad no encontrada.")
 
     clases_creadas = []
 
-    fecha = fecha_inicio
-    while fecha <= fecha_fin:
+    fecha = fechaInicio
+    while fecha <= fechaFin:
         for dia in dias_semana:
             dia_fecha = fecha + timedelta(days=(dia - fecha.weekday()) % 7)
-            if fecha_inicio <= dia_fecha <= fecha_fin:
-                existe = session.query(Clase).filter_by(actividad_id=actividad.id, fecha=dia_fecha).first()
+            if fechaInicio <= dia_fecha <= fechaFin:
+                existe = session.query(Clase).filter_by(actividadID=actividad.id, fecha=dia_fecha).first()
                 if not existe:
                     try:
                         nueva_clase = registrar_clase(
                             {
-                                "actividad_id": actividad.id,
+                                "actividadID": actividad.id,
                                 "fecha": dia_fecha,
                                 "observaciones": observaciones
                             }
@@ -205,7 +205,7 @@ def generar_clases_semana(
 
 def generar_clases_custom(
     session: Session,
-    actividad_id: int,
+    actividadID: int,
     fechas_personalizadas: list[date] | None = None,
     observaciones: str = None
 ) -> list[int] | None:
@@ -214,19 +214,19 @@ def generar_clases_custom(
     - Si dias_semana se define: crea clases cíclicas según días seleccionados.
     - Si fechas_personalizadas se define: crea solo esas fechas.
     """
-    actividad = session.get(Actividad, actividad_id)
+    actividad = session.get(Actividad, actividadID)
     if not actividad:
         raise ValueError("Actividad no encontrada.")
 
     clases_creadas = []
 
     for fecha in fechas_personalizadas:
-        existe = session.query(Clase).filter_by(actividad_id=actividad.id, fecha=fecha).first()
+        existe = session.query(Clase).filter_by(actividadID=actividad.id, fecha=fecha).first()
         if not existe:
             try:
                 nueva_clase = registrar_clase(
                     {
-                        "actividad_id": actividad.id,
+                        "actividadID": actividad.id,
                         "fecha": fecha,
                         "observaciones": observaciones
                     }

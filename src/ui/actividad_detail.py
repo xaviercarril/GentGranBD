@@ -7,24 +7,24 @@ class ActividadDetailWidget(QWidget):
 
     def __init__(self, tipo, parent=None):
         super().__init__(parent)
-        self._actividad_id = None
+        self._actividadID = None
         self._tipo = tipo.lower()
         self._loading = False
 
         self.nombre = QLineEdit()
         self.descripcion = QLineEdit()
-        self.fecha_inicio = QDateEdit(); self.fecha_inicio.setCalendarPopup(True)
-        self.fecha_fin = QDateEdit(); self.fecha_fin.setCalendarPopup(True)
-        self.numero_maximo_alumnos = QSpinBox()
-        self.numero_maximo_alumnos.setMinimum(0)
-        self.numero_maximo_alumnos.setMaximum(999)
+        self.fechaInicio = QDateEdit(); self.fechaInicio.setCalendarPopup(True)
+        self.fechaFin = QDateEdit(); self.fechaFin.setCalendarPopup(True)
+        self.numMaxAlumnos = QSpinBox()
+        self.numMaxAlumnos.setMinimum(0)
+        self.numMaxAlumnos.setMaximum(999)
 
         form = QFormLayout()
         form.addRow("Nom:", self.nombre)
         form.addRow("Descripció:", self.descripcion)
-        form.addRow("Data inici:", self.fecha_inicio)
-        form.addRow("Data fi:", self.fecha_fin)
-        form.addRow("Màxim alumnes:", self.numero_maximo_alumnos)
+        form.addRow("Data inici:", self.fechaInicio)
+        form.addRow("Data fi:", self.fechaFin)
+        form.addRow("Màxim alumnes:", self.numMaxAlumnos)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
@@ -32,20 +32,20 @@ class ActividadDetailWidget(QWidget):
 
         self.nombre.editingFinished.connect(self._save)
         self.descripcion.editingFinished.connect(self._save)
-        self.fecha_inicio.dateChanged.connect(self._save)
-        self.fecha_fin.dateChanged.connect(self._save)
-        self.numero_maximo_alumnos.valueChanged.connect(self._save)
+        self.fechaInicio.dateChanged.connect(self._save)
+        self.fechaFin.dateChanged.connect(self._save)
+        self.numMaxAlumnos.valueChanged.connect(self._save)
 
-    def load(self, actividad_id):
+    def load(self, actividadID):
         self._loading = True
-        self._actividad_id = actividad_id
+        self._actividadID = actividadID
 
-        if actividad_id is None:
+        if actividadID is None:
             self._clear()
             self._loading = False
             return
 
-        act = consultar_actividad(actividad_id)
+        act = consultar_actividad(actividadID)
         if not act:
             QMessageBox.warning(self, "Error", "Activitat no trobada.")
             self._clear()
@@ -56,30 +56,30 @@ class ActividadDetailWidget(QWidget):
         self.descripcion.setText(
             act.get("descripcion") or act.get("descripcion_actividad") or ""
         )
-        if act.get("fecha_inicio"):
-            self.fecha_inicio.setDate(QDate.fromString(str(act["fecha_inicio"]), "yyyy-MM-dd"))
+        if act.get("fechaInicio"):
+            self.fechaInicio.setDate(QDate.fromString(str(act["fechaInicio"]), "yyyy-MM-dd"))
         else:
-            self.fecha_inicio.setDate(QDate())
-        if act.get("fecha_fin"):
-            self.fecha_fin.setDate(QDate.fromString(str(act["fecha_fin"]), "yyyy-MM-dd"))
+            self.fechaInicio.setDate(QDate())
+        if act.get("fechaFin"):
+            self.fechaFin.setDate(QDate.fromString(str(act["fechaFin"]), "yyyy-MM-dd"))
         else:
-            self.fecha_fin.setDate(QDate())
+            self.fechaFin.setDate(QDate())
 
-        max_alumnos = act.get("numero_maximo_alumnos")
+        max_alumnos = act.get("numMaxAlumnos")
         if max_alumnos is None:
             max_alumnos = act.get("max_alumnos")
         if max_alumnos is not None:
-            self.numero_maximo_alumnos.setValue(max_alumnos)
+            self.numMaxAlumnos.setValue(max_alumnos)
         else:
-            self.numero_maximo_alumnos.setValue(1)
+            self.numMaxAlumnos.setValue(1)
         self._loading = False
 
     def _clear(self):
         self.nombre.clear()
         self.descripcion.clear()
-        self.fecha_inicio.setDate(QDate())
-        self.fecha_fin.setDate(QDate())
-        self.numero_maximo_alumnos.setValue(0)
+        self.fechaInicio.setDate(QDate())
+        self.fechaFin.setDate(QDate())
+        self.numMaxAlumnos.setValue(0)
 
     def _validar(self) -> bool:
         if not self.nombre.text().strip():
@@ -92,13 +92,13 @@ class ActividadDetailWidget(QWidget):
             "nombre": self.nombre.text().strip(),
             "tipo": self._tipo,
             "descripcion": self.descripcion.text().strip() or None,
-            "fecha_inicio": self.fecha_inicio.date().toPython() if self.fecha_inicio.date().isValid() else None,
-            "fecha_fin": self.fecha_fin.date().toPython() if self.fecha_fin.date().isValid() else None,
-            "max_alumnos": self.numero_maximo_alumnos.value(),
+            "fechaInicio": self.fechaInicio.date().toPython() if self.fechaInicio.date().isValid() else None,
+            "fechaFin": self.fechaFin.date().toPython() if self.fechaFin.date().isValid() else None,
+            "max_alumnos": self.numMaxAlumnos.value(),
         }
 
     def _save(self):
-        if self._loading or self._actividad_id is None:
+        if self._loading or self._actividadID is None:
             return
 
         if not self._validar():
@@ -108,7 +108,7 @@ class ActividadDetailWidget(QWidget):
 
         data = self._build_data()
         try:
-            modificar_actividad(self._actividad_id, data)
+            modificar_actividad(self._actividadID, data)
             self.saved.emit()
         except ValueError as e:
             QMessageBox.warning(self, "Error", str(e))

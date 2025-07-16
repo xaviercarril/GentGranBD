@@ -9,8 +9,8 @@ from controladores.pagos import registrar_pago
 
 # ────────────────────── DTO ──────────────────────
 class PagoDTO(BaseModel):
-    socio_id: int
-    actividad_id: int
+    socioID: int
+    actividadID: int
     fecha_pago: date
     importe: float = 0.0
     estado: str = "PENDIENTE"  # Estado por defecto
@@ -22,8 +22,8 @@ class PagoUpdateDTO(BaseModel):
 
 def _to_dto(pago: Pago) -> PagoDTO:
     return PagoDTO(
-        socio_id=pago.socio_id,
-        actividad_id=pago.actividad_id,
+        socioID=pago.socioID,
+        actividadID=pago.actividadID,
         fecha_pago=pago.fecha_pago,
         importe=pago.importe,
         estado=pago.estado
@@ -38,8 +38,8 @@ def registrar_pago(data: dict) -> int:
         raise ValueError(f"Datos de entrada inválidos: {e}")
 
     nuevo_pago = Pago(
-        socio_id=dto.socio_id,
-        actividad_id=dto.actividad_id,
+        socioID=dto.socioID,
+        actividadID=dto.actividadID,
         fecha_pago=dto.fecha_pago,
         importe=dto.importe,
         estado=dto.estado

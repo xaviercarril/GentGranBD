@@ -14,8 +14,8 @@ class TestCursoAcademico(ControllerTestCase):
             try:
                 cid = curso.registrar_curso_academico({
                     'nombre': '24/25',
-                    'fecha_inicio': date.today(),
-                    'fecha_fin': date.today()
+                    'fechaInicio': date.today(),
+                    'fechaFin': date.today()
                 })
                 self.assertIsInstance(cid, int)
             except Exception:

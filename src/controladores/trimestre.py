@@ -15,23 +15,23 @@ from models import (
 class TrimestreDTO(BaseModel):
     id: int
     nombre: TrimestreEnum
-    fecha_inicio: date
-    fecha_fin: date
-    cursoA_id: int
+    fechaInicio: date
+    fechaFin: date
+    cursoAcademicoID: int
 
 class TrimestreUpdateDTO(BaseModel):
     nombre: TrimestreEnum | None = None
-    fecha_inicio: date | None = None
-    fecha_fin: date | None = None
-    cursoA_id: int | None = None
+    fechaInicio: date | None = None
+    fechaFin: date | None = None
+    cursoAcademicoID: int | None = None
 
 def _to_dto(trimestre: Trimestre) -> TrimestreDTO:
     return TrimestreDTO(
         id=trimestre.id,
         nombre=trimestre.nombre,
-        fecha_inicio=trimestre.fecha_inicio,
-        fecha_fin=trimestre.fecha_fin,
-        cursoA_id=trimestre.cursoA_id
+        fechaInicio=trimestre.fechaInicio,
+        fechaFin=trimestre.fechaFin,
+        cursoAcademicoID=trimestre.cursoAcademicoID
     )
 
 # ───────────────── CRUD ─────────────────
@@ -45,9 +45,9 @@ def registrar_trimestre(datos: dict) -> int:
     try:
         nuevo_trimestre = Trimestre(
             nombre=dto.nombre,
-            fecha_inicio=dto.fecha_inicio,
-            fecha_fin=dto.fecha_fin,
-            cursoA_id=dto.cursoA_id
+            fechaInicio=dto.fechaInicio,
+            fechaFin=dto.fechaFin,
+            cursoAcademicoID=dto.cursoAcademicoID
         )
         with SessionLocal() as db:
             db.add(nuevo_trimestre)
@@ -57,14 +57,14 @@ def registrar_trimestre(datos: dict) -> int:
     except IntegrityError as e:
         raise ValueError(f"Error al registrar trimestre: {e.orig}")
     
-def modificar_trimestre(trimestre_id: int, cambios: dict) -> None:
+def modificar_trimestre(trimestreID: int, cambios: dict) -> None:
     try:
         dto = TrimestreUpdateDTO(**cambios)
     except ValueError as e:
         raise ValueError(f"Datos inválidos: {e}")
 
     with SessionLocal() as db:
-        trimestre = db.get(Trimestre, trimestre_id)
+        trimestre = db.get(Trimestre, trimestreID)
         if not trimestre:
             raise ValueError("Trimestre inexistent")
         
@@ -79,9 +79,9 @@ def modificar_trimestre(trimestre_id: int, cambios: dict) -> None:
             db.rollback()
             raise ValueError(f"Error al modificar trimestre: {e.orig}")
 
-def eliminar_trimestre(trimestre_id: int) -> None:
+def eliminar_trimestre(trimestreID: int) -> None:
     with SessionLocal() as db:
-        trimestre = db.get(Trimestre, trimestre_id)
+        trimestre = db.get(Trimestre, trimestreID)
         if not trimestre:
             raise ValueError("Trimestre inexistent")
         
@@ -92,26 +92,26 @@ def eliminar_trimestre(trimestre_id: int) -> None:
             db.rollback()
             raise ValueError(f"Error al eliminar trimestre: {e.orig}")
 
-def consultar_trimestre(trimestre_id: int) -> dict | None:
+def consultar_trimestre(trimestreID: int) -> dict | None:
     with SessionLocal() as db:
-        trimestre = db.get(Trimestre, trimestre_id)
+        trimestre = db.get(Trimestre, trimestreID)
         if trimestre:
             return asdict(
                 TrimestreDTO(
                     id=trimestre.id,
                     nombre=trimestre.nombre,
-                    fecha_inicio=trimestre.fecha_inicio,
-                    fecha_fin=trimestre.fecha_fin,
-                    cursoA_id=trimestre.cursoA_id
+                    fechaInicio=trimestre.fechaInicio,
+                    fechaFin=trimestre.fechaFin,
+                    cursoAcademicoID=trimestre.cursoAcademicoID
                 )
             )
         return None
 # ────────────────── Consultas ──────────────────
-def listar_clases_por_trimestre(trimestre_id: int) -> list[dict]:
+def listar_clases_por_trimestre(trimestreID: int) -> list[dict]:
     """Lista las clases de un trimestre."""
     try:
         with SessionLocal() as db:
-            clases = db.query(Clase).filter(Clase.trimestre_id == trimestre_id).all()
+            clases = db.query(Clase).filter(Clase.trimestreID == trimestreID).all()
             return [clase.model_dump() for clase in clases]
     except Exception as e:
         raise ValueError(f"Error al listar clases: {e}")

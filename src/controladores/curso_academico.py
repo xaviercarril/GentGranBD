@@ -12,20 +12,20 @@ from models import Actividad, CursoAcademico
 class CursoAcademicoDTO:
   id: int
   nombre: str
-  fecha_inicio: date
-  fecha_fin: date
+  fechaInicio: date
+  fechaFin: date
 
 class CursoAcademicoUpdateDTO(BaseModel):
   nombre: str | None = None
-  fecha_inicio: date | None = None
-  fecha_fin: date | None = None
+  fechaInicio: date | None = None
+  fechaFin: date | None = None
 
 def _to_dto(curso: CursoAcademico) -> CursoAcademicoDTO:
   return CursoAcademicoDTO(
     id=curso.id,
     nombre=curso.nombre,
-    fecha_inicio=curso.fecha_inicio,
-    fecha_fin=curso.fecha_fin
+    fechaInicio=curso.fechaInicio,
+    fechaFin=curso.fechaFin
   )
   
 # ───────────────── CRUD ─────────────────
@@ -39,8 +39,8 @@ def registrar_cursoA(datos: dict) -> int:
   try:
     nuevo_curso = CursoAcademico(
       nombre=dto.nombre,
-      fecha_inicio=dto.fecha_inicio,
-      fecha_fin=dto.fecha_fin
+      fechaInicio=dto.fechaInicio,
+      fechaFin=dto.fechaFin
     )
     with SessionLocal() as db:
       db.add(nuevo_curso)
@@ -51,14 +51,14 @@ def registrar_cursoA(datos: dict) -> int:
     raise ValueError(f"Error al registrar curso académico: {e.orig}")
   
 
-def modificar_cursoA(cursoA_id: int, cambios: dict) -> None:
+def modificar_cursoA(cursoAcademicoID: int, cambios: dict) -> None:
   try:
     dto = CursoAcademicoUpdateDTO(**cambios)
   except ValueError as e:
     raise ValueError(f"Datos inválidos: {e}")
 
   with SessionLocal() as db:
-    curso = db.get(CursoAcademico, cursoA_id)
+    curso = db.get(CursoAcademico, cursoAcademicoID)
     if not curso:
       raise ValueError("Curso inexistent")
     
@@ -74,21 +74,21 @@ def modificar_cursoA(cursoA_id: int, cambios: dict) -> None:
       raise ValueError(f"Error al modificar curso académico: {e.orig}")
     db.commit()
 
-def consultar_cursoA(cursoA_id: int) -> dict | None:
+def consultar_cursoA(cursoAcademicoID: int) -> dict | None:
   try:
     with SessionLocal() as db:
-      curso = db.get(CursoAcademico, cursoA_id)
+      curso = db.get(CursoAcademico, cursoAcademicoID)
       if curso:
         return _to_dto(curso).model_dump()
       return None
   except Exception as e:
     raise ValueError(f"Error al consultar curso académico: {e}")
   
-def eliminar_cursoA(cursoA_id: int) -> None:
+def eliminar_cursoA(cursoAcademicoID: int) -> None:
   """Elimina un curso académico por su ID."""
   try:
     with SessionLocal() as db:
-      curso = db.get(CursoAcademico, cursoA_id)
+      curso = db.get(CursoAcademico, cursoAcademicoID)
       if not curso:
         raise ValueError("Curso inexistent")
       db.delete(curso)
@@ -100,61 +100,61 @@ def eliminar_cursoA(cursoA_id: int) -> None:
 def listar_cursosA() -> list[dict]:
   """Devuelve todos los cursos académicos"""
   with SessionLocal() as db:
-    cursos = db.query(CursoAcademico).order_by(CursoAcademico.fecha_inicio).all()
+    cursos = db.query(CursoAcademico).order_by(CursoAcademico.fechaInicio).all()
     return [_to_dto(c).model_dump() for c in cursos]
 
-def listar_trimestres_por_cursoA(cursoA_id: int) -> list[dict]:
+def listar_trimestres_por_cursoA(cursoAcademicoID: int) -> list[dict]:
   """Devuelve los trimestres de un curso académico."""
   with SessionLocal() as db:
-    trimestres = db.query(TrimestreDTO).filter(TrimestreDTO.cursoA_id == cursoA_id).all()
+    trimestres = db.query(TrimestreDTO).filter(TrimestreDTO.cursoAcademicoID == cursoAcademicoID).all()
     return [t.model_dump() for t in trimestres]
   
-def listar_actividades_por_CursoAcademico(cursoA_id: int) -> list[dict]:
+def listar_actividades_por_CursoAcademico(cursoAcademicoID: int) -> list[dict]:
     """Devuelve actividades de un curso académico."""
     try:
         with SessionLocal() as db:
-            acts = db.query(Actividad).filter(Actividad.cursoA_id == cursoA_id).all()
+            acts = db.query(Actividad).filter(Actividad.cursoAcademicoID == cursoAcademicoID).all()
             return [a.model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por curso: {e}")
   
 # ────────────────── Generadores ──────────────────
-def generar_T1(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+def generar_T1(cursoAcademicoID: int, data_inicio: date, data_fin: date) -> int:
     """Genera un trimestre 1 para el curso académico."""
     nuevoTrim = registrar_trimestre(
         nombre="T1",
-        fecha_inicio=data_inicio,
-        fecha_fin=data_fin,
-        cursoA_id=cursoA_id
+        fechaInicio=data_inicio,
+        fechaFin=data_fin,
+        cursoAcademicoID=cursoAcademicoID
     )
     return nuevoTrim.id
 
-def generar_T2(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+def generar_T2(cursoAcademicoID: int, data_inicio: date, data_fin: date) -> int:
     """Genera un trimestre 2 para el curso académico."""
     nuevoTrim = registrar_trimestre(
         nombre="T2",
-        fecha_inicio=data_inicio,
-        fecha_fin=data_fin,
-        cursoA_id=cursoA_id
+        fechaInicio=data_inicio,
+        fechaFin=data_fin,
+        cursoAcademicoID=cursoAcademicoID
     )
     return nuevoTrim.id
 
-def generar_T3(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+def generar_T3(cursoAcademicoID: int, data_inicio: date, data_fin: date) -> int:
     """Genera un trimestre 3 para el curso académico."""
     nuevoTrim = registrar_trimestre(
         nombre="T3",
-        fecha_inicio=data_inicio,
-        fecha_fin=data_fin,
-        cursoA_id=cursoA_id
+        fechaInicio=data_inicio,
+        fechaFin=data_fin,
+        cursoAcademicoID=cursoAcademicoID
     )
     return nuevoTrim.id
 
-def generar_T4(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+def generar_T4(cursoAcademicoID: int, data_inicio: date, data_fin: date) -> int:
     """Genera un trimestre 4 para el curso académico."""
     nuevoTrim = registrar_trimestre(
         nombre="T4",
-        fecha_inicio=data_inicio,
-        fecha_fin=data_fin,
-        cursoA_id=cursoA_id
+        fechaInicio=data_inicio,
+        fechaFin=data_fin,
+        cursoAcademicoID=cursoAcademicoID
     )
     return nuevoTrim.id

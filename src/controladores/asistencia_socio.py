@@ -8,8 +8,8 @@ from pydantic import BaseModel, ValidationError
 # ─────────────────DTO────────────────────────────
 @dataclass(slots=True)
 class AsistenciaSocioDTO(BaseModel):
-    socio_id: int
-    clase_id: int
+    socioID: int
+    claseID: int
     presente: bool = False
     observaciones: str | None = None
 
@@ -19,8 +19,8 @@ class AsistenciaSocioUpdateDTO(BaseModel):
 
 def _to_dto(asistencia: AsistenciaSocio) -> AsistenciaSocioDTO:
     return AsistenciaSocioDTO(
-        socio_id=asistencia.socio_id,
-        clase_id=asistencia.clase_id,
+        socioID=asistencia.socioID,
+        claseID=asistencia.claseID,
         presente=asistencia.presente,
         observaciones=asistencia.observaciones
     )
@@ -35,8 +35,8 @@ def registrar_asistenciaSocio(data: dict) -> int:
 
     try:
         nueva_asistencia = AsistenciaSocio(
-            socio_id=dto.socio_id,
-            clase_id=dto.clase_id,
+            socioID=dto.socioID,
+            claseID=dto.claseID,
             presente=dto.presente,
             observaciones=dto.observaciones
         )
@@ -50,7 +50,7 @@ def registrar_asistenciaSocio(data: dict) -> int:
         raise ValueError(f"Error al registrar asistencia: {e.orig}")
 
 
-def modificar_asistenciaSocio(socio_id: int, clase_id: int, nuevos_datos: dict) -> None:
+def modificar_asistenciaSocio(socioID: int, claseID: int, nuevos_datos: dict) -> None:
     """Modifica asistencia de un socio a una clase; recibe ID y dict con cambios."""
     try:
         dto = AsistenciaSocioUpdateDTO(**nuevos_datos)
@@ -58,7 +58,7 @@ def modificar_asistenciaSocio(socio_id: int, clase_id: int, nuevos_datos: dict) 
         raise ValueError(f"Datos inválidos: {e}")
 
     with SessionLocal() as db:
-        asistencia = db.get(AsistenciaSocio, {'socio_id': socio_id, 'clase_id': clase_id})
+        asistencia = db.get(AsistenciaSocio, {'socioID': socioID, 'claseID': claseID})
         if not asistencia:
             raise ValueError("Asistencia inexistent")
         
@@ -73,11 +73,11 @@ def modificar_asistenciaSocio(socio_id: int, clase_id: int, nuevos_datos: dict) 
             db.rollback()
             raise ValueError(f"Error al modificar asistencia: {e.orig}")
         
-def eliminar_asistenciaSocio(socio_id: int, clase_id: int) -> None:
+def eliminar_asistenciaSocio(socioID: int, claseID: int) -> None:
     """Elimina asistencia de un socio a una clase; recibe IDs."""
     try:
         with SessionLocal() as db:
-            asistencia = db.get(AsistenciaSocio, {'socio_id': socio_id, 'clase_id': clase_id})
+            asistencia = db.get(AsistenciaSocio, {'socioID': socioID, 'claseID': claseID})
             if not asistencia:
                 raise ValueError("Asistencia inexistent")
             db.delete(asistencia)
@@ -85,10 +85,10 @@ def eliminar_asistenciaSocio(socio_id: int, clase_id: int) -> None:
     except IntegrityError as e:
         raise ValueError(f"Error al eliminar asistencia: {e.orig}")
 
-def consultar_asistenciaSocio(socio_id: int, clase_id: int) -> dict | None:
+def consultar_asistenciaSocio(socioID: int, claseID: int) -> dict | None:
     """Consulta asistencia de un socio a una clase; devuelve dict o None."""
     with SessionLocal() as db:
-        asistencia = db.get(AsistenciaSocio, {'socio_id': socio_id, 'clase_id': clase_id})
+        asistencia = db.get(AsistenciaSocio, {'socioID': socioID, 'claseID': claseID})
         return _to_dto(asistencia).model_dump() if asistencia else None
 
 

@@ -9,34 +9,34 @@ def test_registrar_inscripcion_con_estado_y_matricula(session):
     act_id = registrar_actividad(session, {
         'nombre': 'Gimnasia',
         'tipo': 'taller',
-        'numero_maximo_alumnos': 1,
+        'numMaxAlumnos': 1,
         'precio_matricula': 30.0
     })
 
     socio1 = registrar_socio(session, {
-        'dni_nie': 'X001',
+        'dniNie': 'X001',
         'nombre': 'Laura',
-        'fecha_alta': date.today()
+        'fechaAlta': date.today()
     })
 
     socio2 = registrar_socio(session, {
-        'dni_nie': 'X002',
+        'dniNie': 'X002',
         'nombre': 'Joan',
-        'fecha_alta': date.today()
+        'fechaAlta': date.today()
     })
 
     # 2️⃣ Registrar primera inscripción
     ins1 = registrar_inscripcion(session, {
-        'socio_id': socio1,
-        'actividad_id': act_id,
-        'fecha_inscripcion': datetime.now()
+        'socioID': socio1,
+        'actividadID': act_id,
+        'fechaInscripcion': datetime.now()
     })
 
     # 3️⃣ Registrar segunda inscripción (RESERVA)
     ins2 = registrar_inscripcion(session, {
-        'socio_id': socio2,
-        'actividad_id': act_id,
-        'fecha_inscripcion': datetime.now()
+        'socioID': socio2,
+        'actividadID': act_id,
+        'fechaInscripcion': datetime.now()
     })
 
     from models import InscripcionSocio, EstadoInscripcion

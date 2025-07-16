@@ -16,24 +16,24 @@ class ActividadDialog(QDialog):
         self.tipo.addItems(["Curso", "Taller", "Altres"])
         self.descripcion = QLineEdit()
         self.profesor = QLineEdit()
-        self.fecha_inicio = QDateEdit()
-        self.fecha_inicio.setCalendarPopup(True)
-        self.fecha_inicio.setDate(QDate.currentDate())
-        self.fecha_fin = QDateEdit()
-        self.fecha_fin.setCalendarPopup(True)
-        self.fecha_fin.setDate(QDate.currentDate())
-        self.numero_maximo_alumnos = QSpinBox()
-        self.numero_maximo_alumnos.setMinimum(1)
-        self.numero_maximo_alumnos.setMaximum(999)
+        self.fechaInicio = QDateEdit()
+        self.fechaInicio.setCalendarPopup(True)
+        self.fechaInicio.setDate(QDate.currentDate())
+        self.fechaFin = QDateEdit()
+        self.fechaFin.setCalendarPopup(True)
+        self.fechaFin.setDate(QDate.currentDate())
+        self.numMaxAlumnos = QSpinBox()
+        self.numMaxAlumnos.setMinimum(1)
+        self.numMaxAlumnos.setMaximum(999)
 
         form = QFormLayout()
         form.addRow("Nom:", self.nombre)
         form.addRow("Tipus:", self.tipo)
         form.addRow("Descripció:", self.descripcion)
         form.addRow("Professor/Voluntari:", self.profesor)
-        form.addRow("Data inici:", self.fecha_inicio)
-        form.addRow("Data fi:", self.fecha_fin)
-        form.addRow("Màxim alumnes:", self.numero_maximo_alumnos)
+        form.addRow("Data inici:", self.fechaInicio)
+        form.addRow("Data fi:", self.fechaFin)
+        form.addRow("Màxim alumnes:", self.numMaxAlumnos)
 
         btn_guardar = QPushButton("Guardar")
         btn_cancelar = QPushButton("Cancel·lar")
@@ -51,9 +51,9 @@ class ActividadDialog(QDialog):
             self.tipo.setCurrentText(actividad["tipo"])
             self.descripcion.setText(actividad.get("descripcion", ""))
             self.profesor.setText(actividad.get("profesor", ""))
-            self.fecha_inicio.setDate(QDate.fromString(actividad.get("fecha_inicio", ""), "yyyy-MM-dd"))
-            self.fecha_fin.setDate(QDate.fromString(actividad.get("fecha_fin", ""), "yyyy-MM-dd"))
-            self.numero_maximo_alumnos.setValue(actividad.get("numero_maximo_alumnos", 1))
+            self.fechaInicio.setDate(QDate.fromString(actividad.get("fechaInicio", ""), "yyyy-MM-dd"))
+            self.fechaFin.setDate(QDate.fromString(actividad.get("fechaFin", ""), "yyyy-MM-dd"))
+            self.numMaxAlumnos.setValue(actividad.get("numMaxAlumnos", 1))
 
     def _save(self):
         data = {
@@ -61,9 +61,9 @@ class ActividadDialog(QDialog):
             "tipo": self.tipo.currentText(),
             "descripcion": self.descripcion.text().strip(),
             "profesor": self.profesor.text().strip(),
-            "fecha_inicio": self.fecha_inicio.date().toString("yyyy-MM-dd"),
-            "fecha_fin": self.fecha_fin.date().toString("yyyy-MM-dd"),
-            "numero_maximo_alumnos": self.numero_maximo_alumnos.value()
+            "fechaInicio": self.fechaInicio.date().toString("yyyy-MM-dd"),
+            "fechaFin": self.fechaFin.date().toString("yyyy-MM-dd"),
+            "numMaxAlumnos": self.numMaxAlumnos.value()
         }
 
         if not data["nombre"]:

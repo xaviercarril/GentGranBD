@@ -14,7 +14,7 @@ class DictTableModel(QAbstractTableModel):
           • [('ID', 'id'), ('Nom', 'nombre'), ...] (etiqueta, clau)
         """
         super().__init__(parent)
-        self.rows = rows
+        self.rows = rows or []
 
         # Normalitzem: guardem llistes paral·leles
         if headers and isinstance(headers[0], (list, tuple)):
@@ -24,10 +24,11 @@ class DictTableModel(QAbstractTableModel):
             self.labels = [h.capitalize() for h in headers]
 
     # ── obligatoris ──────────────────────────────────────────
-    def rowCount(self, parent=None):
+    def rowCount(self, parent=QModelIndex()):
         return len(self.rows)
 
-    def columnCount(self, *_): return len(self.keys)
+    def columnCount(self, parent=QModelIndex()):
+        return len(self.keys)
 
     def data(self, idx, role=Qt.DisplayRole):
         if role != Qt.DisplayRole:

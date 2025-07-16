@@ -28,11 +28,11 @@ MAX_DATE_COLS = 30
 # ─────────────────────────────────────────────────────────────
 # Funció principal
 # ─────────────────────────────────────────────────────────────
-def generar_pdf_parrilla_asistencias(session, actividad_id: int, ruta_pdf: str):
+def generar_pdf_parrilla_asistencias(session, actividadID: int, ruta_pdf: str):
     """Genera la parrilla d’assistències (PDF) d’una activitat en català."""
 
     # 1. Validació i càrrega
-    actividad = session.query(Actividad).filter_by(id=actividad_id).first()
+    actividad = session.query(Actividad).filter_by(id=actividadID).first()
     if not actividad:
         raise ValueError("Activitat no trobada.")
 
