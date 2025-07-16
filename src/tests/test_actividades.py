@@ -3,14 +3,14 @@ from controladores.actividades import (
     modificar_actividad,
     eliminar_actividad,
     consultar_actividad,
-    crear_trimestre
 )
+from controladores.trimestre import registrar_trimestre
 from datetime import date
 from models import Curso, Taller, Trimestre, TrimestreEnum
 
 def test_crud_curso_con_trimestres(session):
     # Registrar un curso
-    curso_id = registrar_actividad(session, {
+    curso_id = registrar_actividad({
         'nombre': 'Anglès Inicial',
         'tipo': 'curso',
         'numMaxAlumnos': 12,
@@ -25,41 +25,42 @@ def test_crud_curso_con_trimestres(session):
     assert curso.nombre == 'Anglès Inicial'
 
     # Crear trimestres asociados al curso
-    trimestre1_id = crear_trimestre(
-        session,
-        nombre=TrimestreEnum.Q1,
-        fechaInicio=date(2025, 1, 1),
-        fechaFin=date(2025, 3, 31),
-        curso_id=curso_id
-    )
 
-    trimestre2_id = crear_trimestre(
-        session,
-        nombre=TrimestreEnum.Q2,
-        fechaInicio=date(2025, 4, 1),
-        fechaFin=date(2025, 6, 30),
-        curso_id=curso_id
-    )
+    trimestre1_id = registrar_trimestre({
+        'nombre': TrimestreEnum.T1,
+        'fecha_inicio': date(2025, 1, 1),
+        'fecha_fin': date(2025, 3, 31),
+        'cursoAcademicoID': curso_id
+    })
+
+    trimestre2_id = registrar_trimestre({
+        'nombre': TrimestreEnum.T2,
+        'fecha_inicio': date(2025, 4, 1),
+        'fecha_fin': date(2025, 6, 30),
+        'cursoAcademicoID': curso_id
+    })
+
 
     # Verificar que se asocian correctamente
     curso = session.get(Curso,curso_id)
     assert len(curso.trimestres) == 2
     nombres = [t.nombre for t in curso.trimestres]
-    assert TrimestreEnum.Q1 in nombres
-    assert TrimestreEnum.Q2 in nombres
+    assert TrimestreEnum.T1 in nombres
+    assert TrimestreEnum.T2 in nombres
 
     # Modificar
-    modificar_actividad(session, curso_id, {'numMaxAlumnos': 15})
+    modificar_actividad(curso_id, {'numero_maximo_alumnos': 15})
+
     curso = session.get(Curso,curso_id)
     assert curso.numMaxAlumnos == 15
 
     # Eliminar curso (cascade)
-    eliminado = eliminar_actividad(session, curso_id)
+    eliminado = eliminar_actividad(curso_id)
     assert eliminado is True
-    assert consultar_actividad(session, curso_id) is None
+    assert consultar_actividad(curso_id) is None
 
 def test_crud_taller(session):
-    taller_id = registrar_actividad(session, {
+    taller_id = registrar_actividad({
         'nombre': 'Ceràmica Creativa',
         'tipo': 'taller',
         'numMaxAlumnos': 8,
@@ -72,30 +73,33 @@ def test_crud_taller(session):
     assert taller is not None
     assert taller.nombre == 'Ceràmica Creativa'
 
-    modificar_actividad(session, taller_id, {'numMaxAlumnos': 10})
+
+    modificar_actividad(taller_id, {'numMaxAlumnos': 10})
+
     taller = session.get(Taller,taller_id)
     assert taller.numMaxAlumnos == 10
 
-    eliminado = eliminar_actividad(session, taller_id)
+    eliminado = eliminar_actividad(taller_id)
     assert eliminado is True
-    assert consultar_actividad(session, taller_id) is None
+    assert consultar_actividad(taller_id) is None
 
 def test_crear_trimestre_unit(session):
     # Test directo crear trimestre aislado (solo para verificar FK)
-    curso_id = registrar_actividad(session, {
+    curso_id = registrar_actividad({
         'nombre': 'Francès Bàsic',
         'tipo': 'curso'
     })
 
-    trimestreID = crear_trimestre(
-        session,
-        nombre=TrimestreEnum.Q3,
-        fechaInicio=date(2025, 7, 1),
-        fechaFin=date(2025, 9, 30),
-        curso_id=curso_id
-    )
+
+    trimestre_id = registrar_trimestre({
+        'nombre': TrimestreEnum.T3,
+        'fechaInicio': date(2025, 7, 1),
+        'fechaFin': date(2025, 9, 30),
+        'cursoAcademicoID': curso_id
+    })
+
 
     trimestre = session.get(Trimestre,trimestreID)
     assert trimestre is not None
-    assert trimestre.nombre == TrimestreEnum.Q3
+    assert trimestre.nombre == TrimestreEnum.T3
     assert trimestre.curso_id == curso_id

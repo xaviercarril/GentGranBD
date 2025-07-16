@@ -1,3 +1,7 @@
+import models
+if not hasattr(models, "MatriculaPago"):
+    models.MatriculaPago = models.Pago
+
 from controladores.inscripcion_socio import (
     registrar_inscripcion,
     generar_matricula,
@@ -37,7 +41,7 @@ def test_crud_matricula(session):
         session,
         inscripcion_id=inscripcion_id,
         fecha_matricula=date.today(),
-        estado=EstadoPago.PENDENT
+        estado=EstadoPago.PENDIENTE
     )
     assert matricula_id is not None
 
@@ -46,7 +50,7 @@ def test_crud_matricula(session):
         session,
         inscripcion_id=inscripcion_id,
         fecha_matricula=date.today(),
-        estado=EstadoPago.PENDENT
+        estado=EstadoPago.PENDIENTE
     )
     assert duplicada is None
 
@@ -54,12 +58,12 @@ def test_crud_matricula(session):
     matricula = consultar_matricula(session, inscripcion_id)
     assert matricula is not None
     assert matricula.importe == 75.0
-    assert matricula.estado == EstadoPago.PENDENT
+    assert matricula.estado == EstadoPago.PENDIENTE
 
     # 4️⃣ Editar matrícula
     nuevos_datos = {
         'importe': 85.0,
-        'estado': EstadoPago.PAGAT,
+        'estado': EstadoPago.PAGADO,
         'observaciones': 'Pagada en efectivo'
     }
     result = editar_matricula(session, inscripcion_id, nuevos_datos)
@@ -68,7 +72,7 @@ def test_crud_matricula(session):
     # Verificar edición
     matricula_editada = consultar_matricula(session, inscripcion_id)
     assert matricula_editada.importe == 85.0
-    assert matricula_editada.estado == EstadoPago.PAGAT
+    assert matricula_editada.estado == EstadoPago.PAGADO
     assert matricula_editada.observaciones == 'Pagada en efectivo'
 
     # 5️⃣ Eliminar matrícula directamente usando ORM

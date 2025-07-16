@@ -41,7 +41,7 @@ def test_generar_pdf_inscripciones(session):
             'fechaInscripcion': datetime(2025, 6, 20-i, 14, 30)
         })
         if ( i % 2 == 0):
-            generar_matricula(session, inscripcion_id, date(2025, 6, 20-i), EstadoPago.PAGAT)
+            generar_matricula(session, inscripcion_id, date(2025, 6, 20-i), EstadoPago.PAGADO)
 
     output_file = "./informe_inscripciones.pdf"
     generar_pdf_inscripciones(session, actividadID, output_file)

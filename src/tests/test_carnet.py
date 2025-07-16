@@ -11,7 +11,9 @@ def test_generar_carnet(tmp_path, session):
         "apellido2": "López",
         "fechaAlta": date.today()
     })
-    adjuntar_foto_socio(session, socioID, "./tests/foto_socio3.jpg")
+
+    adjuntar_foto_socio(session, socio_id, "./src/tests/foto_socio3.jpg")
+
     outfile = "./carnet.pdf"
     generar_carnet_socio(session, socioID, str(outfile), "./extra/logo.png")
     assert os.stat(outfile).st_size > 0
