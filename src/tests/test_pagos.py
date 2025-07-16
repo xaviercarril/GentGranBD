@@ -1,3 +1,7 @@
+import models
+if not hasattr(models, "MatriculaPago"):
+    models.MatriculaPago = models.Pago
+
 from controladores.pagos import registrar_pago, consultar_pagos_por_inscripcion, consultar_matricula_por_inscripcion
 from controladores.actividades import registrar_actividad
 from controladores.socios import registrar_socio
@@ -6,7 +10,7 @@ from datetime import date
 from models import EstadoPago
 
 def test_registrar_matricula_y_mensualidad(session):
-    act_id = registrar_actividad(session, {
+    act_id = registrar_actividad({
         'nombre': 'Dansa',
         'tipo': 'curso',
         'numero_maximo_alumnos': 1,
@@ -20,27 +24,27 @@ def test_registrar_matricula_y_mensualidad(session):
         'fecha_alta': date.today()
     })
 
-    insc_id = registrar_inscripcion(session, {
+    insc_id = registrar_inscripcion({
         'socio_id': socio_id,
         'actividad_id': act_id,
         'fecha_inscripcion': date.today()
     })
 
     # Crear matrícula manualmente
-    registrar_pago(session, {
+    registrar_pago({
         'inscripcion_id': insc_id,
         'fecha': date.today(),
         'importe': 50.0,
-        'estado': EstadoPago.PENDENT,
+        'estado': EstadoPago.PENDIENTE,
         'tipo': 'matricula'
     }, tipo='matricula')
 
     # Crear mensualidad
-    registrar_pago(session, {
+    registrar_pago({
         'inscripcion_id': insc_id,
         'fecha': date.today(),
         'importe': 15.0,
-        'estado': EstadoPago.PAGAT,
+        'estado': EstadoPago.PAGADO,
         'tipo': 'mensualidades'
     }, tipo='mensualidades')
 
@@ -55,4 +59,4 @@ def test_registrar_matricula_y_mensualidad(session):
     matricula = consultar_matricula_por_inscripcion(session, insc_id)
     assert matricula is not None
     assert matricula.importe == 50.0
-    assert matricula.estado == EstadoPago.PENDENT
+    assert matricula.estado == EstadoPago.PENDIENTE

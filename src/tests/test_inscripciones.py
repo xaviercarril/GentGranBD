@@ -45,7 +45,7 @@ def test_registrar_inscripcion_con_estado_y_matricula(session):
     i2 = session.get(InscripcionSocio, ins2)
 
     # ✅ Verificar estados 
-    assert i1.estado == EstadoInscripcion.INSCRIT
+    assert i1.estado == EstadoInscripcion.INSCRITO
     assert i2.estado == EstadoInscripcion.RESERVA
 
     # ✅ Verificar matrícula generada solo para INSCRIT
