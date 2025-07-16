@@ -85,7 +85,7 @@ class SociosTab(QWidget):
     self._all_socios = rows
     headers = [
       ("ID", "id"),
-      ("DNI/NIE", "dni_nie"),
+      ("DNI/NIE", "dniNie"),
       ("Nom", "nombre"),
       ("1r Cognom", "apellido1"),
       ("2n Cognom", "apellido2"),
@@ -115,8 +115,8 @@ class SociosTab(QWidget):
 
   def _editar_socio_dialog(self, index):
     fila = self.table_socis.model().rows[index.row()]
-    socio_id = fila["id"]
-    socio_complet = consultar_socio(socio_id)
+    socioID = fila["id"]
+    socio_complet = consultar_socio(socioID)
     dlg = SocioDialog(self, socio=socio_complet)
     if dlg.exec():
       self._refresh_socios()
@@ -162,8 +162,8 @@ class SociosTab(QWidget):
     if not curr.isValid():
       self.detail.load(None)
       return
-    socio_id = self.table_socis.model().rows[curr.row()]["id"]
-    self.detail.load(socio_id)
+    socioID = self.table_socis.model().rows[curr.row()]["id"]
+    self.detail.load(socioID)
 
   def _generar_carnet_socio(self):
     sel = self.table_socis.selectionModel().selectedRows()
@@ -182,7 +182,7 @@ class SociosTab(QWidget):
 
       doc = QPdfDocument()
       load_result = doc.load(pdf_path)
-      if load_result != QPdfDocument.NoError:
+      if load_result != 0:
         raise Exception("Error loading PDF")
 
       printer = QPrinter(QPrinter.HighResolution)

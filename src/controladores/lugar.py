@@ -52,14 +52,14 @@ def registrar_lugar(data: dict) -> int:
     except IntegrityError as e:
         raise ValueError(f"Error al registrar lugar: {e.orig}")
     
-def modificar_lugar(lugar_id: int, cambios: dict) -> None:
+def modificar_lugar(lugarID: int, cambios: dict) -> None:
     try:
         dto = LugarUpdateDTO(**cambios)
     except ValidationError as e:
         raise ValueError(f"Datos inválidos: {e}")
 
     with SessionLocal() as db:
-        lugar = db.get(Lugar, lugar_id)
+        lugar = db.get(Lugar, lugarID)
         if not lugar:
             raise ValueError("Lugar inexistent")
         
@@ -74,9 +74,9 @@ def modificar_lugar(lugar_id: int, cambios: dict) -> None:
             db.rollback()
             raise ValueError(f"Error al modificar lugar: {e.orig}")
         
-def eliminar_lugar(lugar_id: int) -> None:
+def eliminar_lugar(lugarID: int) -> None:
     with SessionLocal() as db:
-        lugar = db.get(Lugar, lugar_id)
+        lugar = db.get(Lugar, lugarID)
         if not lugar:
             raise ValueError("Lugar inexistent")
         
@@ -87,9 +87,9 @@ def eliminar_lugar(lugar_id: int) -> None:
             db.rollback()
             raise ValueError(f"Error al eliminar lugar: {e.orig}")
         
-def consultar_lugar(lugar_id: int) -> dict | None:
+def consultar_lugar(lugarID: int) -> dict | None:
     with SessionLocal() as db:
-        lugar = db.get(Lugar, lugar_id)
+        lugar = db.get(Lugar, lugarID)
         return _to_dto(lugar).model_dump() if lugar else None
 
 # ────────────────── Consultas ──────────────────
@@ -98,11 +98,11 @@ def consultar_lugares() -> list[dict]:
         lugares = db.query(Lugar).order_by(Lugar.nombre).all()
         return [_to_dto(l).model_dump() for l in lugares]
 
-def listar_actividades_por_lugar(lugar_id: int) -> list[dict]:
+def listar_actividades_por_lugar(lugarID: int) -> list[dict]:
     """Devuelve actividades asociadas a un lugar."""
     try:
         with SessionLocal() as db:
-            actividades = db.query(Actividad).filter(Actividad.lugar_id == lugar_id).all()
+            actividades = db.query(Actividad).filter(Actividad.lugarID == lugarID).all()
             return [a.model_dump() for a in actividades]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por lugar: {e}")

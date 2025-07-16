@@ -8,7 +8,7 @@ from controladores.voluntarios import (
 
 def test_cu11_registrar_voluntario(session):
     datos = {
-        'dni_nie': 'V1234567X',
+        'dniNie': 'V1234567X',
         'nombre': 'Laura',
         'apellido1': 'Prats'
     }
@@ -19,7 +19,7 @@ def test_cu11_registrar_voluntario(session):
 
 def test_cu12_modificar_voluntario(session):
     datos = {
-        'dni_nie': 'V7654321Y',
+        'dniNie': 'V7654321Y',
         'nombre': 'Oriol',
         'apellido1': 'Mir'
     }
@@ -30,7 +30,7 @@ def test_cu12_modificar_voluntario(session):
 
 def test_cu13_eliminar_voluntario(session):
     datos = {
-        'dni_nie': 'V000111Z',
+        'dniNie': 'V000111Z',
         'nombre': 'Marta',
         'apellido1': 'Soler'
     }
@@ -41,11 +41,11 @@ def test_cu13_eliminar_voluntario(session):
 
 def test_cu14_consultar_voluntario(session):
     datos = {
-        'dni_nie': 'V999888W',
+        'dniNie': 'V999888W',
         'nombre': 'Albert',
         'apellido1': 'Costa'
     }
     voluntario_id = registrar_voluntario(session, datos)
     voluntario = consultar_voluntario(session, voluntario_id)
-    assert voluntario.dni_nie == 'V999888W'
+    assert voluntario.dniNie == 'V999888W'
     assert voluntario.nombre == 'Albert'

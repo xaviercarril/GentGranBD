@@ -9,21 +9,21 @@ def test_registrar_matricula_y_mensualidad(session):
     act_id = registrar_actividad(session, {
         'nombre': 'Dansa',
         'tipo': 'curso',
-        'numero_maximo_alumnos': 1,
+        'numMaxAlumnos': 1,
         'duracion': 60,
         'precio_matricula': 50.0
     })
 
-    socio_id = registrar_socio(session, {
-        'dni_nie': 'P00123X',
+    socioID = registrar_socio(session, {
+        'dniNie': 'P00123X',
         'nombre': 'Meritxell',
-        'fecha_alta': date.today()
+        'fechaAlta': date.today()
     })
 
     insc_id = registrar_inscripcion(session, {
-        'socio_id': socio_id,
-        'actividad_id': act_id,
-        'fecha_inscripcion': date.today()
+        'socioID': socioID,
+        'actividadID': act_id,
+        'fechaInscripcion': date.today()
     })
 
     # Crear matrícula manualmente

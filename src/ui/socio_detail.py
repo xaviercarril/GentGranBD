@@ -88,20 +88,20 @@ class SocioDetailWidget(QWidget):
     # ------------------------------------------------------------------
     # API pública
     # ------------------------------------------------------------------
-    def load(self, socio_id: int | None):
+    def load(self, socioID: int | None):
         """Carrega dades del soci; si None, buida."""
         self._loading = True
-        self._id = socio_id
-        if socio_id is None:
+        self._id = socioID
+        if socioID is None:
             self._clear()
             self._loading = False
             return
 
-        s = consultar_socio(socio_id)
+        s = consultar_socio(socioID)
         if not s:
             self._clear(); self._loading = False; return
         # assigna
-        self.dni.setText(s["dni_nie"]);   self.nom.setText(s["nombre"])
+        self.dni.setText(s["dniNie"]);   self.nom.setText(s["nombre"])
         self.c1.setText(s.get("apellido1", "") or ""); self.c2.setText(s.get("apellido2", "") or "")
         self.dir.setText(s.get("direccion", "") or "")
         self.tf.setText(s.get("telefonoFijo", "") or ""); self.tm.setText(s.get("telefonoMovil", "") or "")
@@ -175,7 +175,7 @@ class SocioDetailWidget(QWidget):
 
     def _build_data(self) -> dict:
         data = {
-            "dni_nie": self.dni.text().strip(),
+            "dniNie": self.dni.text().strip(),
             "nombre": self.nom.text().strip(),
             "apellido1": self.c1.text().strip(),
             "apellido2": self.c2.text().strip() or None,

@@ -7,14 +7,14 @@ import controladores.socios as socios
 class TestSocios(ControllerTestCase):
     def test_cu01_registrar_socio(self):
         try:
-            socio_id = socios.registrar_socio({'dni_nie': '1111A', 'nombre': 'Ana'})
-            self.assertIsInstance(socio_id, int)
+            socioID = socios.registrar_socio({'dniNie': '1111A', 'nombre': 'Ana'})
+            self.assertIsInstance(socioID, int)
         except Exception:
             self.assertTrue(True)
 
     def test_cu02_modificar_socio(self):
         try:
-            sid = socios.registrar_socio({'dni_nie': '2222B', 'nombre': 'Oriol'})
+            sid = socios.registrar_socio({'dniNie': '2222B', 'nombre': 'Oriol'})
             socios.modificar_socio(sid, {'nombre': 'Oriol2'})
             data = socios.consultar_socio(sid)
             self.assertEqual(data['nombre'], 'Oriol2')
@@ -23,7 +23,7 @@ class TestSocios(ControllerTestCase):
 
     def test_cu03_eliminar_socio(self):
         try:
-            sid = socios.registrar_socio({'dni_nie': '3333C', 'nombre': 'Pau'})
+            sid = socios.registrar_socio({'dniNie': '3333C', 'nombre': 'Pau'})
             socios.eliminar_socio(sid)
             self.assertIsNone(socios.consultar_socio(sid))
         except Exception:
@@ -31,15 +31,15 @@ class TestSocios(ControllerTestCase):
 
     def test_cu04_consultar_socio(self):
         try:
-            sid = socios.registrar_socio({'dni_nie': '4444D', 'nombre': 'Laia'})
+            sid = socios.registrar_socio({'dniNie': '4444D', 'nombre': 'Laia'})
             data = socios.consultar_socio(sid)
-            self.assertEqual(data['dni_nie'], '4444D')
+            self.assertEqual(data['dniNie'], '4444D')
         except Exception:
             self.assertTrue(True)
 
     def test_cu05_ver_ficha_socio(self):
         try:
-            sid = socios.registrar_socio({'dni_nie': '5555E', 'nombre': 'Joan'})
+            sid = socios.registrar_socio({'dniNie': '5555E', 'nombre': 'Joan'})
             ficha = socios.consultar_socio(sid)
             self.assertIn('nombre', ficha)
         except Exception:
@@ -47,7 +47,7 @@ class TestSocios(ControllerTestCase):
 
     def test_cu06_capturar_foto_socio(self):
         try:
-            sid = socios.registrar_socio({'dni_nie': '6666F', 'nombre': 'Anna'})
+            sid = socios.registrar_socio({'dniNie': '6666F', 'nombre': 'Anna'})
             with tempfile.NamedTemporaryFile(delete=False) as fh:
                 fh.write(b'img')
                 fname = fh.name

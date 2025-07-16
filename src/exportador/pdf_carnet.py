@@ -69,7 +69,7 @@ def _fons(c: canvas.Canvas, logo_path: str | None):
 # ──────────────────────────────────────────────────────
 def generar_carnet_socio(
     session,
-    socio_id: int,
+    socioID: int,
     ruta_pdf: str,
     logo_path: str | None = None
 ):
@@ -81,7 +81,7 @@ def generar_carnet_socio(
       • franja inferior amb text de contacte
     Sempre cap en **una sola pàgina**.
     """
-    soci = session.get(Socio, socio_id)     # API moderna SQLAlchemy
+    soci = session.get(Socio, socioID)     # API moderna SQLAlchemy
     if not soci:
         raise ValueError("Soci no trobat")
 

@@ -10,13 +10,13 @@ class PersonalDTO(BaseModel):
     nombre: str
     apellido1: str
     apellido2: str | None = None
-    dni_nie: str
+    dniNie: str
 
 class PersonalUpdateDTO(BaseModel):
     nombre: str | None = None
     apellido1: str | None = None
     apellido2: str | None = None
-    dni_nie: str | None = None
+    dniNie: str | None = None
 
 def _to_dto(personal: Personal) -> PersonalDTO:
     return PersonalDTO(
@@ -24,7 +24,7 @@ def _to_dto(personal: Personal) -> PersonalDTO:
         nombre=personal.nombre,
         apellido1=personal.apellido1,
         apellido2=personal.apellido2,
-        dni_nie=personal.dni_nie
+        dniNie=personal.dniNie
     )
 
 # ───────────────── CRUD ─────────────────
@@ -40,14 +40,14 @@ def registrar_personal(data: dict, tipo: str) -> int:
             nombre=dto.nombre,
             apellido1=dto.apellido1,
             apellido2=dto.apellido2,
-            dni_nie=dto.dni_nie
+            dniNie=dto.dniNie
         )
     elif tipo == 'voluntario':
         nuevo_personal = Voluntario(
             nombre=dto.nombre,
             apellido1=dto.apellido1,
             apellido2=dto.apellido2,
-            dni_nie=dto.dni_nie
+            dniNie=dto.dniNie
         )
     else:
         raise ValueError("Tipo de personal no válido")
@@ -61,7 +61,7 @@ def registrar_personal(data: dict, tipo: str) -> int:
     except IntegrityError as e:
         raise ValueError(f"Error al registrar personal: {e.orig}")
 
-def modificar_personal(personal_id: int, cambios: dict) -> None:
+def modificar_personal(personalID: int, cambios: dict) -> None:
     """Modifica un personal; recibe ID y dict con cambios."""
     try:
         dto = PersonalUpdateDTO(**cambios)
@@ -69,7 +69,7 @@ def modificar_personal(personal_id: int, cambios: dict) -> None:
         raise ValueError(f"Datos inválidos: {e}")
 
     with SessionLocal() as db:
-        personal = db.get(Personal, personal_id)
+        personal = db.get(Personal, personalID)
         if not personal:
             raise ValueError("Personal inexistente")
 
@@ -84,19 +84,19 @@ def modificar_personal(personal_id: int, cambios: dict) -> None:
             db.rollback()
             raise ValueError(f"Error al modificar personal: {e.orig}")
 
-def eliminar_personal(personal_id: int) -> None:
+def eliminar_personal(personalID: int) -> None:
     with SessionLocal() as db:
-        persona = db.get(Personal, personal_id)
+        persona = db.get(Personal, personalID)
         if not persona:
             raise ValueError("Personal inexistente")
         db.delete(persona)
         db.commit()
 
-def consultar_personal(personal_id: int) -> Personal | None:
+def consultar_personal(personalID: int) -> Personal | None:
     """Consulta un personal por su ID y devuelve sus datos."""
     try:
         with SessionLocal() as db:
-            return db.get(Personal, personal_id)
+            return db.get(Personal, personalID)
     except Exception as e:
         raise ValueError(f"Error al consultar personal: {e}")
 
@@ -128,11 +128,11 @@ def listar_voluntarios() -> list[dict]:
     except Exception as e:
         raise ValueError(f"Error al listar voluntarios: {e}")
     
-def listar_actividades_por_Personal(personal_id: int) -> list[dict]:
+def listar_actividades_por_Personal(personalID: int) -> list[dict]:
     """Lista las actividades en las que un personal está asignado."""
     try:
         with SessionLocal() as db:
-            actividades = db.query(Personal.actividades).filter(Personal.id == personal_id).all()
+            actividades = db.query(Personal.actividades).filter(Personal.id == personalID).all()
             return [a.model_dump() for a in actividades]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por personal: {e}")

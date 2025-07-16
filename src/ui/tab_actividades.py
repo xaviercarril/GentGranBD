@@ -51,7 +51,7 @@ class ActividadesTab(QWidget):
       QTableView::item:selected {
         background: #c5d6a1;
         color: black;
-      }
+      } 
       QTableView::item:selected:active {
         background: #a8bd88;
       }
@@ -196,15 +196,15 @@ class ActividadesTab(QWidget):
     if not curr.isValid():
       self.detail_curso.load(None)
       return
-    actividad_id = self.table_cursos.model().rows[curr.row()]["id"]
-    self.detail_curso.load(actividad_id)
+    actividadID = self.table_cursos.model().rows[curr.row()]["id"]
+    self.detail_curso.load(actividadID)
 
   def _row_changed_taller(self, curr, _prev):
     if not curr.isValid():
       self.detail_taller.load(None)
       return
-    actividad_id = self.table_tallers.model().rows[curr.row()]["id"]
-    self.detail_taller.load(actividad_id)
+    actividadID = self.table_tallers.model().rows[curr.row()]["id"]
+    self.detail_taller.load(actividadID)
 
   def _dialog_nova_actividad(self):
     dlg = ActividadDialog(self)

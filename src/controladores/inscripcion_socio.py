@@ -2,33 +2,33 @@
 from pydantic import ValidationError
 from sqlalchemy.orm import Session
 from database import SessionLocal
-from models import InscripcionSocio, Actividad, EstadoInscripcion, MatriculaPago, EstadoPago, Pago, Socio
+from models import InscripcionSocio, Actividad, EstadoInscripcion, Pago, EstadoPago, Pago, Socio
 from controladores.pagos import registrar_pago
 from sqlalchemy.exc import IntegrityError
 from datetime import date
 
 # ────────────────────── DTO ──────────────────────
 class InscripcionSocioDTO(BaseModel):
-    socio_id: int
-    actividad_id: int
-    fecha_inscripcion: date
+    socioID: int
+    actividadID: int
+    fechaInscripcion: date
     estado: EstadoInscripcion = EstadoInscripcion.RESERVA
     observaciones: str | None = None
-    fecha_baja: date | None = None
+    fechaBaja: date | None = None
 
 class InscripcionSocioUpdateDTO(BaseModel):
     estado: EstadoInscripcion | None = None
     observaciones: str | None = None
-    fecha_baja: date | None = None
+    fechaBaja: date | None = None
 
 def _to_dto(inscripcion: InscripcionSocio) -> InscripcionSocioDTO:
     return InscripcionSocioDTO(
-        socio_id=inscripcion.socio_id,
-        actividad_id=inscripcion.actividad_id,
-        fecha_inscripcion=inscripcion.fecha_inscripcion,
+        socioID=inscripcion.socioID,
+        actividadID=inscripcion.actividadID,
+        fechaInscripcion=inscripcion.fechaInscripcion,
         estado=inscripcion.estado,
         observaciones=inscripcion.observaciones,
-        fecha_baja=inscripcion.fecha_baja
+        fechaBaja=inscripcion.fechaBaja
     )
 
 # ───────────────── CRUD ─────────────────
@@ -40,12 +40,12 @@ def registrar_inscripcion(data: dict) -> int:
         raise ValueError(f"Datos de entrada inválidos: {e}")
 
     nueva_inscripcion = InscripcionSocio(
-        socio_id=dto.socio_id,
-        actividad_id=dto.actividad_id,
-        fecha_inscripcion=dto.fecha_inscripcion,
+        socioID=dto.socioID,
+        actividadID=dto.actividadID,
+        fechaInscripcion=dto.fechaInscripcion,
         estado=dto.estado,
         observaciones=dto.observaciones,
-        fecha_baja=dto.fecha_baja
+        fechaBaja=dto.fechaBaja
     )
 
     with SessionLocal() as db:
@@ -141,55 +141,3 @@ def listar_pagos_por_InscripcionSocio(inscripcion_id: int) -> list[dict]:
     except Exception as e:
         raise ValueError(f"Error al listar pagos: {e}")
     
-# ────────────────── Generadores ──────────────────
-def generar_matricula(session: Session, socio_id: int, actividad_id: int, fecha_matricula: date, estado: EstadoPago):
-    inscripcion = session.get(InscripcionSocio, {'socio_id': socio_id, 'actividad_id': actividad_id})
-    actividad = session.get(Actividad, actividad_id)
-    if not inscripcion:
-        print("Inscripción no encontrada.")
-        return None
-    if consultar_matricula(session, socio_id, actividad_id):
-        print("Ya existe una matrícula para esta inscripción.")
-        return None
-
-    print(f"Generando matrícula para la inscripción socio:{socio_id} act:{actividad_id}, fecha: {fecha_matricula}, estado: {estado.value}")
-    # Registrar el pago de matrícula
-    matricula_id = registrar_pago(session, {
-        'socio_id': socio_id,
-        'actividad_id': actividad_id,
-        'fecha': fecha_matricula,
-        'importe': actividad.precio_matricula,
-        'estado': estado
-    }, tipo='matricula')
-    
-    return matricula_id
-
-def consultar_matricula(session: Session, socio_id: int, actividad_id: int):
-    return session.query(MatriculaPago).filter(
-        MatriculaPago.socio_id == socio_id,
-        MatriculaPago.actividad_id == actividad_id
-    ).first()
-
-
-
-def actualizar_estado_inscripciones(session: Session, actividad_id: int):
-    actividad = session.query(Actividad).filter_by(id=actividad_id).first()
-    if not actividad:
-        print("Actividad no encontrada.")
-        return False
-
-    inscripciones = session.query(InscripcionSocio).filter_by(actividad_id=actividad.id).order_by(InscripcionSocio.fecha_inscripcion).all()
-
-    for i, inscripcion in enumerate(inscripciones, start=1):
-        if actividad.numero_maximo_alumnos is not None and i > actividad.numero_maximo_alumnos:
-            inscripcion.estado = EstadoInscripcion.RESERVA
-        else:
-            inscripcion.estado = EstadoInscripcion.INSCRIT
-        session.add(inscripcion)
-
-    try:
-        session.commit()
-        return True
-    except IntegrityError:
-        session.rollback()
-        return False

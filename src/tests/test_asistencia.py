@@ -6,22 +6,22 @@ from controladores.inscripcion_socio import registrar_inscripcion
 from datetime import date
 
 def test_registrar_y_consultar_asistencia(session):
-    actividad_id = registrar_actividad(session, {
+    actividadID = registrar_actividad(session, {
         'nombre': 'Ioga',
         'tipo': 'curso',
-        'numero_maximo_alumnos': 5
+        'numMaxAlumnos': 5
     })
-    socio_id = registrar_socio(session, {
-        'dni_nie': '12345678A',
+    socioID = registrar_socio(session, {
+        'dniNie': '12345678A',
         'nombre': 'Clara',
-        'fecha_alta': date.today()
+        'fechaAlta': date.today()
     })
     insc_id = registrar_inscripcion(session, {
-        'socio_id': socio_id,
-        'actividad_id': actividad_id,
-        'fecha_inscripcion': date.today()
+        'socioID': socioID,
+        'actividadID': actividadID,
+        'fechaInscripcion': date.today()
     })
-    fecha_id = agregar_fecha(session, actividad_id, date.today(), 'Clase de prueba')
+    fecha_id = agregar_fecha(session, actividadID, date.today(), 'Clase de prueba')
 
     asistencia_id = registrar_asistencia(
         session,

@@ -10,8 +10,8 @@ from models import ActividadPersonal, Personal
 @dataclass(slots=True)
 class ActividadPersonalDTO(BaseModel):
     id: int | None = None
-    actividad_id: int
-    personal_id: int
+    actividadID: int
+    personalID: int
     rol: str | None = None
 
 class ActividadPersonalUpdateDTO(BaseModel):
@@ -20,8 +20,8 @@ class ActividadPersonalUpdateDTO(BaseModel):
 def _to_dto(actividad_personal: ActividadPersonal) -> ActividadPersonalDTO:
     return ActividadPersonalDTO(
         id=actividad_personal.id,
-        actividad_id=actividad_personal.actividad_id,
-        personal_id=actividad_personal.personal_id,
+        actividadID=actividad_personal.actividadID,
+        personalID=actividad_personal.personalID,
         rol=actividad_personal.rol
     )
 
@@ -34,8 +34,8 @@ def registrar_actividad_personal(data: dict) -> int:
         raise ValueError(f"Datos de entrada inválidos: {e}")
 
     nueva_actividad_personal = ActividadPersonal(
-        actividad_id=dto.actividad_id,
-        personal_id=dto.personal_id,
+        actividadID=dto.actividadID,
+        personalID=dto.personalID,
         rol=dto.rol
     )
 
@@ -96,22 +96,22 @@ def eliminar_actividad_personal(id: int) -> None:
         
 
 # ───────────────── Consultas ─────────────────
-def consultar_personal_ActividadPersonal(actividadPersonal_id: int) -> dict | None:
+def consultar_personal_ActividadPersonal(actividadpersonalID: int) -> dict | None:
     """Consulta personal asociado a una actividad y devuelve lista de dicts."""
     try:
         with SessionLocal() as db:
-            personal = db.get(ActividadPersonal, actividadPersonal_id)
+            personal = db.get(ActividadPersonal, actividadpersonalID)
             if not personal:
                 return None
             return personal.model_dump()
     except Exception as e:
         raise ValueError(f"Error al consultar personal de actividad: {e}")
     
-def consultar_actividad_ActividadPersonal(actividadPersonal_id: int) -> dict | None:
+def consultar_actividad_ActividadPersonal(actividadpersonalID: int) -> dict | None:
     """Consulta actividad asociada a un personal y devuelve lista de dicts."""
     try:
         with SessionLocal() as db:
-            actividad = db.get(ActividadPersonal, actividadPersonal_id)
+            actividad = db.get(ActividadPersonal, actividadpersonalID)
             if not actividad:
                 return None
             return actividad.model_dump()

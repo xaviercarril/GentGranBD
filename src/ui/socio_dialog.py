@@ -12,12 +12,12 @@ import os
 class SocioDialog(QDialog):
     """Diàleg de “Nou / Editar” soci amb tots els camps i gestió de foto."""
 
-    _REQUERITS = ("dni_nie", "nombre")
+    _REQUERITS = ("dniNie", "nombre")
 
     def __init__(self, parent=None, socio: dict | None = None):
         super().__init__(parent)
         self._edit_mode = socio is not None
-        self._socio_id = socio["id"] if socio else None
+        self._socioID = socio["id"] if socio else None
         self._foto_path: str | None = None
         self.setWindowTitle("Editar soci" if socio else "Nou soci")
 
@@ -71,7 +71,7 @@ class SocioDialog(QDialog):
     # ─────────────────────────────────────────────────────────
     def _load_socio(self, s: dict):
         """Carrega dades existents al formulari."""
-        self.dni.setText(s["dni_nie"])
+        self.dni.setText(s["dniNie"])
         self.nom.setText(s["nombre"])
         self.c1.setText(s["apellido1"])
         self.c2.setText(s.get("apellido2", "") or "")
@@ -80,10 +80,10 @@ class SocioDialog(QDialog):
         self.tel_mob.setText(s.get("telefono", "") or "")
         self.email.setText(s.get("email", "") or "")
         self.grup.setText(s.get("grupoDifusion", "") or "")
-        if s.get("fecha_alta"):
-            self.data_alta.setDate(QDate.fromString(str(s["fecha_alta"]), "yyyy-MM-dd"))
-        if s.get("fecha_baja"):
-            self.data_baixa.setDate(QDate.fromString(str(s["fecha_baja"]), "yyyy-MM-dd"))
+        if s.get("fechaAlta"):
+            self.data_alta.setDate(QDate.fromString(str(s["fechaAlta"]), "yyyy-MM-dd"))
+        if s.get("fechaBaja"):
+            self.data_baixa.setDate(QDate.fromString(str(s["fechaBaja"]), "yyyy-MM-dd"))
         # Foto existent
         if s.get("foto"):
           pix = QPixmap()
@@ -119,7 +119,7 @@ class SocioDialog(QDialog):
 
     def _build_data(self) -> dict:
         data = {
-            "dni_nie": self.dni.text().strip(),
+            "dniNie": self.dni.text().strip(),
             "nombre": self.nom.text().strip(),
             "apellido1": self.c1.text().strip(),
             "apellido2": self.c2.text().strip() or None,
@@ -128,8 +128,8 @@ class SocioDialog(QDialog):
             "telefonoMovil": self.tel_mob.text().strip() or None,
             "email": self.email.text().strip() or None,
             "grupoDifusion": self.grup.text().strip() or None,
-            "fecha_alta": self.data_alta.date().toPython() or date.today(),
-            "fecha_baja": (
+            "fechaAlta": self.data_alta.date().toPython() or date.today(),
+            "fechaBaja": (
                 self.data_baixa.date().toPython()
                 if self.data_baixa.date().isValid() else None
             ),
@@ -147,7 +147,7 @@ class SocioDialog(QDialog):
         data = self._build_data()
         try:
             if self._edit_mode:
-                modificar_socio(self._socio_id, data)
+                modificar_socio(self._socioID, data)
             else:
                 registrar_socio(data)
         except ValueError as e:
