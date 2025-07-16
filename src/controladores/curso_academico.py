@@ -1,11 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass, asdict
 from datetime import date
+from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
+from controladores.trimestre import TrimestreDTO, registrar_trimestre
 from database import SessionLocal
-from models import CursoAcademico
+from models import Actividad, CursoAcademico
 
-
+# ───────────────────── DTO ─────────────────────
 @dataclass(slots=True)
 class CursoAcademicoDTO:
   id: int
@@ -13,27 +15,32 @@ class CursoAcademicoDTO:
   fecha_inicio: date
   fecha_fin: date
 
+class CursoAcademicoUpdateDTO(BaseModel):
+  nombre: str | None = None
+  fecha_inicio: date | None = None
+  fecha_fin: date | None = None
 
-def consultar_curso_academico(curso_id: int) -> dict | None:
-  with SessionLocal() as db:
-    curso = db.get(CursoAcademico, curso_id)
-    if curso:
-      return asdict(CursoAcademicoDTO(
-        id=curso.id,
-        nombre=curso.nombre,
-        fecha_inicio=curso.fecha_inicio,
-        fecha_fin=curso.fecha_fin
-      ))
-    return None
+def _to_dto(curso: CursoAcademico) -> CursoAcademicoDTO:
+  return CursoAcademicoDTO(
+    id=curso.id,
+    nombre=curso.nombre,
+    fecha_inicio=curso.fecha_inicio,
+    fecha_fin=curso.fecha_fin
+  )
   
 # ───────────────── CRUD ─────────────────
-def registrar_curso_academico(datos: dict) -> int:
+def registrar_cursoA(datos: dict) -> int:
   """Crea un nuevo curso académico; devuelve su ID."""
   try:
+    dto = CursoAcademicoDTO(**datos)
+  except ValueError as e:
+    raise ValueError(f"Datos inválidos: {e}")
+  
+  try:
     nuevo_curso = CursoAcademico(
-      nombre=datos['nombre'],
-      fecha_inicio=datos['fecha_inicio'],
-      fecha_fin=datos['fecha_fin']
+      nombre=dto.nombre,
+      fecha_inicio=dto.fecha_inicio,
+      fecha_fin=dto.fecha_fin
     )
     with SessionLocal() as db:
       db.add(nuevo_curso)
@@ -42,38 +49,112 @@ def registrar_curso_academico(datos: dict) -> int:
       return nuevo_curso.id
   except IntegrityError as e:
     raise ValueError(f"Error al registrar curso académico: {e.orig}")
+  
 
+def modificar_cursoA(cursoA_id: int, cambios: dict) -> None:
+  try:
+    dto = CursoAcademicoUpdateDTO(**cambios)
+  except ValueError as e:
+    raise ValueError(f"Datos inválidos: {e}")
 
-def listar_cursos() -> list[dict]:
+  with SessionLocal() as db:
+    curso = db.get(CursoAcademico, cursoA_id)
+    if not curso:
+      raise ValueError("Curso inexistent")
+    
+    try:
+      for k, v in dto.model_dump(exclude_unset=True).items():
+        setattr(curso, k, v)
+      db.commit()
+    except AttributeError as e:
+      db.rollback()
+      raise ValueError(f"Campo no válido: {e}")
+    except IntegrityError as e:
+      db.rollback()
+      raise ValueError(f"Error al modificar curso académico: {e.orig}")
+    db.commit()
+
+def consultar_cursoA(cursoA_id: int) -> dict | None:
+  try:
+    with SessionLocal() as db:
+      curso = db.get(CursoAcademico, cursoA_id)
+      if curso:
+        return _to_dto(curso).model_dump()
+      return None
+  except Exception as e:
+    raise ValueError(f"Error al consultar curso académico: {e}")
+  
+def eliminar_cursoA(cursoA_id: int) -> None:
+  """Elimina un curso académico por su ID."""
+  try:
+    with SessionLocal() as db:
+      curso = db.get(CursoAcademico, cursoA_id)
+      if not curso:
+        raise ValueError("Curso inexistent")
+      db.delete(curso)
+      db.commit()
+  except Exception as e:
+    raise ValueError(f"Error al eliminar curso académico: {e}")
+  
+# ────────────────── Consultas ──────────────────
+def listar_cursosA() -> list[dict]:
   """Devuelve todos los cursos académicos"""
   with SessionLocal() as db:
     cursos = db.query(CursoAcademico).order_by(CursoAcademico.fecha_inicio).all()
-    return [
-      asdict(
-        CursoAcademicoDTO(
-          id=c.id,
-          nombre=c.nombre,
-          fecha_inicio=c.fecha_inicio,
-          fecha_fin=c.fecha_fin,
-        )
-      ) for c in cursos
-    ]
+    return [_to_dto(c).model_dump() for c in cursos]
 
-
-def modificar_curso(curso_id: int, cambios: dict) -> None:
+def listar_trimestres_por_cursoA(cursoA_id: int) -> list[dict]:
+  """Devuelve los trimestres de un curso académico."""
   with SessionLocal() as db:
-    curso = db.get(CursoAcademico, curso_id)
-    if not curso:
-      raise ValueError("Curso inexistent")
-    for k, v in cambios.items():
-      setattr(curso, k, v)
-    db.commit()
+    trimestres = db.query(TrimestreDTO).filter(TrimestreDTO.cursoA_id == cursoA_id).all()
+    return [t.model_dump() for t in trimestres]
+  
+def listar_actividades_por_CursoAcademico(cursoA_id: int) -> list[dict]:
+    """Devuelve actividades de un curso académico."""
+    try:
+        with SessionLocal() as db:
+            acts = db.query(Actividad).filter(Actividad.cursoA_id == cursoA_id).all()
+            return [a.model_dump() for a in acts]
+    except Exception as e:
+        raise ValueError(f"Error al listar actividades por curso: {e}")
+  
+# ────────────────── Generadores ──────────────────
+def generar_T1(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+    """Genera un trimestre 1 para el curso académico."""
+    nuevoTrim = registrar_trimestre(
+        nombre="T1",
+        fecha_inicio=data_inicio,
+        fecha_fin=data_fin,
+        cursoA_id=cursoA_id
+    )
+    return nuevoTrim.id
 
+def generar_T2(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+    """Genera un trimestre 2 para el curso académico."""
+    nuevoTrim = registrar_trimestre(
+        nombre="T2",
+        fecha_inicio=data_inicio,
+        fecha_fin=data_fin,
+        cursoA_id=cursoA_id
+    )
+    return nuevoTrim.id
 
-def eliminar_curso(curso_id: int) -> None:
-  with SessionLocal() as db:
-    curso = db.get(CursoAcademico, curso_id)
-    if not curso:
-      raise ValueError("Curso inexistent")
-    db.delete(curso)
-    db.commit()
+def generar_T3(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+    """Genera un trimestre 3 para el curso académico."""
+    nuevoTrim = registrar_trimestre(
+        nombre="T3",
+        fecha_inicio=data_inicio,
+        fecha_fin=data_fin,
+        cursoA_id=cursoA_id
+    )
+    return nuevoTrim.id
+
+def generar_T4(cursoA_id: int, data_inicio: date, data_fin: date) -> int:
+    """Genera un trimestre 4 para el curso académico."""
+    nuevoTrim = registrar_trimestre(
+        nombre="T4",
+        fecha_inicio=data_inicio,
+        fecha_fin=data_fin,
+        cursoA_id=cursoA_id
+    )
+    return nuevoTrim.id

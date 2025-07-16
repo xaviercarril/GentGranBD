@@ -1,4 +1,4 @@
-from controladores.inscripciones import (
+from controladores.inscripcion_socio import (
     registrar_inscripcion,
     generar_matricula,
     consultar_matricula,

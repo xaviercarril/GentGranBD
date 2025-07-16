@@ -2,7 +2,7 @@ from controladores.actividades import registrar_actividad
 from controladores.asistencia_socio import registrar_asistencia
 from controladores.clase import agregar_fecha
 from controladores.socios import registrar_socio
-from controladores.inscripciones import registrar_inscripcion
+from controladores.inscripcion_socio import registrar_inscripcion
 from datetime import date
 
 def test_registrar_y_consultar_asistencia(session):

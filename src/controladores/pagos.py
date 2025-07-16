@@ -1,51 +1,115 @@
 
 from sqlalchemy.orm import Session
-from models import MatriculaPago
+from models import InscripcionSocio, Pago
 from datetime import date
+from pydantic import BaseModel, ValidationError
+from database import SessionLocal
+from sqlalchemy.exc import IntegrityError
+from controladores.pagos import registrar_pago
 
-def registrar_pago(session: Session, datos: dict):
-    print(f"Registrando pago: {datos}")
-    pago = MatriculaPago(
-        socio_id=datos['socio_id'],
-        actividad_id=datos['actividad_id'],
-        fecha=datos.get('fecha', date.today()),
-        importe=datos.get('importe', 0),
-        estado=datos['estado'],
-        observaciones=datos.get('observaciones'),
+# ────────────────────── DTO ──────────────────────
+class PagoDTO(BaseModel):
+    socio_id: int
+    actividad_id: int
+    fecha_pago: date
+    importe: float = 0.0
+    estado: str = "PENDIENTE"  # Estado por defecto
+
+class PagoUpdateDTO(BaseModel):
+    fecha_pago: date | None = None
+    estado: str | None = None
+    importe: float | None = None
+
+def _to_dto(pago: Pago) -> PagoDTO:
+    return PagoDTO(
+        socio_id=pago.socio_id,
+        actividad_id=pago.actividad_id,
+        fecha_pago=pago.fecha_pago,
+        importe=pago.importe,
+        estado=pago.estado
     )
 
-    session.add(pago)
-    session.commit()
-    return pago.id
+# ───────────────── CRUD ─────────────────
+def registrar_pago(data: dict) -> int:
+    """Registra un pago; recibe dict, valida con DTO y devuelve ID."""
+    try:
+        dto = PagoDTO(**data)
+    except ValidationError as e:
+        raise ValueError(f"Datos de entrada inválidos: {e}")
 
-def modificar_pago(session: Session, pago_id: int, nuevos_datos: dict):
-    pago = session.query(MatriculaPago).filter(MatriculaPago.id == pago_id).first()
-    if not pago:
-        return False
-    for clave, valor in nuevos_datos.items():
-        setattr(pago, clave, valor)
-    session.commit()
-    return True
+    nuevo_pago = Pago(
+        socio_id=dto.socio_id,
+        actividad_id=dto.actividad_id,
+        fecha_pago=dto.fecha_pago,
+        importe=dto.importe,
+        estado=dto.estado
+    )
 
-def consultar_pagos_por_inscripcion(session: Session, socio_id: int, actividad_id: int):
-    return session.query(MatriculaPago).filter(
-        MatriculaPago.socio_id == socio_id,
-        MatriculaPago.actividad_id == actividad_id,
-    ).all()
+    with SessionLocal() as db:
+        db.add(nuevo_pago)
+        try:
+            db.commit()
+            db.refresh(nuevo_pago)
+            return nuevo_pago.id
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al registrar pago: {e.orig}")
 
-def consultar_matricula_por_inscripcion(session: Session, socio_id: int, actividad_id: int):
-    return session.query(MatriculaPago).filter(
-        MatriculaPago.socio_id == socio_id,
-        MatriculaPago.actividad_id == actividad_id,
-    ).first()
+def modificar_pago(pago_id: int, nuevos_datos: dict) -> None:
+    """Modifica un pago; recibe ID y dict con cambios."""
+    try:
+        dto = PagoUpdateDTO(**nuevos_datos)
+    except ValidationError as e:
+        raise ValueError(f"Datos inválidos: {e}")
 
-def consultar_pago(session: Session, pago_id: int):
-    return session.query(MatriculaPago).filter(MatriculaPago.id == pago_id).first()
+    with SessionLocal() as db:
+        pago = db.get(Pago, pago_id)
+        if not pago:
+            raise ValueError("Pago inexistente")
+        try:
+            for key, value in dto.model_dump(exclude_unset=True).items():
+                setattr(pago, key, value)
+            db.commit()
+        except AttributeError as e:
+            db.rollback()
+            raise ValueError(f"Campo desconocido: {e}")
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al modificar pago: {e.orig}")
 
-def eliminar_pago(session: Session, pago_id: int):
-    pago = session.query(MatriculaPago).filter(MatriculaPago.id == pago_id).first()
-    if not pago:
-        return False
-    session.delete(pago)
-    session.commit()
-    return True
+def consultar_pago(pago_id: int) -> dict | None:
+    """Consulta un pago por su ID y devuelve sus datos como dict."""
+    try:
+        with SessionLocal() as db:
+            pago = db.get(Pago, pago_id)
+            if not pago:
+                return None
+            return _to_dto(pago).model_dump()
+    except Exception as e:
+        raise ValueError(f"Error al consultar pago: {e}")
+
+def eliminar_pago(pago_id: int) -> None:
+    """Elimina un pago por su ID."""
+    try:
+        with SessionLocal() as db:
+            pago = db.get(Pago, pago_id)
+            if not pago:
+                raise ValueError("Pago inexistente")
+            db.delete(pago)
+            db.commit()
+    except IntegrityError as e:
+        raise ValueError(f"Error al eliminar pago: {e.orig}")
+    except Exception as e:
+        raise ValueError(f"Error inesperado al eliminar pago: {e}")
+    
+# ────────────────── Consultas ──────────────────
+def consultar_inscripcion_por_Pago(pago_id: int) -> list[dict]:
+    """Consulta inscripciones asociadas a un pago."""
+    try:
+        with SessionLocal() as db:
+            inscr = db.get(InscripcionSocio, pago_id)
+            if not inscr:
+                return None
+            return inscr.model_dump()
+    except Exception as e:
+        raise ValueError(f"Error al listar inscripciones por pago: {e}")

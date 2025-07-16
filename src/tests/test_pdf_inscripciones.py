@@ -3,7 +3,7 @@ from stat import *
 from exportador.pdf_inscripciones import generar_pdf_inscripciones
 from controladores.socios import registrar_socio
 from controladores.actividades import registrar_actividad
-from controladores.inscripciones import registrar_inscripcion, generar_matricula
+from controladores.inscripcion_socio import registrar_inscripcion, generar_matricula
 from models import EstadoPago
 from controladores.personal import registrar_personal
 from datetime import date, datetime

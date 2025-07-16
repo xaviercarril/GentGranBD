@@ -13,25 +13,23 @@ from pydantic import BaseModel, ValidationError
 
 
 from database import SessionLocal  # fábrica de sesiones
-from models import Socio
+from models import AsistenciaSocio, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Socio
 
 
-# ────────────────────────────────────────────────
-# DTO
-# ────────────────────────────────────────────────
+# ───────────────────── DTO ─────────────────────
 class SocioDTO(BaseModel):
 
     id: int | None = None
     dni_nie: str
     nombre: str
-    apellido1: str | None = None
+    apellido1: str
     apellido2: str | None = None
     direccion: str | None = None
     telefono_fijo: str | None = None
     telefono_movil: str | None = None
     email: str | None = None
     grupo_difusion: str | None = None
-    fecha_alta: date | None = None
+    fecha_alta: date
     fecha_baja: date | None = None
     observaciones: str | None = None
     foto: bytes | None = None
@@ -49,7 +47,6 @@ class SocioUpdateDTO(BaseModel):
     grupo_difusion: str | None = None
     fecha_alta: date | None = None
     fecha_baja: date | None = None
-
     observaciones: str | None = None
     foto: bytes | None = None
 
@@ -73,16 +70,7 @@ def _to_dto(obj: Socio) -> SocioDTO:
     )
 
 
-# ────────────────────────────────────────────────
-# API Pública
-# ────────────────────────────────────────────────
-def listar_socios() -> list[dict]:
-    """Devuelve todos los socios como lista de dicts ordenados por nombre."""
-    with SessionLocal() as db:
-        socios = db.query(Socio).order_by(Socio.nombre).all()
-        return [_to_dto(s).model_dump() for s in socios]
-
-
+# ───────────────── CRUD ─────────────────
 def registrar_socio(datos: dict) -> int:
     """Crea un socio y devuelve su ID."""
     try:
@@ -111,7 +99,10 @@ def registrar_socio(datos: dict) -> int:
             db.commit()
         except IntegrityError:
             db.rollback()
-            raise ValueError("DNI/NIE duplicado")
+            raise ValueError("Error al registrar socio: DNI/NIE duplicado")
+        except Exception as e:
+            db.rollback()
+            raise ValueError(f"Error inesperado al registrar socio: {e}")
         db.refresh(nuevo)
         return nuevo.id
 
@@ -127,40 +118,38 @@ def modificar_socio(socio_id: int, cambios: dict) -> None:
         if not socio:
             raise ValueError("Soci inexistent")
 
-        mapping = {
-            "telefono_fijo": "telefono_fijo",
-            "telefono_movil": "telefono_movil",
-            "grupo_difusion": "grupo_difusion",
-            "fecha_alta": "fecha_alta",
-            "fecha_baja": "fecha_baja",
-        }
-
         try:
             for k, v in dto.model_dump(exclude_unset=True).items():
-                setattr(socio, mapping.get(k, k), v)
-
+                setattr(socio, k, v)
             db.commit()
         except AttributeError as e:
             db.rollback()
             raise ValueError(f"Camp desconegut: {e}")
-
-
-def eliminar_socio(socio_id: int) -> None:
-    with SessionLocal() as db:
-        socio = db.get(Socio, socio_id)
-        if not socio:
-            raise ValueError("Soci inexistent")
-        db.delete(socio)
-        db.commit()
-
+        except IntegrityError as e:
+            db.rollback()
+            raise ValueError(f"Error al modificar socio: {e.orig}")
 
 def consultar_socio(socio_id: int) -> dict | None:
     """Retorna TOT el soci (inclosa foto) com a dict o None."""
-    with SessionLocal() as db:
-        s = db.get(Socio, socio_id)
-        return _to_dto(s).model_dump() if s else None
+    try:
+        with SessionLocal() as db:
+            s = db.get(Socio, socio_id)
+            return _to_dto(s).model_dump() if s else None
+    except Exception as e:
+        raise ValueError(f"Error al consultar soci: {e}")
 
+def eliminar_socio(socio_id: int) -> None:
+    try:
+        with SessionLocal() as db:
+            socio = db.get(Socio, socio_id)
+            if not socio:
+                raise ValueError("Soci inexistent")
+            db.delete(socio)
+            db.commit()
+    except IntegrityError as e:
+        raise ValueError(f"Error al eliminar soci: {e.orig}")
 
+# ────────────────── Generadores ──────────────────
 def adjuntar_foto_socio(socio_id: int, filename: str) -> None:
     """Adjunta/actualiza foto a un socio."""
     with open(filename, "rb") as fh:
@@ -176,7 +165,50 @@ def adjuntar_foto_socio(socio_id: int, filename: str) -> None:
         socio.foto = foto_bytes
         db.commit()
 
+def eliminar_foto_socio(socio_id: int) -> None:
+    """Elimina la foto d'un soci."""
+    with SessionLocal() as db:
+        socio = db.get(Socio, socio_id)
+        if not socio:
+            raise ValueError("Soci inexistent")
+        socio.foto = None
+        db.commit()
 
+# ────────────────── Consultas ──────────────────
+
+def listar_asistencias_por_socio_clase(socio_id: int, clase_id: int) -> list[dict]:
+    """Lista las asistencias de un socio a una clase específica."""
+    try:
+        with SessionLocal() as db:
+            asistencias = db.query(AsistenciaSocio).filter(
+                AsistenciaSocio.socio_id == socio_id,
+                AsistenciaSocio.clase_id == clase_id
+            ).all()
+            return [a.model_dump() for a in asistencias]
+    except Exception as e:
+        raise ValueError(f"Error al listar asistencias: {e}")
+    
+def listar_asistencia_por_Socio(socio_id: int) -> list[dict]:
+    """Consulta todas las asistencias de un socio específico."""
+    try:
+        with SessionLocal() as session:
+            asistencias = session.query(AsistenciaSocio).filter_by(socio_id=socio_id).all()
+            return [asistencia.model_dump() for asistencia in asistencias]
+    except Exception as e:
+        raise ValueError(f"Error al consultar asistencias: {e}")
+    
+def consultar_firma_LOPD(socio_id: int) -> dict | None:
+    """Consulta la firma LOPD de un socio."""
+    try:
+        with SessionLocal() as db:
+            firma = db.get(FirmaLOPD, socio_id)
+            if not firma:
+                return None
+            return firma.model_dump()
+    except Exception as e:
+        raise ValueError(f"Error al consultar firma LOPD: {e}")
+    
+# ────────────────── Exportación ──────────────────
 def generar_carnet_pdf(socio_id: int, ruta_pdf: str) -> None:
     """
     Genera un carnet de soci en format PDF.

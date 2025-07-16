@@ -1,7 +1,7 @@
 from controladores.pagos import registrar_pago, consultar_pagos_por_inscripcion, consultar_matricula_por_inscripcion
 from controladores.actividades import registrar_actividad
 from controladores.socios import registrar_socio
-from controladores.inscripciones import registrar_inscripcion
+from controladores.inscripcion_socio import registrar_inscripcion
 from datetime import date
 from models import EstadoPago
 

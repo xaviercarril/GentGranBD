@@ -3,7 +3,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 from models import Actividad, InscripcionSocio, Socio, Pago
-from controladores.inscripciones import consultar_matricula
+from controladores.inscripcion_socio import consultar_matricula
 from sqlalchemy.orm import Session
 
 def generar_pdf_inscripciones(session: Session, actividad_id: int, ruta_pdf: str):

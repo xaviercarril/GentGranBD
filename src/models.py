@@ -54,10 +54,10 @@ class Socio(Base):
     # Relationships
     inscripciones = relationship("InscripcionSocio", back_populates="socio", cascade="all, delete-orphan")
     asistencias = relationship("AsistenciaSocio", back_populates="socio", cascade="all, delete-orphan")
-    firma = relationship("FirmaProteccionDatos", back_populates="socio", uselist=False, cascade="all, delete-orphan")
+    firma = relationship("FirmaLOPD", back_populates="socio", uselist=False, cascade="all, delete-orphan")
 
 
-class FirmaProteccionDatos(Base):
+class FirmaLOPD(Base):
     """One-to-one table that stores the GDPR consent signature."""
     __tablename__ = "firma_proteccion_datos"
 
@@ -139,7 +139,7 @@ class Trimestre(Base):
     fecha_inicio = Column(Date, nullable=False)
     fecha_fin = Column(Date, nullable=False)
 
-    curso_id = Column(Integer, ForeignKey("curso_academico.id"), nullable=False)
+    cursoA_id = Column(Integer, ForeignKey("curso_academico.id"), nullable=False)
     curso = relationship("CursoAcademico", back_populates="trimestres")
 
     clases = relationship("Clase", back_populates="trimestre", cascade="all, delete-orphan")
@@ -157,7 +157,7 @@ class Actividad(Base):
     observaciones = Column(Text)
 
     # Foreign Keys
-    curso_id = Column(Integer, ForeignKey("curso_academico.id"))
+    cursoA_id = Column(Integer, ForeignKey("curso_academico.id"))
     lugar_id = Column(Integer, ForeignKey("lugares.id"))
 
     # Relationships
@@ -175,8 +175,6 @@ class ActividadPersonal(Base):
     actividad_id = Column(Integer, ForeignKey("actividades.id"), primary_key=True)
     personal_id = Column(Integer, ForeignKey("personal.id"), primary_key=True)
     rol = Column(String(50))
-    fecha_inicio = Column(Date)
-    fecha_fin = Column(Date)
 
     actividad = relationship("Actividad", back_populates="monitores")
     personal = relationship("Personal", back_populates="actividades_as_monitor")
@@ -219,7 +217,7 @@ class InscripcionSocio(Base):
     socio = relationship("Socio", back_populates="inscripciones")
     actividad = relationship("Actividad", back_populates="inscripciones")
 
-    matriculas = relationship("MatriculaPago", back_populates="inscripcion", cascade="all, delete-orphan")
+    matriculas = relationship("Pago", back_populates="inscripcion", cascade="all, delete-orphan")
 
 # ---------------------------------------------
 # ATTENDANCE TRACKING
@@ -240,7 +238,7 @@ class AsistenciaSocio(Base):
 # ---------------------------------------------
 # ENROLLMENT FEE PAYMENTS
 # ---------------------------------------------
-class MatriculaPago(Base):
+class Pago(Base):
     __tablename__ = "matricula_pagos"
 
     id = Column(Integer, primary_key=True)

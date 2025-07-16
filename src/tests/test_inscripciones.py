@@ -1,6 +1,6 @@
 from controladores.actividades import registrar_actividad
 from controladores.socios import registrar_socio
-from controladores.inscripciones import registrar_inscripcion, consultar_matricula
+from controladores.inscripcion_socio import registrar_inscripcion, consultar_matricula
 from datetime import date, datetime
 from models import EstadoInscripcion
 
