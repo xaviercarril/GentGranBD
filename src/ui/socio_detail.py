@@ -45,7 +45,12 @@ class SocioDetailWidget(QWidget):
         self.fe_baixa = QDateEdit(); self.fe_baixa.setCalendarPopup(True)
         self.cb_baixa = QCheckBox("Baixa")
         self.cb_baixa.toggled.connect(self._toggle_baixa)
-        self.fe_baixa.setEnabled(False)              # per defecte desactivat
+        if self.fe_baixa is None:
+            self.cb_baixa.setChecked(False)
+            self.fe_baixa.setEnabled(False)              # per defecte desactivat
+        else:
+            self.cb_baixa.setChecked(True)
+            self.fe_baixa.setEnabled(True)               # si hi ha baixa, activat
         self.obs = QTextEdit()
 
         self.preview = QLabel(); self.preview.setFixedSize(100, 120)

@@ -11,9 +11,8 @@ from models import (
 )
 
 # ───────────────────── DTO ─────────────────────
-@dataclass(slots=True)
 class TrimestreDTO(BaseModel):
-    id: int
+    id: int | None = None
     nombre: TrimestreEnum
     fechaInicio: date
     fechaFin: date

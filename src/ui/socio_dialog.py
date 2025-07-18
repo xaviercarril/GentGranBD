@@ -28,17 +28,13 @@ class SocioDialog(QDialog):
         self.tel_fix = QLineEdit();  self.tel_mob = QLineEdit()
         self.email = QLineEdit();    self.grup = QLineEdit()
         self.data_alta = QDateEdit();  self.data_alta.setCalendarPopup(True)
-        self.data_baixa = QDateEdit(); self.data_baixa.setCalendarPopup(True)
         self.obs = QTextEdit()
         self.preview = QLabel();     self.preview.setFixedSize(100, 120)
         self.preview.setAlignment(Qt.AlignCenter)
         self.preview.setStyleSheet("border:1px solid #aaa;")
 
-        # Carregar dades si edició
-        if socio:
-            self._load_socio(socio)
-        else:
-            self.data_alta.setDate(QDate.currentDate())
+
+        self.data_alta.setDate(QDate.currentDate())
 
         # ── Disseny ──────────────────────────────────────────
         form = QFormLayout(self)
@@ -52,7 +48,6 @@ class SocioDialog(QDialog):
         form.addRow("Email:", self.email)
         form.addRow("Grup difusió:", self.grup)
         form.addRow("Data alta:", self.data_alta)
-        form.addRow("Data baixa:", self.data_baixa)
         form.addRow("Observacions:", self.obs)
 
         # Foto
@@ -69,32 +64,6 @@ class SocioDialog(QDialog):
     # ─────────────────────────────────────────────────────────
     # Utils
     # ─────────────────────────────────────────────────────────
-    def _load_socio(self, s: dict):
-        """Carrega dades existents al formulari."""
-        self.dni.setText(s["dniNie"])
-        self.nom.setText(s["nombre"])
-        self.c1.setText(s["apellido1"])
-        self.c2.setText(s.get("apellido2", "") or "")
-        self.dir.setText(s.get("direccion", "") or "")
-        self.tel_fix.setText(s.get("telefonoFijo", "") or "")
-        self.tel_mob.setText(s.get("telefono", "") or "")
-        self.email.setText(s.get("email", "") or "")
-        self.grup.setText(s.get("grupoDifusion", "") or "")
-        if s.get("fechaAlta"):
-            self.data_alta.setDate(QDate.fromString(str(s["fechaAlta"]), "yyyy-MM-dd"))
-        if s.get("fechaBaja"):
-            self.data_baixa.setDate(QDate.fromString(str(s["fechaBaja"]), "yyyy-MM-dd"))
-        # Foto existent
-        if s.get("foto"):
-          pix = QPixmap()
-          pix.loadFromData(s["foto"])
-          self.preview.setPixmap(
-            pix.scaled(
-              self.preview.width(), self.preview.height(),
-              Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-          )
-
     def _seleccionar_foto(self):
         file, _ = QFileDialog.getOpenFileName(
             self, "Selecciona foto", "", "Imatges (*.png *.jpg *.jpeg)"
@@ -129,10 +98,7 @@ class SocioDialog(QDialog):
             "email": self.email.text().strip() or None,
             "grupoDifusion": self.grup.text().strip() or None,
             "fechaAlta": self.data_alta.date().toPython() or date.today(),
-            "fechaBaja": (
-                self.data_baixa.date().toPython()
-                if self.data_baixa.date().isValid() else None
-            ),
+            "fechaBaja": None,
             "observaciones": self.obs.toPlainText() or None,
         }
         if self._foto_path:

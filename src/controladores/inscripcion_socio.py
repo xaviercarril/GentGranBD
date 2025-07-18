@@ -1,5 +1,5 @@
 
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 from database import SessionLocal
 from models import InscripcionSocio, Actividad, EstadoInscripcion, Pago, EstadoPago, Pago, Socio
