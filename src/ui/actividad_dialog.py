@@ -51,8 +51,8 @@ class ActividadDialog(QDialog):
             self.tipo.setCurrentText(actividad["tipo"])
             self.descripcion.setText(actividad.get("descripcion", ""))
             self.profesor.setText(actividad.get("profesor", ""))
-            self.fechaInicio.setDate(QDate.fromString(actividad.get("fechaInicio", ""), "yyyy-MM-dd"))
-            self.fechaFin.setDate(QDate.fromString(actividad.get("fechaFin", ""), "yyyy-MM-dd"))
+            self.fechaInicio.setDate(QDate.fromString(actividad.get("fechaInicio", ""), "dd-MM-yyyy"))
+            self.fechaFin.setDate(QDate.fromString(actividad.get("fechaFin", ""), "dd-MM-yyyy"))
             self.numMaxAlumnos.setValue(actividad.get("numMaxAlumnos", 1))
 
     def _save(self):
@@ -61,8 +61,8 @@ class ActividadDialog(QDialog):
             "tipo": self.tipo.currentText(),
             "descripcion": self.descripcion.text().strip(),
             "profesor": self.profesor.text().strip(),
-            "fechaInicio": self.fechaInicio.date().toString("yyyy-MM-dd"),
-            "fechaFin": self.fechaFin.date().toString("yyyy-MM-dd"),
+            "fechaInicio": self.fechaInicio.date().toString("dd-MM-yyyy"),
+            "fechaFin": self.fechaFin.date().toString("dd-MM-yyyy"),
             "numMaxAlumnos": self.numMaxAlumnos.value()
         }
 

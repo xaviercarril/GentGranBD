@@ -14,10 +14,12 @@ class CursoAcademicoFormDialog(QDialog):
         self.inici = QDateEdit()
         self.inici.setDate(QDate.currentDate())
         self.inici.setCalendarPopup(True)
+        self.inici.setDisplayFormat("dd-MM-yyyy")
 
         self.fi = QDateEdit()
         self.fi.setDate(QDate.currentDate().addYears(1))
         self.fi.setCalendarPopup(True)
+        self.fi.setDisplayFormat("dd-MM-yyyy")
 
         form_layout.addRow("Nom del curs:", self.nom)
         form_layout.addRow("Inici:", self.inici)

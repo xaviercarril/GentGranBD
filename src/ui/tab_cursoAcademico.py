@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QDateEdit, QFormLayout, QTableWidget, QTableWidgetItem, QMessageBox, QTableView, QGroupBox, QHBoxLayout
-from PySide6.QtCore import QDate, Qt
+from PySide6.QtCore import QDate, Qt, QSize
 from PySide6.QtGui import QIcon, QPixmap
 from datetime import date
 from controladores.curso_academico import eliminar_cursoA, listar_trimestres_por_cursoA, listar_cursosA, generar_T1, generar_T2, generar_T3, generar_T4
@@ -12,16 +12,22 @@ class CursoAcademicoDialog(QDialog):
         self.setWindowTitle("Nou Curs Acadèmic")
 
         main_layout = QVBoxLayout()
-        btn_nou = QPushButton("Nou curs")
+        btn_nou = QPushButton("Nou Curs Acadèmic")
+        btn_nou.setIcon(QIcon("ui/assets/plus.svg"))
+        btn_nou.setIconSize(QSize(16, 16))
         btn_nou.clicked.connect(self._mostrar_dialog_crear)
-        main_layout.addWidget(btn_nou)
+        btn_borrar = QPushButton("Eliminar Curs Acadèmic")
+        btn_borrar.setIcon(QIcon("ui/assets/minus.svg"))
+        btn_borrar.setIconSize(QSize(16, 16))
+        btn_borrar.clicked.connect(self._eliminar_curso)
+        
+        top_buttons_layout = QHBoxLayout()
+        top_buttons_layout.addWidget(btn_nou)
+        top_buttons_layout.addWidget(btn_borrar)
+        top_buttons_layout.addStretch()
+        main_layout.addLayout(top_buttons_layout)
 
         top_layout = QHBoxLayout()
-        form_layout = QFormLayout()
-
-        btn_borrar = QPushButton("Eliminar seleccionat")
-        btn_borrar.clicked.connect(self._eliminar_curso)
-        form_layout.addRow(btn_borrar)
 
         self.tabla = QTableView()
         self.tabla.setSelectionBehavior(QTableView.SelectRows)
@@ -47,6 +53,8 @@ class CursoAcademicoDialog(QDialog):
             fin = QDateEdit()
             inicio.setCalendarPopup(True)
             fin.setCalendarPopup(True)
+            inicio.setDisplayFormat("dd-MM-yyyy")
+            fin.setDisplayFormat("dd-MM-yyyy")
             self.trimestres_edits.append((inicio, fin))
             row_layout = QHBoxLayout()
             row_layout.addWidget(QLabel(f"Trimestre {i+1} Inici:"))
@@ -63,7 +71,6 @@ class CursoAcademicoDialog(QDialog):
         top_layout.addWidget(self.tabla)
         top_layout.addWidget(self.trimestre_box)
 
-        main_layout.addLayout(form_layout)
         main_layout.addLayout(top_layout)
 
         self.setLayout(main_layout)
@@ -77,6 +84,9 @@ class CursoAcademicoDialog(QDialog):
     def _refresh_table(self):
         """Actualiza la tabla con los cursos académicos."""
         cursos = listar_cursosA()
+        for curso in cursos:
+            curso["fechaInicio"] = curso["fechaInicio"].strftime("%d-%m-%Y")
+            curso["fechaFin"] = curso["fechaFin"].strftime("%d-%m-%Y")
         self._all_cursos = cursos  # Guardar para eliminar
         headers = [("Nom", "nombre"), 
                    ("Inici", "fechaInicio"),
@@ -147,8 +157,8 @@ class CursoAcademicoDialog(QDialog):
       for i, (inicio_edit, fin_edit) in enumerate(self.trimestres_edits):
         if i < len(trimestres):
           trimestre = trimestres[i]
-          inicio_edit.setDate(QDate.fromString(trimestre["fechaInicio"].isoformat(), Qt.ISODate))
-          fin_edit.setDate(QDate.fromString(trimestre["fechaFin"].isoformat(), Qt.ISODate))
+          inicio_edit.setDate(QDate(trimestre["fechaInicio"].year, trimestre["fechaInicio"].month, trimestre["fechaInicio"].day))
+          fin_edit.setDate(QDate(trimestre["fechaFin"].year, trimestre["fechaFin"].month, trimestre["fechaFin"].day))
         else:
           inicio_edit.setDate(QDate.currentDate())
           fin_edit.setDate(QDate.currentDate().addMonths(3))

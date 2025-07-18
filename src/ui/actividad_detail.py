@@ -57,11 +57,11 @@ class ActividadDetailWidget(QWidget):
             act.get("descripcion") or act.get("descripcion_actividad") or ""
         )
         if act.get("fechaInicio"):
-            self.fechaInicio.setDate(QDate.fromString(str(act["fechaInicio"]), "yyyy-MM-dd"))
+            self.fechaInicio.setDate(QDate.fromString(str(act["fechaInicio"]), "dd-MM-yyyy"))
         else:
             self.fechaInicio.setDate(QDate())
         if act.get("fechaFin"):
-            self.fechaFin.setDate(QDate.fromString(str(act["fechaFin"]), "yyyy-MM-dd"))
+            self.fechaFin.setDate(QDate.fromString(str(act["fechaFin"]), "dd-MM-yyyy"))
         else:
             self.fechaFin.setDate(QDate())
 
