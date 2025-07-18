@@ -95,7 +95,6 @@ class ActividadesTab(QWidget):
     self.table_activitats.setModel(model)
     self.table_activitats.resizeColumnsToContents()
     self.table_activitats.hideColumn(0)
-    # self.table_activitats.hideColumn(2)  # Ensure this column is visible
 
     sel_model = self.table_activitats.selectionModel()
     sel_model.currentChanged.connect(self._row_changed_actividad)

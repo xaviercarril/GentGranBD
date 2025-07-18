@@ -6,6 +6,7 @@ from PySide6.QtGui import QAction
 from ui.tab_socios import SociosTab
 from ui.tab_actividades import ActividadesTab
 from ui.tab_cursoAcademico import CursoAcademicoDialog
+from ui.tab_personal import PersonalTab
 
 class MainWindow(QMainWindow):
     """Finestra principal amb pestanyes (Socis, Activitats, …)."""
@@ -36,16 +37,17 @@ class MainWindow(QMainWindow):
 
         self.tabs.addTab(SociosTab(), "Socis")
         self.tabs.addTab(ActividadesTab(), "Activitats")
+        self.tabs.addTab(PersonalTab(), "Personal")
 
         # ── Menú superior ───────────────────────────────────────
         # Crear barra de menú
         menu_bar = self.menuBar()
-        menu_gestio = menu_bar.addMenu("Gestió")
+        menu_arxiu = menu_bar.addMenu("Arxiu")
 
         # Acción para crear curso académico
-        action_nou_curs = QAction("Nou Curs Acadèmic", self)
+        action_nou_curs = QAction("Gestionar Curs Acadèmic", self)
         action_nou_curs.triggered.connect(self._mostrar_dialog_nou_curs)
-        menu_gestio.addAction(action_nou_curs)
+        menu_arxiu.addAction(action_nou_curs)
 
     def _mostrar_dialog_nou_curs(self):
         from ui.tab_cursoAcademico import CursoAcademicoDialog

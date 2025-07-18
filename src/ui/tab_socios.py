@@ -99,6 +99,7 @@ class SociosTab(QWidget):
     model = DictTableModel(filtered_rows, headers)
     self.table_socis.setModel(model)
     self.table_socis.resizeColumnsToContents()
+    self.table_socis.hideColumn(0)
 
     new_sel = self.table_socis.selectionModel()
     try:

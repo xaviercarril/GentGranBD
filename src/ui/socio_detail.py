@@ -111,14 +111,14 @@ class SocioDetailWidget(QWidget):
         self.dir.setText(s.get("direccion", "") or "")
         self.tf.setText(s.get("telefonoFijo", "") or ""); self.tm.setText(s.get("telefonoMovil", "") or "")
         self.email.setText(s.get("email", "") or ""); self.grup.setText(s.get("grupoDifusion", "") or "")
-        if s.get("fechaAlta"):
-            self.fe_alta.setDate(QDate.fromString(str(s["fechaAlta"]), "dd-MM-yyyy"))
+        if s.get("fechaAlta") is not None:
+            self.fe_alta.setDate(QDate(s["fechaAlta"].year, s["fechaAlta"].month, s["fechaAlta"].day))
         else:
             self.fe_alta.setDate(QDate())
         if s.get("fechaBaja"):
             self.cb_baixa.setChecked(True)
             self.fe_baixa.setEnabled(True)
-            self.fe_baixa.setDate(QDate.fromString(str(s["fechaBaja"]), "dd-MM-yyyy"))
+            self.fe_baixa.setDate(QDate(s["fechaBaja"].year, s["fechaBaja"].month, s["fechaBaja"].day))
         else:
             self.cb_baixa.setChecked(False)
             self.fe_baixa.setEnabled(False)
