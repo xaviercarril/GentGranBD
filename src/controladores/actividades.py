@@ -16,29 +16,29 @@ from models import (
 class ActividadDTO(BaseModel):
     id: int | None = None
     nombre: str
-    max_alumnos: int = 1
+    descripcion: str | None = None
+    numMaxAlumnos: int | None = 0
     cursoAcademico_id: int
     lugarID: int | None = None
     precio_matricula: float = 0.0
-    observaciones: str | None = None
 
 class ActividadUpdateDTO(BaseModel):
     nombre: str | None = None
-    max_alumnos: int | None = None
+    descripcion: str | None = None
+    numMaxAlumnos: int | None = None
     cursoAcademico_id: int | None = None
     lugarID: int | None = None
     precio_matricula: float | None = None
-    observaciones: str | None = None
 
 def _to_dto(a: Actividad) -> ActividadDTO:
     return ActividadDTO(
         id=a.id,
         nombre=a.nombre,
-        max_alumnos=a.numMaxAlumnos,
-        cursoAcademico_id=a.cursoAcademico_id,
+        descripcion=a.descripcion,
+        numMaxAlumnos=a.numMaxAlumnos,
+        cursoAcademico_id=a.cursoAcademicoID,
         lugarID=a.lugarID,
-        precio_matricula=a.precio_matricula,
-        observaciones=a.observaciones
+        precio_matricula=a.precio_matricula
     )
 
 
@@ -52,11 +52,11 @@ def registrar_actividad(data: dict) -> int:
     try:
         nueva = Actividad(
             nombre=dto.nombre,
-            numMaxAlumnos=dto.max_alumnos,
-            cursoAcademico_id=dto.cursoAcademico_id,
+            descripcion=dto.descripcion,
+            numMaxAlumnos=dto.numMaxAlumnos,
+            cursoAcademicoID=dto.cursoAcademico_id,
             lugarID=dto.lugarID,
             precio_matricula=dto.precio_matricula,
-            observaciones=dto.observaciones,
         )
         with SessionLocal() as db:
             db.add(nueva)
@@ -78,8 +78,15 @@ def modificar_actividad(actividadID: int, newData: dict) -> None:
         if not act:
             raise ValueError("Actividad no encontrada")
         try:
+            mapeo = {
+                "numMaxAlumnos": "numMaxAlumnos",
+                "cursoAcademico_id": "cursoAcademicoID",
+                "lugarID": "lugarID",  # Este ya coincide, pero lo puedes mantener por consistencia
+            }
+
             for k, v in dto.model_dump(exclude_unset=True).items():
-                setattr(act, k, v)
+                attr = mapeo.get(k, k)  # Usa el mapeo si existe, si no el mismo nombre
+                setattr(act, attr, v)
             db.commit()
         except AttributeError as e:
             db.rollback()

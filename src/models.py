@@ -154,7 +154,7 @@ class Actividad(Base):
     nombre = Column(String(100), nullable=False)
     numMaxAlumnos = Column(Integer)
     precio_matricula = Column(DECIMAL(10, 2), default=0.0)
-    observaciones = Column(Text)
+    descripcion = Column(Text)
 
     # Foreign Keys
     cursoAcademicoID = Column(Integer, ForeignKey("curso_academico.id"))

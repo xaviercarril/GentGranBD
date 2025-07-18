@@ -5,16 +5,13 @@ from controladores.actividades import consultar_actividad, modificar_actividad
 class ActividadDetailWidget(QWidget):
     saved = Signal()
 
-    def __init__(self, tipo, parent=None):
+    def __init__(self, parent=None):
         super().__init__(parent)
         self._actividadID = None
-        self._tipo = tipo.lower()
         self._loading = False
 
         self.nombre = QLineEdit()
         self.descripcion = QLineEdit()
-        self.fechaInicio = QDateEdit(); self.fechaInicio.setCalendarPopup(True)
-        self.fechaFin = QDateEdit(); self.fechaFin.setCalendarPopup(True)
         self.numMaxAlumnos = QSpinBox()
         self.numMaxAlumnos.setMinimum(0)
         self.numMaxAlumnos.setMaximum(999)
@@ -22,19 +19,19 @@ class ActividadDetailWidget(QWidget):
         form = QFormLayout()
         form.addRow("Nom:", self.nombre)
         form.addRow("Descripció:", self.descripcion)
-        form.addRow("Data inici:", self.fechaInicio)
-        form.addRow("Data fi:", self.fechaFin)
         form.addRow("Màxim alumnes:", self.numMaxAlumnos)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addStretch()
 
-        self.nombre.editingFinished.connect(self._save)
-        self.descripcion.editingFinished.connect(self._save)
-        self.fechaInicio.dateChanged.connect(self._save)
-        self.fechaFin.dateChanged.connect(self._save)
-        self.numMaxAlumnos.valueChanged.connect(self._save)
+        self.nombre.editingFinished.connect(self._on_editing_finished)
+        self.descripcion.editingFinished.connect(self._on_editing_finished)
+        self.numMaxAlumnos.editingFinished.connect(self._on_editing_finished)
+
+    def _on_editing_finished(self):
+        if not self._loading:
+            self._save()
 
     def load(self, actividadID):
         self._loading = True
@@ -56,29 +53,21 @@ class ActividadDetailWidget(QWidget):
         self.descripcion.setText(
             act.get("descripcion") or act.get("descripcion_actividad") or ""
         )
-        if act.get("fechaInicio"):
-            self.fechaInicio.setDate(QDate.fromString(str(act["fechaInicio"]), "dd-MM-yyyy"))
-        else:
-            self.fechaInicio.setDate(QDate())
-        if act.get("fechaFin"):
-            self.fechaFin.setDate(QDate.fromString(str(act["fechaFin"]), "dd-MM-yyyy"))
-        else:
-            self.fechaFin.setDate(QDate())
 
-        max_alumnos = act.get("numMaxAlumnos")
-        if max_alumnos is None:
-            max_alumnos = act.get("max_alumnos")
-        if max_alumnos is not None:
-            self.numMaxAlumnos.setValue(max_alumnos)
+        numMaxAlumnos = act.get("numMaxAlumnos")
+        if numMaxAlumnos is None:
+            numMaxAlumnos = act.get("numMaxAlumnos")
+        if numMaxAlumnos is not None:
+            self.numMaxAlumnos.setValue(numMaxAlumnos)
         else:
             self.numMaxAlumnos.setValue(1)
+        print("Cargando actividad:", act)  # debug
         self._loading = False
+        self.saved.emit()
 
     def _clear(self):
         self.nombre.clear()
         self.descripcion.clear()
-        self.fechaInicio.setDate(QDate())
-        self.fechaFin.setDate(QDate())
         self.numMaxAlumnos.setValue(0)
 
     def _validar(self) -> bool:
@@ -90,11 +79,8 @@ class ActividadDetailWidget(QWidget):
     def _build_data(self) -> dict:
         return {
             "nombre": self.nombre.text().strip(),
-            "tipo": self._tipo,
             "descripcion": self.descripcion.text().strip() or None,
-            "fechaInicio": self.fechaInicio.date().toPython() if self.fechaInicio.date().isValid() else None,
-            "fechaFin": self.fechaFin.date().toPython() if self.fechaFin.date().isValid() else None,
-            "max_alumnos": self.numMaxAlumnos.value(),
+            "numMaxAlumnos": self.numMaxAlumnos.value(),
         }
 
     def _save(self):
@@ -104,9 +90,10 @@ class ActividadDetailWidget(QWidget):
         if not self._validar():
             QMessageBox.warning(self, "Error", "Dades incompletes o incorrectes.")
             return  
-            
 
         data = self._build_data()
+        print("Guardando datos:", data)  # debug
+
         try:
             modificar_actividad(self._actividadID, data)
             self.saved.emit()

@@ -1,15 +1,14 @@
 from controladores.actividades import listar_actividades, consultar_actividad, eliminar_actividad
 from PySide6.QtWidgets import (
-  QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QTableView,
-  QPushButton, QMessageBox, QLineEdit, QLabel
+  QWidget, QVBoxLayout, QHBoxLayout, QTableView,
+  QPushButton, QMessageBox, QLineEdit, QComboBox
 )
-from PySide6.QtGui import QPixmap, QIcon
-from PySide6.QtPrintSupport import QPrinter, QPrintDialog
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtGui import QIcon
+from PySide6.QtCore import QSize, QModelIndex
 from ui.actividad_dialog import ActividadDialog
-from ui.socio_detail import SocioDetailWidget
 from ui.actividad_detail import ActividadDetailWidget
 from ui.table_models import DictTableModel
+from controladores.curso_academico import listar_cursosA, listar_actividades_por_CursoAcademico
 
 class ActividadesTab(QWidget):
   # ==========================================================
@@ -17,37 +16,27 @@ class ActividadesTab(QWidget):
   # ==========================================================
   def __init__(self, parent=None):
     super().__init__(parent)
-    self.activitats_tabs = QTabWidget()
 
-    # --- Cursos ---
-    self._init_cursos_tab()
 
-    # --- Tallers ---
-    self._init_tallers_tab()
+    self._curso_selector = QComboBox()
+    self._curso_selector.addItem("Tots els cursos", None)
+    for curso in listar_cursosA():
+        self._curso_selector.addItem(curso["nombre"], curso["id"])
+    self._curso_selector.currentIndexChanged.connect(self._refresh_activitats)
+    # Installa event filter para detectar cuando se despliega el ComboBox
+    self._curso_selector.view().window().installEventFilter(self)
 
-    # Add main tab
-    page = QWidget()
-    ly = QVBoxLayout(page)
-    ly.addWidget(self.activitats_tabs)
-    self.setLayout(ly)
-
-    self._refresh_cursos()
-    self._refresh_tallers()
-
-    self.table_cursos.selectionModel().currentRowChanged.connect(self._row_changed_curso)
-
-  def _init_cursos_tab(self):
-    self.table_cursos = QTableView()
-    self._search_box_cursos = QLineEdit()
-    self._search_box_cursos.setPlaceholderText("Cerca cursos...")
-    self._search_box_cursos.textChanged.connect(self._filtrar_cursos)
+    self.table_activitats = QTableView()
+    self._search_box = QLineEdit()
+    self._search_box.setPlaceholderText("Cerca activitats...")
+    self._search_box.textChanged.connect(self._refresh_activitats)
 
     # Configure table
-    self.table_cursos.verticalHeader().setVisible(False)
-    self.table_cursos.setSelectionBehavior(QTableView.SelectRows)
-    self.table_cursos.setSelectionMode(QTableView.SingleSelection)
-    self.table_cursos.setAlternatingRowColors(True)
-    self.table_cursos.setStyleSheet("""
+    self.table_activitats.verticalHeader().setVisible(False)
+    self.table_activitats.setSelectionBehavior(QTableView.SelectRows)
+    self.table_activitats.setSelectionMode(QTableView.SingleSelection)
+    self.table_activitats.setAlternatingRowColors(True)
+    self.table_activitats.setStyleSheet("""
       QTableView::item:selected {
         background: #c5d6a1;
         color: black;
@@ -56,124 +45,60 @@ class ActividadesTab(QWidget):
         background: #a8bd88;
       }
     """)
-    self._refresh_cursos()
 
-    self.detail_curso = ActividadDetailWidget(tipo="curso")
-    self.detail_curso.saved.connect(self._refresh_cursos)
+    self.detail_actividad = ActividadDetailWidget()
+    self.detail_actividad.saved.connect(self._refresh_activitats)
+    self.detail_actividad.setFixedWidth(300)
 
-    
+    # Buttons
+    self.btn_nova_actividad = QPushButton("Nova Activitat")
+    self.btn_nova_actividad.setIcon(QIcon("ui/assets/plus.svg"))
+    self.btn_nova_actividad.setIconSize(QSize(16, 16))
+    btn_eliminar_actividad = QPushButton("Eliminar Activitat")
+    btn_eliminar_actividad.setIcon(QIcon("ui/assets/minus.svg"))
+    btn_eliminar_actividad.setIconSize(QSize(16, 16))
 
-    # Layout for cursos
-    hlayout = QHBoxLayout()
-    hlayout.addWidget(self.table_cursos, stretch=3)
-    self.detail_curso.setFixedWidth(300)
-    hlayout.addWidget(self.detail_curso, stretch=0)
+    self.btn_nova_actividad.clicked.connect(self._dialog_nova_actividad)
+    btn_eliminar_actividad.clicked.connect(self._eliminar_actividad)
 
-    # Buttons for cursos
-    btn_nou_curso = QPushButton("Nou Curs")
-    btn_nou_curso.setIcon(QIcon("ui/assets/plus.svg"))
-    btn_nou_curso.setIconSize(QSize(16, 16))
-    btn_esborrar_curso = QPushButton("Eliminar Curs")
-    btn_esborrar_curso.setIcon(QIcon("ui/assets/minus.svg"))
-    btn_esborrar_curso.setIconSize(QSize(16, 16))
+    # Layouts
+    main_layout = QVBoxLayout(self)
 
-    btn_nou_curso.clicked.connect(self._dialog_nova_actividad)
-    btn_esborrar_curso.clicked.connect(self._eliminar_actividad_curso)
+    top_buttons = QHBoxLayout()
+    top_buttons.addWidget(self.btn_nova_actividad)
+    top_buttons.addWidget(btn_eliminar_actividad)
+    top_buttons.addStretch()
 
-    page_cursos = QWidget()
-    lyt = QVBoxLayout(page_cursos)
-    top_buttons_c = QHBoxLayout()
-    top_buttons_c.addWidget(btn_nou_curso)
-    top_buttons_c.addWidget(btn_esborrar_curso)
-    top_buttons_c.addStretch()
+    main_layout.addWidget(self._curso_selector)
+    main_layout.addLayout(top_buttons)
+    main_layout.addWidget(self._search_box)
 
-    lyt.addLayout(top_buttons_c)
-    lyt.addWidget(self._search_box_cursos)
-    lyt.addLayout(hlayout, 1)
+    mid_layout = QHBoxLayout()
+    mid_layout.addWidget(self.table_activitats, stretch=3)
+    mid_layout.addWidget(self.detail_actividad, stretch=0)
 
-    self.activitats_tabs.addTab(page_cursos, "Cursos")
+    main_layout.addLayout(mid_layout, 1)
 
+    self._refresh_activitats()
 
-  def _init_tallers_tab(self):
-    self.table_tallers = QTableView()
-    self._search_box_tallers = QLineEdit()
-    self._search_box_tallers.setPlaceholderText("Cerca tallers...")
-    self._search_box_tallers.textChanged.connect(self._filtrar_tallers)
-
-    self.table_tallers.setSelectionBehavior(QTableView.SelectRows)
-
-    btn_nou_taller = QPushButton("Nou taller")
-    btn_esborrar_taller = QPushButton("Eliminar")
-
-    btn_nou_taller.clicked.connect(self._dialog_nova_actividad)
-    btn_esborrar_taller.clicked.connect(self._eliminar_actividad_taller)
-
-    page_tallers = QWidget()
-    lyt = QVBoxLayout(page_tallers)
-    top_buttons_t = QHBoxLayout()
-    top_buttons_t.addWidget(btn_nou_taller)
-    top_buttons_t.addWidget(btn_esborrar_taller)
-    top_buttons_t.addStretch()
-
-    lyt.addLayout(top_buttons_t)
-    lyt.addWidget(self._search_box_tallers)
-
-    hlayout_tallers = QHBoxLayout()
-    hlayout_tallers.addWidget(self.table_tallers, stretch=3)
-    self.detail_taller = ActividadDetailWidget(tipo="taller")
-    self.detail_taller.saved.connect(self._refresh_tallers)
-    hlayout_tallers.addWidget(self.detail_taller)
-    self.detail_taller.setFixedWidth(300)
-    lyt.addLayout(hlayout_tallers, 1)
-
-    self.activitats_tabs.addTab(page_tallers, "Tallers")
-
-  def _refresh_cursos(self):
-    rows = listar_actividades()
-    self._all_cursos = [a for a in rows if (a.get("tipo") or "").lower() in ["curs", "curso"]]
+  def _refresh_activitats(self):
+    curso_id = self._curso_selector.currentData()
+    self.btn_nova_actividad.setEnabled(curso_id is not None)
+    rows = listar_actividades_por_CursoAcademico(curso_id) if curso_id else listar_actividades()
     headers = [
       ("ID", "id"),
       ("Nom", "nombre"),
-      ("Tipus", "tipo"),
-      ("Màxim alumnes", "max_alumnos"),
+      ("Màxim alumnes", "numMaxAlumnos")
     ]
-    filtered_rows = self._filter_activitats_rows(self._search_box_cursos.text(), self._all_cursos)
+    filtered_rows = self._filter_activitats_rows(self._search_box.text(), rows)
     model = DictTableModel(filtered_rows, headers)
-    self.table_cursos.setModel(model)
-    self.table_cursos.resizeColumnsToContents()
-    self.table_cursos.hideColumn(0)
-    self.table_cursos.hideColumn(2)
+    self.table_activitats.setModel(model)
+    self.table_activitats.resizeColumnsToContents()
+    self.table_activitats.hideColumn(0)
+    # self.table_activitats.hideColumn(2)  # Ensure this column is visible
 
-    new_sel = self.table_cursos.selectionModel()
-    try:
-      new_sel.currentRowChanged.disconnect()
-    except (TypeError, RuntimeError):
-      pass
-    new_sel.currentRowChanged.connect(self._row_changed_curso)
-    self._sel_model = new_sel
-    
-  def _refresh_tallers(self):
-    rows = listar_actividades()
-    self._all_tallers = [a for a in rows if (a.get("tipo") or "").lower() in ["taller", "tallers"]]
-    headers = [
-      ("ID", "id"),
-      ("Nom", "nombre"),
-      ("Tipus", "tipo"),
-      ("Màxim alumnes", "max_alumnos"),
-    ]
-    filtered_rows = self._filter_activitats_rows(self._search_box_tallers.text(), self._all_tallers)
-    model = DictTableModel(filtered_rows, headers)
-    self.table_tallers.setModel(model)
-    self.table_tallers.resizeColumnsToContents()
-    self.table_tallers.hideColumn(0)
-    self.table_tallers.hideColumn(2)
-
-    sel = self.table_tallers.selectionModel()
-    try:
-        sel.currentRowChanged.disconnect(self._row_changed_taller)
-    except (TypeError, RuntimeError):
-        pass
-    sel.currentRowChanged.connect(self._row_changed_taller)
+    sel_model = self.table_activitats.selectionModel()
+    sel_model.currentChanged.connect(self._row_changed_actividad)
 
   def _filter_activitats_rows(self, text, rows):
     if not text.strip():
@@ -186,38 +111,25 @@ class ActividadesTab(QWidget):
       )
     return [a for a in rows if matches(a)]
 
-  def _filtrar_cursos(self):
-    self._refresh_cursos()
-
-  def _filtrar_tallers(self):
-    self._refresh_tallers()
-
-  def _row_changed_curso(self, curr, _prev):
-    if not curr.isValid():
-      self.detail_curso.load(None)
+  def _row_changed_actividad(self, current: QModelIndex, previous: QModelIndex):
+    if not current.isValid():
+      self.detail_actividad.load(None)
       return
-    actividadID = self.table_cursos.model().rows[curr.row()]["id"]
-    self.detail_curso.load(actividadID)
-
-  def _row_changed_taller(self, curr, _prev):
-    if not curr.isValid():
-      self.detail_taller.load(None)
-      return
-    actividadID = self.table_tallers.model().rows[curr.row()]["id"]
-    self.detail_taller.load(actividadID)
+    actividadID = self.table_activitats.model().rows[current.row()]["id"]
+    self.detail_actividad.load(actividadID)
 
   def _dialog_nova_actividad(self):
-    dlg = ActividadDialog(self)
-    if dlg.exec():
-      self._refresh_cursos()
-      self._refresh_tallers()
+      curso_id = self._curso_selector.currentData()
+      dlg = ActividadDialog(self, cursoAcademico_id=curso_id)
+      if dlg.exec():
+          self._refresh_activitats()
 
-  def _eliminar_actividad_curso(self):
-    sel = self.table_cursos.selectionModel().selectedRows()
+  def _eliminar_actividad(self):
+    sel = self.table_activitats.selectionModel().selectedRows()
     if not sel:
       return
     row = sel[0].row()
-    actividad = self.table_cursos.model().rows[row]
+    actividad = self.table_activitats.model().rows[row]
     box = QMessageBox(self)
     box.setWindowTitle("Confirmar eliminació")
     box.setText(
@@ -232,28 +144,22 @@ class ActividadesTab(QWidget):
     if reply != QMessageBox.Yes:
       return
     eliminar_actividad(actividad["id"])
-    self._refresh_cursos()
-    self.detail_curso.load(None)
+    self._refresh_activitats()
+    self.detail_actividad.load(None)
 
-  def _eliminar_actividad_taller(self):
-    sel = self.table_tallers.selectionModel().selectedRows()
-    if not sel:
-      return
-    row = sel[0].row()
-    actividad = self.table_tallers.model().rows[row]
-    box = QMessageBox(self)
-    box.setWindowTitle("Confirmar eliminació")
-    box.setText(
-      f"Vols eliminar l'activitat «{actividad['nombre']}» (ID {actividad['id']})?\n"
-      "Aquesta acció no es pot desfer."
-    )
-    box.setIcon(QMessageBox.Warning)
-    box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-    box.button(QMessageBox.Yes).setText("Sí")
-    box.button(QMessageBox.No).setText("No")
-    reply = box.exec()
-    if reply != QMessageBox.Yes:
-      return
-    eliminar_actividad(actividad["id"])
-    self._refresh_tallers()
-    self.detail_taller.load(None)
+  def _actualizar_cursos(self):
+      self._curso_selector.blockSignals(True)
+      curso_actual = self._curso_selector.currentData()
+      self._curso_selector.clear()
+      self._curso_selector.addItem("Tots els cursos", None)
+      for curso in listar_cursosA():
+          self._curso_selector.addItem(curso["nombre"], curso["id"])
+      index = self._curso_selector.findData(curso_actual)
+      self._curso_selector.setCurrentIndex(index if index >= 0 else 0)
+      self._curso_selector.blockSignals(False)
+
+  def eventFilter(self, source, event):
+      from PySide6.QtCore import QEvent
+      if event.type() == QEvent.Show and source is self._curso_selector.view().window():
+          self._actualizar_cursos()
+      return super().eventFilter(source, event)

@@ -1,10 +1,10 @@
 from __future__ import annotations
-from dataclasses import dataclass, asdict
 from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
-from controladores.trimestre import TrimestreDTO, registrar_trimestre
+from controladores.trimestre import registrar_trimestre, _to_dto as trimestre_to_dto
+from controladores.actividades import _to_dto as actividad_to_dto
 from database import SessionLocal
 from models import Actividad, CursoAcademico, Trimestre, TrimestreEnum
 
@@ -134,14 +134,14 @@ def listar_trimestres_por_cursoA(cursoAcademicoID: int) -> list[dict]:
   """Devuelve los trimestres de un curso académico."""
   with SessionLocal() as db:
     trimestres = db.query(Trimestre).filter(Trimestre.cursoAcademicoID == cursoAcademicoID).all()
-    return [_to_dto(t).model_dump() for t in trimestres]
+    return [trimestre_to_dto(t).model_dump() for t in trimestres]
   
 def listar_actividades_por_CursoAcademico(cursoAcademicoID: int) -> list[dict]:
     """Devuelve actividades de un curso académico."""
     try:
         with SessionLocal() as db:
             acts = db.query(Actividad).filter(Actividad.cursoAcademicoID == cursoAcademicoID).all()
-            return [a.model_dump() for a in acts]
+            return [actividad_to_dto(a).model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por curso: {e}")
   
