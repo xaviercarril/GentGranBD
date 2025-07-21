@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import QWidget, QFormLayout, QLineEdit, QDateEdit, QSpinBox, QMessageBox, QVBoxLayout, QTextEdit, QComboBox, QDoubleSpinBox
-from PySide6.QtCore import Signal, QDate
+from PySide6.QtCore import Signal, QDate, Qt
 from controladores.actividades import consultar_actividad, modificar_actividad
 from controladores.personal import consultar_personal, listar_personal
 
@@ -33,7 +33,7 @@ class ActividadDetailWidget(QWidget):
         layout.addStretch()
 
         self.nombre.editingFinished.connect(self._on_editing_finished)
-        self.descripcion.textChanged.connect(self._on_editing_finished)
+        self.descripcion.focusOutEvent = self._wrap_focus_out(self.descripcion.focusOutEvent)
         self.personal.currentTextChanged.connect(self._on_editing_finished)
         self.numMaxAlumnos.editingFinished.connect(self._on_editing_finished)
         self.preuMatricula.editingFinished.connect(self._on_editing_finished)
@@ -133,3 +133,9 @@ class ActividadDetailWidget(QWidget):
             else:
                 nombre = f"{persona['apellido1']} {persona['apellido2']}, {persona['nombre']}".strip()
             self.personal.addItem(nombre, userData=persona["id"])
+    def _wrap_focus_out(self, original_focus_out):
+        def new_focus_out(event):
+            if not self._loading:
+                self._save()
+            return original_focus_out(event)
+        return new_focus_out
