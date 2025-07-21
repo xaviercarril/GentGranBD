@@ -95,9 +95,13 @@ class ActividadesTab(QWidget):
       ("Descripció", "descripcion")
     ]
 
+    # Enriquecer datos con nombre del personal
     for row in rows:
-        personal = consultar_personal(row["personalID"]) if row["personalID"] else None
-        row["personal_nombre"] = personal["nombre"] + " " + personal["apellido1"] if personal else "Desconegut"
+        try:
+            personal = consultar_personal(row["personalID"]) if row["personalID"] else None
+            row["personal_nombre"] = f"{personal['nombre']} {personal['apellido1']}" if personal else "Desconegut"
+        except Exception:
+            row["personal_nombre"] = "Desconegut"
 
     filtered_rows = self._filter_activitats_rows(self._search_box.text(), rows)
 
@@ -107,12 +111,13 @@ class ActividadesTab(QWidget):
     if sel_model and sel_model.currentIndex().isValid():
         selected_id = self.table_activitats.model().rows[sel_model.currentIndex().row()]["id"]
 
+    # Asignar nuevo modelo
     model = DictTableModel(filtered_rows, headers)
     self.table_activitats.setModel(model)
     self.table_activitats.resizeColumnsToContents()
     self.table_activitats.hideColumn(0)
 
-    # Reconectar el selector
+    # Conectar el nuevo modelo
     sel_model = self.table_activitats.selectionModel()
     sel_model.currentChanged.connect(self._row_changed_actividad)
 
@@ -122,7 +127,7 @@ class ActividadesTab(QWidget):
             if r["id"] == selected_id:
                 index = model.index(row_idx, 0)
                 from PySide6.QtCore import QItemSelectionModel
-                sel_model.setCurrentIndex(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+                sel_model.setCurrentIndex(index, QItemSelectionModel.SelectCurrent | QItemSelectionModel.Rows)
                 break
 
   def _filter_activitats_rows(self, text, rows):
