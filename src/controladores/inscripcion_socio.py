@@ -1,35 +1,12 @@
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
+from controladores.dtos_models import InscripcionSocioDTO, InscripcionSocioUpdateDTO
 from database import SessionLocal
-from models import InscripcionSocio, Actividad, EstadoInscripcion, Pago, EstadoPago, Pago, Socio
-from controladores.pagos import registrar_pago
+from models import InscripcionSocio, Actividad, EstadoInscripcion, Pago, Pago, Socio
+from controladores.dtos import actividad_to_dto, inscripcion_to_dto, socio_to_dto, pago_to_dto
 from sqlalchemy.exc import IntegrityError
 from datetime import date
-
-# ────────────────────── DTO ──────────────────────
-class InscripcionSocioDTO(BaseModel):
-    socioID: int
-    actividadID: int
-    fechaInscripcion: date
-    estado: EstadoInscripcion = EstadoInscripcion.RESERVA
-    observaciones: str | None = None
-    fechaBaja: date | None = None
-
-class InscripcionSocioUpdateDTO(BaseModel):
-    estado: EstadoInscripcion | None = None
-    observaciones: str | None = None
-    fechaBaja: date | None = None
-
-def _to_dto(inscripcion: InscripcionSocio) -> InscripcionSocioDTO:
-    return InscripcionSocioDTO(
-        socioID=inscripcion.socioID,
-        actividadID=inscripcion.actividadID,
-        fechaInscripcion=inscripcion.fechaInscripcion,
-        estado=inscripcion.estado,
-        observaciones=inscripcion.observaciones,
-        fechaBaja=inscripcion.fechaBaja
-    )
 
 # ───────────────── CRUD ─────────────────
 def registrar_inscripcion(data: dict) -> int:
@@ -59,7 +36,7 @@ def registrar_inscripcion(data: dict) -> int:
             db.rollback()
             raise ValueError(f"Error inesperado al registrar inscripción: {e}")
         db.refresh(nueva_inscripcion)
-        return nueva_inscripcion.id
+        return nueva_inscripcion
 
 def modificar_inscripcion(inscripcion_id: int, cambios: dict) -> None:
     """Modifica inscripción de un socio a una actividad; recibe ID y dict con cambios."""
@@ -91,7 +68,7 @@ def consultar_inscripcion(inscripcion_id: int) -> dict | None:
             inscripcion = db.get(InscripcionSocio, inscripcion_id)
             if not inscripcion:
                 return None
-            return _to_dto(inscripcion).model_dump()
+            return inscripcion_to_dto(inscripcion).model_dump()
     except Exception as e:
         raise ValueError(f"Error al consultar inscripción: {e}")
 
@@ -110,25 +87,25 @@ def eliminar_inscripcion(inscripcion_id: int) -> None:
             raise ValueError(f"Error al eliminar inscripción: {e.orig}")
 
 # ────────────────── Consultas ──────────────────
-def consultar_actividad_InscripcionSocio(inscripcion_id: int) -> dict | None:
+def consultar_actividadID_InscripcionSocio(inscripcion_id: int) -> int | None:
     """Consulta una actividad por la inscripción de un socio."""
     try:
         with SessionLocal() as db:
-            act = db.get(Actividad, inscripcion_id)
-            if not act:
+            ins = db.get(InscripcionSocio, inscripcion_id)
+            if not ins:
                 return None
-            return act.model_dump()
+            return ins.actividadID
     except Exception as e:
         raise ValueError(f"Error al consultar actividad: {e}")
 
-def consultar_socio_InscripcionSocio(inscripcion_id: int) -> dict | None:
+def consultar_socioID_InscripcionSocio(inscripcion_id: int) -> int | None:
     """Consulta un socio por la inscripción a una actividad."""
     try:
         with SessionLocal() as db:
-            socio = db.get(Socio, inscripcion_id)
-            if not socio:
+            ins = db.get(InscripcionSocio, inscripcion_id)
+            if not ins:
                 return None
-            return socio.model_dump()
+            return ins.socioID
     except Exception as e:
         raise ValueError(f"Error al consultar socio: {e}")
     
@@ -137,7 +114,7 @@ def listar_pagos_por_InscripcionSocio(inscripcion_id: int) -> list[dict]:
     try:
         with SessionLocal() as db:
             pagos = db.query(Pago).filter(Pago.inscripcion.id == inscripcion_id).all()
-            return [pago.model_dump() for pago in pagos]
+            return [pago_to_dto(pago).model_dump() for pago in pagos]
     except Exception as e:
         raise ValueError(f"Error al listar pagos: {e}")
     

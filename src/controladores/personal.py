@@ -1,3 +1,5 @@
+from controladores.dtos import personal_to_dto
+from controladores.dtos_models import PersonalDTO, PersonalUpdateDTO
 from models import Personal, Profesor, Voluntario
 from pydantic import BaseModel, ValidationError
 from database import SessionLocal
@@ -5,36 +7,6 @@ from sqlalchemy.exc import IntegrityError
 from dataclasses import dataclass
 # ───────────────────── DTO ─────────────────────
 
-class PersonalDTO(BaseModel):
-    id: int | None = None
-    nombre: str
-    apellido1: str
-    apellido2: str | None = None
-    dniNie: str | None = None
-    email: str | None = None
-    telfMovil: str | None = None
-    observaciones: str | None = None
-
-class PersonalUpdateDTO(BaseModel):
-    nombre: str | None = None
-    apellido1: str | None = None
-    apellido2: str | None = None
-    dniNie: str | None = None
-    email: str | None = None
-    telfMovil: str | None = None
-    observaciones: str | None = None
-
-def _to_dto(personal: Personal) -> PersonalDTO:
-    return PersonalDTO(
-        id=personal.id,
-        nombre=personal.nombre,
-        apellido1=personal.apellido1,
-        apellido2=personal.apellido2,
-        dniNie=personal.dniNie,
-        email=personal.email,
-        telfMovil=personal.telfMovil,
-        observaciones=personal.observaciones
-    )
 
 # ───────────────── CRUD ─────────────────
 def registrar_personal(data: dict, tipo: str) -> int:
@@ -108,7 +80,7 @@ def consultar_personal(personalID: int) -> dict | None:
     try:
         with SessionLocal() as db:
             pers = db.get(Personal, personalID)
-            return _to_dto(pers).model_dump() if pers else None
+            return personal_to_dto(pers).model_dump() if pers else None
     except Exception as e:
         raise ValueError(f"Error al consultar personal: {e}")
 
@@ -118,7 +90,7 @@ def listar_personal() -> list[dict]:
     try:
         with SessionLocal() as db:
             personal_list = db.query(Personal).all()
-            return [_to_dto(p).model_dump() for p in personal_list]
+            return [personal_to_dto(p).model_dump() for p in personal_list]
     except Exception as e:
         raise ValueError(f"Error al listar personal: {e}")
     
@@ -127,7 +99,7 @@ def listar_profesores() -> list[dict]:
     try:
         with SessionLocal() as db:
             profesores = db.query(Profesor).all()
-            return [_to_dto(p).model_dump() for p in profesores]
+            return [personal_to_dto(p).model_dump() for p in profesores]
     except Exception as e:
         raise ValueError(f"Error al listar profesores: {e}")
     
@@ -136,7 +108,7 @@ def listar_voluntarios() -> list[dict]:
     try:
         with SessionLocal() as db:
             voluntarios = db.query(Voluntario).all()
-            return [_to_dto(v).model_dump() for v in voluntarios]
+            return [personal_to_dto(v).model_dump() for v in voluntarios]
     except Exception as e:
         raise ValueError(f"Error al listar voluntarios: {e}")
     

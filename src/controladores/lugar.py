@@ -10,26 +10,10 @@ from dataclasses import dataclass, asdict
 from datetime import date
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
+from controladores.dtos import lugar_to_dto
+from controladores.dtos_models import LugarDTO, LugarUpdateDTO
 from database import SessionLocal
 from models import Actividad, Lugar
-
-# ───────────────────── DTO ─────────────────────
-@dataclass(slots=True)
-class LugarDTO:
-    id: int | None = None
-    nombre: str
-    direccion: str | None = None
-
-class LugarUpdateDTO(BaseModel):
-    nombre: str | None = None
-    direccion: str | None = None
-
-def _to_dto(lugar: Lugar) -> LugarDTO:
-    return LugarDTO(
-        id=lugar.id,
-        nombre=lugar.nombre,
-        direccion=lugar.direccion
-    )
 
 # ───────────────── CRUD ─────────────────
 def registrar_lugar(data: dict) -> int:
@@ -90,13 +74,13 @@ def eliminar_lugar(lugarID: int) -> None:
 def consultar_lugar(lugarID: int) -> dict | None:
     with SessionLocal() as db:
         lugar = db.get(Lugar, lugarID)
-        return _to_dto(lugar).model_dump() if lugar else None
+        return lugar_to_dto(lugar).model_dump() if lugar else None
 
 # ────────────────── Consultas ──────────────────
 def consultar_lugares() -> list[dict]:
     with SessionLocal() as db:
         lugares = db.query(Lugar).order_by(Lugar.nombre).all()
-        return [_to_dto(l).model_dump() for l in lugares]
+        return [lugar_to_dto(l).model_dump() for l in lugares]
 
 def listar_actividades_por_lugar(lugarID: int) -> list[dict]:
     """Devuelve actividades asociadas a un lugar."""

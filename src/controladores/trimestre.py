@@ -5,33 +5,12 @@ from datetime import date
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
 
+from controladores.dtos import clase_to_dto
+from controladores.dtos_models import TrimestreDTO, TrimestreUpdateDTO
 from database import SessionLocal
 from models import (
     Clase, Trimestre, TrimestreEnum, CursoAcademico
 )
-
-# ───────────────────── DTO ─────────────────────
-class TrimestreDTO(BaseModel):
-    id: int | None = None
-    nombre: TrimestreEnum
-    fechaInicio: date
-    fechaFin: date
-    cursoAcademicoID: int
-
-class TrimestreUpdateDTO(BaseModel):
-    nombre: TrimestreEnum | None = None
-    fechaInicio: date | None = None
-    fechaFin: date | None = None
-    cursoAcademicoID: int | None = None
-
-def _to_dto(trimestre: Trimestre) -> TrimestreDTO:
-    return TrimestreDTO(
-        id=trimestre.id,
-        nombre=trimestre.nombre,
-        fechaInicio=trimestre.fechaInicio,
-        fechaFin=trimestre.fechaFin,
-        cursoAcademicoID=trimestre.cursoAcademicoID
-    )
 
 # ───────────────── CRUD ─────────────────
 def registrar_trimestre(datos: dict) -> int:
@@ -111,7 +90,7 @@ def listar_clases_por_trimestre(trimestreID: int) -> list[dict]:
     try:
         with SessionLocal() as db:
             clases = db.query(Clase).filter(Clase.trimestreID == trimestreID).all()
-            return [clase.model_dump() for clase in clases]
+            return [clase_to_dto(clase).model_dump() for clase in clases]
     except Exception as e:
         raise ValueError(f"Error al listar clases: {e}")
     

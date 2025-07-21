@@ -1,29 +1,11 @@
 from dataclasses import dataclass
 from sqlalchemy.orm import Session
+from controladores.dtos import asistencia_to_dto
+from controladores.dtos_models import AsistenciaSocioDTO, AsistenciaSocioUpdateDTO
 from database import SessionLocal
 from models import AsistenciaSocio, InscripcionSocio, Clase, Socio
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
-
-# ─────────────────DTO────────────────────────────
-@dataclass(slots=True)
-class AsistenciaSocioDTO(BaseModel):
-    socioID: int
-    claseID: int
-    presente: bool = False
-    observaciones: str | None = None
-
-class AsistenciaSocioUpdateDTO(BaseModel):
-    presente: bool | None = None
-    observaciones: str | None = None
-
-def _to_dto(asistencia: AsistenciaSocio) -> AsistenciaSocioDTO:
-    return AsistenciaSocioDTO(
-        socioID=asistencia.socioID,
-        claseID=asistencia.claseID,
-        presente=asistencia.presente,
-        observaciones=asistencia.observaciones
-    )
 
 # ─────────────────CRUD──────────────────────────
 def registrar_asistenciaSocio(data: dict) -> int:
@@ -89,7 +71,7 @@ def consultar_asistenciaSocio(socioID: int, claseID: int) -> dict | None:
     """Consulta asistencia de un socio a una clase; devuelve dict o None."""
     with SessionLocal() as db:
         asistencia = db.get(AsistenciaSocio, {'socioID': socioID, 'claseID': claseID})
-        return _to_dto(asistencia).model_dump() if asistencia else None
+        return asistencia_to_dto(asistencia).model_dump() if asistencia else None
 
 
 
@@ -100,7 +82,7 @@ def consultar_clase_AsistenciaSocio(asistencia_id: int) -> dict | None:
     try:
         with SessionLocal() as db:
             clase = db.get(Clase, asistencia_id)
-            return _to_dto(clase).model_dump() if clase else None
+            return asistencia_to_dto(clase).model_dump() if clase else None
     except Exception as e:
         raise ValueError(f"Error al consultar clase: {e}")
     
@@ -111,6 +93,6 @@ def consultar_socio_AsistenciaSocio(asistencia_id: int) -> dict | None:
             socio = db.get(Socio, asistencia_id)
             if not socio:
                 return None
-            return _to_dto(socio).model_dump() if socio else None
+            return asistencia_to_dto(socio).model_dump() if socio else None
     except Exception as e:
         raise ValueError(f"Error al consultar socio: {e}")

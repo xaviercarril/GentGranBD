@@ -3,7 +3,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal
 from controladores.personal import modificar_personal, consultar_personal
-from controladores.personal import _to_dto  # add this if it's implemented
 
 class ProfeDetailWidget(QWidget):
     """Panell lateral de detall i edició auto-guardada."""

@@ -7,43 +7,12 @@ from __future__ import annotations
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.exc import IntegrityError
 
+from controladores.dtos_models import ActividadDTO, ActividadUpdateDTO
+from controladores.dtos import actividad_to_dto
 from database import SessionLocal
 from models import (
     Actividad, Clase, InscripcionSocio
 )
-
-# ───────────────────── DTO ─────────────────────
-class ActividadDTO(BaseModel):
-    id: int | None = None
-    nombre: str
-    descripcion: str | None = None
-    numMaxAlumnos: int | None = 0
-    cursoAcademico_id: int
-    lugarID: int | None = None
-    personalID: int | None = None   
-    precio_matricula: float = 0.0
-
-class ActividadUpdateDTO(BaseModel):
-    nombre: str | None = None
-    descripcion: str | None = None
-    numMaxAlumnos: int | None = None
-    cursoAcademico_id: int | None = None
-    lugarID: int | None = None
-    personalID: int | None = None
-    precio_matricula: float | None = None
-
-def _to_dto(a: Actividad) -> ActividadDTO:
-    return ActividadDTO(
-        id=a.id,
-        nombre=a.nombre,
-        descripcion=a.descripcion,
-        numMaxAlumnos=a.numMaxAlumnos,
-        cursoAcademico_id=a.cursoAcademicoID,
-        lugarID=a.lugarID,
-        personalID=a.personalID,
-        precio_matricula=a.precio_matricula
-    )
-
 
 # ───────────────── CRUD ─────────────────
 def registrar_actividad(data: dict) -> int:
@@ -102,7 +71,7 @@ def modificar_actividad(actividadID: int, newData: dict) -> None:
 def consultar_actividad(actividadID: int) -> dict | None:
     with SessionLocal() as db:
         act = db.get(Actividad, actividadID)
-        return _to_dto(act).model_dump() if act else None
+        return actividad_to_dto(act).model_dump() if act else None
 
 def eliminar_actividad(actividadID: int) -> None:
     try:
@@ -123,7 +92,7 @@ def listar_actividades() -> list[dict]:
     try:
         with SessionLocal() as db:
             acts = db.query(Actividad).order_by(Actividad.nombre).all()
-            return [_to_dto(a).model_dump() for a in acts]
+            return [actividad_to_dto(a).model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades: {e}")
 

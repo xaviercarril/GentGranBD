@@ -3,31 +3,12 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
-from controladores.trimestre import registrar_trimestre, _to_dto as trimestre_to_dto
-from controladores.actividades import _to_dto as actividad_to_dto
+from controladores.dtos_models import CursoAcademicoDTO
+from controladores.trimestre import registrar_trimestre
+from controladores.dtos import actividad_to_dto, cursoA_to_dto, trimestre_to_dto
 from database import SessionLocal
 from models import Actividad, CursoAcademico, Trimestre, TrimestreEnum
 
-# ───────────────────── DTO ─────────────────────
-class CursoAcademicoDTO(BaseModel):
-  id: int | None = None
-  nombre: str
-  fechaInicio: date
-  fechaFin: date
-
-class CursoAcademicoUpdateDTO(BaseModel):
-  nombre: str | None = None
-  fechaInicio: date | None = None
-  fechaFin: date | None = None
-
-def _to_dto(curso: CursoAcademico) -> CursoAcademicoDTO:
-  return CursoAcademicoDTO(
-    id=curso.id,
-    nombre=curso.nombre,
-    fechaInicio=curso.fechaInicio,
-    fechaFin=curso.fechaFin
-  )
-  
 # ───────────────── CRUD ─────────────────
 def registrar_cursoA(datos: dict) -> int:
   """Crea un nuevo curso académico; devuelve su ID."""
@@ -106,7 +87,7 @@ def consultar_cursoA(cursoAcademicoID: int) -> dict | None:
     with SessionLocal() as db:
       curso = db.get(CursoAcademico, cursoAcademicoID)
       if curso:
-        return _to_dto(curso).model_dump()
+        return cursoA_to_dto(curso).model_dump()
       return None
   except Exception as e:
     raise ValueError(f"Error al consultar curso académico: {e}")
@@ -128,7 +109,7 @@ def listar_cursosA() -> list[dict]:
   """Devuelve todos los cursos académicos"""
   with SessionLocal() as db:
     cursos = db.query(CursoAcademico).order_by(CursoAcademico.fechaInicio).all()
-    return [_to_dto(c).model_dump() for c in cursos]
+    return [cursoA_to_dto(c).model_dump() for c in cursos]
 
 def listar_trimestres_por_cursoA(cursoAcademicoID: int) -> list[dict]:
   """Devuelve los trimestres de un curso académico."""

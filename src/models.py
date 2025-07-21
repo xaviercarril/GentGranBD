@@ -190,10 +190,10 @@ class Clase(Base):
 # ---------------------------------------------
 class InscripcionSocio(Base):
     __tablename__ = "inscripciones"
-
+    id = Column(Integer, primary_key=True)
     # Composite primary key (socioID, actividadID)
-    socioID = Column(Integer, ForeignKey("socios.id"), primary_key=True)
-    actividadID = Column(Integer, ForeignKey("actividades.id"), primary_key=True)
+    socioID = Column(Integer, ForeignKey("socios.id"))
+    actividadID = Column(Integer, ForeignKey("actividades.id"))
 
     fechaInscripcion = Column(Date, nullable=False)
     fechaBaja = Column(Date)
@@ -210,7 +210,7 @@ class InscripcionSocio(Base):
 # ---------------------------------------------
 class AsistenciaSocio(Base):
     __tablename__ = "asistencias_socio"
-
+    id = Column(Integer, primary_key=True)
     # Composite primary key (socioID, claseID)
     socioID = Column(Integer, ForeignKey("socios.id"), primary_key=True)
     claseID = Column(Integer, ForeignKey("clases.id"), primary_key=True)

@@ -1,3 +1,4 @@
+from controladores.dtos import firma_to_dto
 from models import FirmaLOPD, Socio
 from sqlalchemy import Column, Integer, String, Date, LargeBinary, ForeignKey
 from sqlalchemy.orm import relationship
@@ -5,24 +6,6 @@ from pydantic import BaseModel, ValidationError
 from database import SessionLocal
 from sqlalchemy.exc import IntegrityError
 from dataclasses import dataclass
-
-# ───────────────────── DTO ─────────────────────
-@dataclass(slots=True)
-class FirmaLOPDDTO(BaseModel):
-    socioID: int
-    fecha: Date | None = None
-    firma: bytes | None = None
-
-class FirmaLOPDUpdateDTO(BaseModel):
-    fecha: Date | None = None
-    firma: bytes | None = None
-
-def _to_dto(firma: FirmaLOPD) -> FirmaLOPDDTO:
-    return FirmaLOPDDTO(
-        socioID=firma.socioID,
-        fecha=firma.fecha,
-        firma=firma.firma
-    )
 
 # ───────────────── CRUD ─────────────────
 def registrar_firmaLOPD(datos: dict) -> int:
@@ -76,7 +59,7 @@ def consultar_firmaLOPD(socioID: int) -> dict:
         firma = db.get(FirmaLOPD, socioID)
         if not firma:
             raise ValueError("Firma LOPD no encontrada")
-        return _to_dto(firma).model_dump()
+        return firma_to_dto(firma).model_dump()
         
 def eliminar_firmaLOPD(socioID: int) -> None:
     """Elimina una firma LOPD por ID de socio."""

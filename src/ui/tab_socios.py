@@ -46,6 +46,7 @@ class SociosTab(QWidget):
 
     # Quan seleccionem fila → carregar detall
     self.table_socis.selectionModel().currentRowChanged.connect(self._row_changed)
+    self.table_socis.doubleClicked.connect(self._abrir_inscripciones_socio)
 
     # Layout horitzontal amb taula (flexible) and detall (ample fix, no movable)
     hlayout = QHBoxLayout()
@@ -208,3 +209,11 @@ class SociosTab(QWidget):
       )
 
     return [s for s in self._all_socios if matches(s)]
+
+  def _abrir_inscripciones_socio(self, index):
+      if not index.isValid():
+          return
+      socio = self.table_socis.model().rows[index.row()]
+      from ui.inscripciones_dialog import InscripcionesDialog
+      dlg = InscripcionesDialog(socio["id"], self)
+      dlg.exec()

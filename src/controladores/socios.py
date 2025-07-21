@@ -12,63 +12,10 @@ from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
 
 
+from controladores.dtos_models import SocioDTO, SocioUpdateDTO
 from database import SessionLocal  # fábrica de sesiones
-from models import AsistenciaSocio, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Socio
-
-
-# ───────────────────── DTO ─────────────────────
-class SocioDTO(BaseModel):
-
-    id: int | None = None
-    dniNie: str
-    nombre: str
-    apellido1: str
-    apellido2: str | None = None
-    direccion: str | None = None
-    telefonoFijo: str | None = None
-    telefonoMovil: str | None = None
-    email: str | None = None
-    grupoDifusion: str | None = None
-    fechaAlta: date
-    fechaBaja: date | None = None
-    observaciones: str | None = None
-    foto: bytes | None = None
-
-
-class SocioUpdateDTO(BaseModel):
-    dniNie: str | None = None
-    nombre: str | None = None
-    apellido1: str | None = None
-    apellido2: str | None = None
-    direccion: str | None = None
-    telefonoFijo: str | None = None
-    telefonoMovil: str | None = None
-    email: str | None = None
-    grupoDifusion: str | None = None
-    fechaAlta: date | None = None
-    fechaBaja: date | None = None
-    observaciones: str | None = None
-    foto: bytes | None = None
-
-
-def _to_dto(obj: Socio) -> SocioDTO:
-    return SocioDTO(
-        id=obj.id,
-        dniNie=obj.dniNie,
-        nombre=obj.nombre,
-        apellido1=obj.apellido1,
-        apellido2=obj.apellido2,
-        direccion=obj.direccion,
-        telefonoFijo=obj.telefonoFijo,
-        telefonoMovil=obj.telefonoMovil,
-        email=obj.email,
-        grupoDifusion=obj.grupoDifusion,
-        fechaAlta=obj.fechaAlta,
-        fechaBaja=obj.fechaBaja,
-        observaciones=obj.observaciones,
-        foto=obj.foto,
-    )
-
+from models import AsistenciaSocio, FirmaLOPD, InscripcionSocio, Socio
+from controladores.dtos import asistencia_to_dto, firma_to_dto, inscripcion_to_dto, socio_to_dto
 
 # ───────────────── CRUD ─────────────────
 def registrar_socio(datos: dict) -> int:
@@ -134,7 +81,7 @@ def consultar_socio(socioID: int) -> dict | None:
     try:
         with SessionLocal() as db:
             s = db.get(Socio, socioID)
-            return _to_dto(s).model_dump() if s else None
+            return socio_to_dto(s).model_dump() if s else None
     except Exception as e:
         raise ValueError(f"Error al consultar soci: {e}")
 
@@ -182,7 +129,7 @@ def listar_socios() -> list[dict]:
             socios = db.query(Socio).all()
             if not socios:
                 return None
-            return [_to_dto(s).model_dump() for s in socios]
+            return [socio_to_dto(s).model_dump() for s in socios]
     except Exception as e:
         raise ValueError(f"Error al llistar socis: {e}")
 
@@ -191,7 +138,7 @@ def listar_socios_activos() -> list[dict]:
     try:
         with SessionLocal() as db:
             socios = db.query(Socio).filter(Socio.fechaBaja.is_(None)).all()
-            return [_to_dto(s).model_dump() for s in socios]
+            return [socio_to_dto(s).model_dump() for s in socios]
     except Exception as e:
         raise ValueError(f"Error al llistar socis actius: {e}")
 
@@ -203,7 +150,7 @@ def listar_asistencias_por_socio_clase(socioID: int, claseID: int) -> list[dict]
                 AsistenciaSocio.socioID == socioID,
                 AsistenciaSocio.claseID == claseID
             ).all()
-            return [a.model_dump() for a in asistencias]
+            return [asistencia_to_dto(a).model_dump() for a in asistencias]
     except Exception as e:
         raise ValueError(f"Error al listar asistencias: {e}")
     
@@ -216,6 +163,15 @@ def listar_asistencia_por_Socio(socioID: int) -> list[dict]:
     except Exception as e:
         raise ValueError(f"Error al consultar asistencias: {e}")
     
+def listar_inscripciones_por_socio(socioID: int) -> list[dict]:
+    """Lista las inscripciones de un socio."""
+    try:
+        with SessionLocal() as db:
+            inscripciones = db.query(InscripcionSocio).filter(InscripcionSocio.socioID == socioID).all()
+            return [inscripcion_to_dto(ins).model_dump() for ins in inscripciones]
+    except Exception as e:
+        raise ValueError(f"Error al listar inscripciones: {e}")
+    
 def consultar_firma_LOPD(socioID: int) -> dict | None:
     """Consulta la firma LOPD de un socio."""
     try:
@@ -223,7 +179,7 @@ def consultar_firma_LOPD(socioID: int) -> dict | None:
             firma = db.get(FirmaLOPD, socioID)
             if not firma:
                 return None
-            return firma.model_dump()
+            return firma_to_dto(firma).model_dump()
     except Exception as e:
         raise ValueError(f"Error al consultar firma LOPD: {e}")
     

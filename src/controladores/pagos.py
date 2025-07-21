@@ -1,33 +1,15 @@
 
 from sqlalchemy.orm import Session
+from controladores.dtos import pago_to_dto
+from controladores.dtos_models import PagoDTO, PagoUpdateDTO
 from models import InscripcionSocio, Pago
 from datetime import date
 from pydantic import BaseModel, ValidationError
 from database import SessionLocal
 from sqlalchemy.exc import IntegrityError
-from controladores.pagos import registrar_pago
 
 # ────────────────────── DTO ──────────────────────
-class PagoDTO(BaseModel):
-    socioID: int
-    actividadID: int
-    fecha_pago: date
-    importe: float = 0.0
-    estado: str = "PENDIENTE"  # Estado por defecto
 
-class PagoUpdateDTO(BaseModel):
-    fecha_pago: date | None = None
-    estado: str | None = None
-    importe: float | None = None
-
-def _to_dto(pago: Pago) -> PagoDTO:
-    return PagoDTO(
-        socioID=pago.socioID,
-        actividadID=pago.actividadID,
-        fecha_pago=pago.fecha_pago,
-        importe=pago.importe,
-        estado=pago.estado
-    )
 
 # ───────────────── CRUD ─────────────────
 def registrar_pago(data: dict) -> int:
@@ -84,7 +66,7 @@ def consultar_pago(pago_id: int) -> dict | None:
             pago = db.get(Pago, pago_id)
             if not pago:
                 return None
-            return _to_dto(pago).model_dump()
+            return pago_to_dto(pago).model_dump()
     except Exception as e:
         raise ValueError(f"Error al consultar pago: {e}")
 

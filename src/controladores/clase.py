@@ -3,40 +3,11 @@ from datetime import date, timedelta
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
+from controladores.dtos import clase_to_dto
 from database import SessionLocal
 from models import AsistenciaSocio, Clase, Actividad, Trimestre
 
-@dataclass(slots=True)
-class ClaseDTO(BaseModel):
-    id: int | None = None
-    actividadID: int
-    trimestreID: int
-    fecha: date | None = None
-    horaInicio: str | None = None
-    horaFin: str | None = None
-    duracion: timedelta | None = None
-    observaciones: str | None = None
 
-class ClaseUpdateDTO(BaseModel):
-    fecha: date | None = None
-    horaInicio: str | None = None
-    horaFin: str | None = None
-    duracion: timedelta | None = None
-    observaciones: str | None = None
-    trimestreID: int | None = None
-
-def _to_dto(clase: Clase) -> ClaseDTO:
-    return ClaseDTO(
-        id=clase.id,
-        actividadID=clase.actividadID,
-        trimestreID=clase.trimestreID,
-        fecha=clase.fecha,
-        horaInicio=clase.horaInicio,
-        horaFin=clase.horaFin,
-        duracion=clase.duracion,
-        observaciones=clase.observaciones
-    )
-    
 # ──────────────────────── CRUD ────────────────────────
 def registrar_clase(data: dict) -> int:
     """Crea una nueva clase; recibe dict, valida con DTO y devuelve ID."""
@@ -107,7 +78,7 @@ def consultar_clase(claseID: int) -> dict | None:
         with SessionLocal() as db:
             clase = db.get(Clase, claseID)
             if clase:
-                return _to_dto(clase).model_dump()
+                return clase_to_dto(clase).model_dump()
             return None
     except Exception as e:
         raise ValueError(f"Error al consultar clase: {e}")
