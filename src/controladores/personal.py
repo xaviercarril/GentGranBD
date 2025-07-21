@@ -4,19 +4,25 @@ from database import SessionLocal
 from sqlalchemy.exc import IntegrityError
 from dataclasses import dataclass
 # ───────────────────── DTO ─────────────────────
-@dataclass(slots=True)
+
 class PersonalDTO(BaseModel):
     id: int | None = None
     nombre: str
     apellido1: str
     apellido2: str | None = None
-    dniNie: str
+    dniNie: str | None = None
+    email: str | None = None
+    telfMovil: str | None = None
+    observaciones: str | None = None
 
 class PersonalUpdateDTO(BaseModel):
     nombre: str | None = None
     apellido1: str | None = None
     apellido2: str | None = None
     dniNie: str | None = None
+    email: str | None = None
+    telfMovil: str | None = None
+    observaciones: str | None = None
 
 def _to_dto(personal: Personal) -> PersonalDTO:
     return PersonalDTO(
@@ -24,7 +30,10 @@ def _to_dto(personal: Personal) -> PersonalDTO:
         nombre=personal.nombre,
         apellido1=personal.apellido1,
         apellido2=personal.apellido2,
-        dniNie=personal.dniNie
+        dniNie=personal.dniNie,
+        email=personal.email,
+        telfMovil=personal.telfMovil,
+        observaciones=personal.observaciones
     )
 
 # ───────────────── CRUD ─────────────────
@@ -92,11 +101,14 @@ def eliminar_personal(personalID: int) -> None:
         db.delete(persona)
         db.commit()
 
-def consultar_personal(personalID: int) -> Personal | None:
+def consultar_personal(personalID: int) -> dict | None:
     """Consulta un personal por su ID y devuelve sus datos."""
+    if not isinstance(personalID, int):
+        raise ValueError("El ID debe ser un número entero")
     try:
         with SessionLocal() as db:
-            return db.get(Personal, personalID)
+            pers = db.get(Personal, personalID)
+            return _to_dto(pers).model_dump() if pers else None
     except Exception as e:
         raise ValueError(f"Error al consultar personal: {e}")
 

@@ -114,17 +114,10 @@ class SociosTab(QWidget):
     if dlg.exec():
       self._refresh_socios()
 
-  def _editar_socio_dialog(self, index):
-    fila = self.table_socis.model().rows[index.row()]
-    socioID = fila["id"]
-    socio_complet = consultar_socio(socioID)
-    dlg = SocioDialog(self, socio=socio_complet)
-    if dlg.exec():
-      self._refresh_socios()
-
   def _eliminar_socio(self):
     sel = self.table_socis.selectionModel().selectedRows()
     if not sel:
+      QMessageBox.warning(self, "Error", "No s'ha seleccionat cap soci.")
       return
 
     row = sel[0].row()
