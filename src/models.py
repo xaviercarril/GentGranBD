@@ -83,13 +83,6 @@ class Personal(Base):
     observaciones = Column(Text)
     tipo = Column(String(50))  # Needed for single-table inheritance discriminator
 
-    # Bridge to activities
-    actividadesPersonal = relationship(
-        "ActividadPersonal",
-        back_populates="personal",
-        cascade="all, delete-orphan",
-    )
-
     __mapper_args__ = {
         "polymorphic_identity": "personal",
         "polymorphic_on": tipo,
@@ -162,25 +155,15 @@ class Actividad(Base):
     # Foreign Keys
     cursoAcademicoID = Column(Integer, ForeignKey("curso_academico.id"))
     lugarID = Column(Integer, ForeignKey("lugares.id"))
-
+    personalID = Column(Integer, ForeignKey("personal.id"))
+    
     # Relationships
     curso = relationship("CursoAcademico", back_populates="actividades")
     lugar = relationship("Lugar", back_populates="actividades")
+    personal = relationship("Personal")
 
     clases = relationship("Clase", back_populates="actividad", cascade="all, delete-orphan")
     inscripciones = relationship("InscripcionSocio", back_populates="actividad", cascade="all, delete-orphan")
-    monitores = relationship("ActividadPersonal", back_populates="actividad", cascade="all, delete-orphan")
-
-# Bridge table allowing multiple monitors per activity and historical tracking
-class ActividadPersonal(Base):
-    __tablename__ = "actividad_personal"
-
-    actividadID = Column(Integer, ForeignKey("actividades.id"), primary_key=True)
-    personalID = Column(Integer, ForeignKey("personal.id"), primary_key=True)
-    rol = Column(String(50))
-
-    actividad = relationship("Actividad", back_populates="monitores")
-    personal = relationship("Personal", back_populates="actividadesPersonal")
 
 # ---------------------------------------------
 # CLASS SESSIONS

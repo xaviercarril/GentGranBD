@@ -1,6 +1,7 @@
-from PySide6.QtWidgets import QWidget, QFormLayout, QLineEdit, QDateEdit, QSpinBox, QMessageBox, QVBoxLayout
+from PySide6.QtWidgets import QWidget, QFormLayout, QLineEdit, QDateEdit, QSpinBox, QMessageBox, QVBoxLayout, QTextEdit, QComboBox, QDoubleSpinBox
 from PySide6.QtCore import Signal, QDate
 from controladores.actividades import consultar_actividad, modificar_actividad
+from controladores.personal import consultar_personal, listar_personal
 
 class ActividadDetailWidget(QWidget):
     saved = Signal()
@@ -11,23 +12,31 @@ class ActividadDetailWidget(QWidget):
         self._loading = False
 
         self.nombre = QLineEdit()
-        self.descripcion = QLineEdit()
+        self.personal = QComboBox()
+        self._refresh_personal()
         self.numMaxAlumnos = QSpinBox()
         self.numMaxAlumnos.setMinimum(0)
         self.numMaxAlumnos.setMaximum(999)
+        self.preuMatricula = QDoubleSpinBox()
+        self.preuMatricula.setDecimals(2)
+        self.descripcion = QTextEdit()
 
         form = QFormLayout()
         form.addRow("Nom:", self.nombre)
-        form.addRow("Descripció:", self.descripcion)
+        form.addRow("Professor/Voluntari:", self.personal)
         form.addRow("Màxim alumnes:", self.numMaxAlumnos)
+        form.addRow("Preu matrícula:", self.preuMatricula)
+        form.addRow("Descripció:", self.descripcion)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addStretch()
 
         self.nombre.editingFinished.connect(self._on_editing_finished)
-        self.descripcion.editingFinished.connect(self._on_editing_finished)
+        self.descripcion.textChanged.connect(self._on_editing_finished)
+        self.personal.currentTextChanged.connect(self._on_editing_finished)
         self.numMaxAlumnos.editingFinished.connect(self._on_editing_finished)
+        self.preuMatricula.editingFinished.connect(self._on_editing_finished)
 
     def _on_editing_finished(self):
         if not self._loading:
@@ -50,20 +59,33 @@ class ActividadDetailWidget(QWidget):
             return
 
         self.nombre.setText(act.get("nombre", ""))
-        self.descripcion.setText(
-            act.get("descripcion") or act.get("descripcion_actividad") or ""
-        )
+
+        self._refresh_personal()
+        personalID = act.get("personalID")
+        if personalID is None:
+            self.personal.setCurrentText("Desconegut")
+        else:
+            personal = consultar_personal(personalID)
+            if personal.get("apellido2") is None:
+                self.personal.setCurrentText(f"{personal['apellido1']}, {personal['nombre']}".strip())
+            else:
+                self.personal.setCurrentText(
+                    f"{personal.get('apellido1', '')} {personal.get('apellido2', '')}, {personal.get('nombre', '')}".strip()
+                )
 
         numMaxAlumnos = act.get("numMaxAlumnos")
         if numMaxAlumnos is None:
-            numMaxAlumnos = act.get("numMaxAlumnos")
-        if numMaxAlumnos is not None:
-            self.numMaxAlumnos.setValue(numMaxAlumnos)
+            self.numMaxAlumnos.setValue(0)
         else:
-            self.numMaxAlumnos.setValue(1)
+            self.numMaxAlumnos.setValue(numMaxAlumnos)
+
+        self.preuMatricula.setValue(act.get("precio_matricula", 0.0))
+        self.preuMatricula.setMinimum(0.0)
+        self.preuMatricula.setMaximum(999.99)
+        self.descripcion.setText(act.get("descripcion", ""))
         print("Cargando actividad:", act)  # debug
         self._loading = False
-        self.saved.emit()
+        # self.saved.emit()
 
     def _clear(self):
         self.nombre.clear()
@@ -79,8 +101,10 @@ class ActividadDetailWidget(QWidget):
     def _build_data(self) -> dict:
         return {
             "nombre": self.nombre.text().strip(),
-            "descripcion": self.descripcion.text().strip() or None,
+            "personalID": self.personal.currentData(),
             "numMaxAlumnos": self.numMaxAlumnos.value(),
+            "precio_matricula": self.preuMatricula.value(),
+            "descripcion": self.descripcion.toPlainText().strip() or None,
         }
 
     def _save(self):
@@ -99,3 +123,13 @@ class ActividadDetailWidget(QWidget):
             self.saved.emit()
         except ValueError as e:
             QMessageBox.warning(self, "Error", str(e))
+
+    def _refresh_personal(self):
+        """Actualiza la lista de personal en el combo box."""
+        self.personal.clear()
+        for persona in listar_personal():
+            if persona.get("apellido2") is None:
+                nombre = f"{persona['apellido1']}, {persona['nombre']}".strip()
+            else:
+                nombre = f"{persona['apellido1']} {persona['apellido2']}, {persona['nombre']}".strip()
+            self.personal.addItem(nombre, userData=persona["id"])

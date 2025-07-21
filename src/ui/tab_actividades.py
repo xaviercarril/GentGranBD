@@ -1,10 +1,11 @@
 from controladores.actividades import listar_actividades, consultar_actividad, eliminar_actividad
+from controladores.personal import consultar_personal  # Import the missing function
 from PySide6.QtWidgets import (
   QWidget, QVBoxLayout, QHBoxLayout, QTableView,
   QPushButton, QMessageBox, QLineEdit, QComboBox
 )
 from PySide6.QtGui import QIcon
-from PySide6.QtCore import QSize, QModelIndex
+from PySide6.QtCore import QSize, QModelIndex, QItemSelectionModel
 from ui.actividad_dialog import ActividadDialog
 from ui.actividad_detail import ActividadDetailWidget
 from ui.table_models import DictTableModel
@@ -88,16 +89,41 @@ class ActividadesTab(QWidget):
     headers = [
       ("ID", "id"),
       ("Nom", "nombre"),
-      ("Màxim alumnes", "numMaxAlumnos")
+      ("Personal", "personal_nombre"),
+      ("Preu matrícula", "precio_matricula"),
+      ("Màxim alumnes", "numMaxAlumnos"),
+      ("Descripció", "descripcion")
     ]
+
+    for row in rows:
+        personal = consultar_personal(row["personalID"]) if row["personalID"] else None
+        row["personal_nombre"] = personal["nombre"] + " " + personal["apellido1"] if personal else "Desconegut"
+
     filtered_rows = self._filter_activitats_rows(self._search_box.text(), rows)
+
+    # Guardar ID seleccionado
+    selected_id = None
+    sel_model = self.table_activitats.selectionModel()
+    if sel_model and sel_model.currentIndex().isValid():
+        selected_id = self.table_activitats.model().rows[sel_model.currentIndex().row()]["id"]
+
     model = DictTableModel(filtered_rows, headers)
     self.table_activitats.setModel(model)
     self.table_activitats.resizeColumnsToContents()
     self.table_activitats.hideColumn(0)
 
+    # Reconectar el selector
     sel_model = self.table_activitats.selectionModel()
     sel_model.currentChanged.connect(self._row_changed_actividad)
+
+    # Restaurar selección
+    if selected_id is not None:
+        for row_idx, r in enumerate(model.rows):
+            if r["id"] == selected_id:
+                index = model.index(row_idx, 0)
+                from PySide6.QtCore import QItemSelectionModel
+                sel_model.setCurrentIndex(index, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+                break
 
   def _filter_activitats_rows(self, text, rows):
     if not text.strip():

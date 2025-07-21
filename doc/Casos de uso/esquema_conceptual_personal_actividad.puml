@@ -84,17 +84,7 @@ class Actividad {
 CursoAcademico "1" -- "0..*" Actividad
 Lugar "1" -- "0..*" Actividad
 
-' Bridge table to handle multiple monitors and historical replacements
-class ActividadPersonal {
-    +actividad_id: int   ' PK/FK
-    +personal_id: int    ' PK/FK
-    +rol: string
-    +fecha_inicio: date
-    +fecha_fin: date
-}
-
-Actividad "1" -- "0..*" ActividadPersonal
-Personal  "1" -- "0..*" ActividadPersonal
+Personal  "1" -- "0..*" Actividad
 
 ' ------------- INSCRIPCIÓN DE SOCIOS -------------
 enum estadoInscripcion {

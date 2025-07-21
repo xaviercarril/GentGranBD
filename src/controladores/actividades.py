@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal
 from models import (
-    Actividad, Clase, CursoAcademico, InscripcionSocio, ActividadPersonal, Lugar
+    Actividad, Clase, InscripcionSocio
 )
 
 # ───────────────────── DTO ─────────────────────
@@ -20,6 +20,7 @@ class ActividadDTO(BaseModel):
     numMaxAlumnos: int | None = 0
     cursoAcademico_id: int
     lugarID: int | None = None
+    personalID: int | None = None   
     precio_matricula: float = 0.0
 
 class ActividadUpdateDTO(BaseModel):
@@ -28,6 +29,7 @@ class ActividadUpdateDTO(BaseModel):
     numMaxAlumnos: int | None = None
     cursoAcademico_id: int | None = None
     lugarID: int | None = None
+    personalID: int | None = None
     precio_matricula: float | None = None
 
 def _to_dto(a: Actividad) -> ActividadDTO:
@@ -38,6 +40,7 @@ def _to_dto(a: Actividad) -> ActividadDTO:
         numMaxAlumnos=a.numMaxAlumnos,
         cursoAcademico_id=a.cursoAcademicoID,
         lugarID=a.lugarID,
+        personalID=a.personalID,
         precio_matricula=a.precio_matricula
     )
 
@@ -56,6 +59,7 @@ def registrar_actividad(data: dict) -> int:
             numMaxAlumnos=dto.numMaxAlumnos,
             cursoAcademicoID=dto.cursoAcademico_id,
             lugarID=dto.lugarID,
+            personalID=dto.personalID,
             precio_matricula=dto.precio_matricula,
         )
         with SessionLocal() as db:
@@ -65,7 +69,6 @@ def registrar_actividad(data: dict) -> int:
             return nueva.id
     except IntegrityError as e:
         raise ValueError(f"Error al registrar actividad: {e.orig}")
-    
 
 def modificar_actividad(actividadID: int, newData: dict) -> None:
     try:
@@ -81,6 +84,7 @@ def modificar_actividad(actividadID: int, newData: dict) -> None:
             mapeo = {
                 "numMaxAlumnos": "numMaxAlumnos",
                 "cursoAcademico_id": "cursoAcademicoID",
+                "personalID": "personalID",
                 "lugarID": "lugarID",  # Este ya coincide, pero lo puedes mantener por consistencia
             }
 
@@ -112,7 +116,7 @@ def eliminar_actividad(actividadID: int) -> None:
         raise ValueError(f"Error al eliminar actividad: {e.orig}")
 
 
-# ────────────────── Consultas ──────────────────
+# ────────────────── Consultas ────────────
 
 def listar_actividades() -> list[dict]:
     """Devuelve todas las actividades como lista de dicts."""
@@ -141,30 +145,32 @@ def listar_clases_por_Actividad(actividadID: int) -> list[dict] :
     except Exception as e:
         raise ValueError(f"Error al listar clases por actividad: {e}")
     
-def listar_actividadPersonal_por_Actividad(actividadID: int) -> dict | None:
-    """Devuelve datos de una actividad específica."""
-    try:
-        with SessionLocal() as db:
-            act = db.query(ActividadPersonal).filter(ActividadPersonal.actividadID == actividadID).first()
-            return [ap.model_dump() for ap in act] if act else None
-    except Exception as e:
-        raise ValueError(f"Error al consultar actividad: {e}")
     
-def consultar_lugar_Actividad(actividadID: int) -> dict | None:
+def consultar_lugarID_Actividad(actividadID: int) -> int | None:
     """Consulta el lugar de una actividad."""
     try:
         with SessionLocal() as db:
-            lugar = db.get(Lugar, actividadID)
-            return _to_dto(lugar).model_dump() if lugar else None
+            act = db.get(Actividad, actividadID)
+            return act.lugarID if act else None
     except Exception as e:
         raise ValueError(f"Error al consultar lugar: {e}")
-    
-def consultar_cursoA_Actividad(actividadID: int) -> dict | None:
+
+def consultar_cursoAcademicoID_Actividad(actividadID: int) -> int | None:
     """Consulta el curso académico de una actividad."""
     try:
         with SessionLocal() as db:
-            cursoA = db.get(CursoAcademico, actividadID)
-            return _to_dto(cursoA).model_dump() if cursoA else None
+            act = db.get(Actividad, actividadID)
+            return act.cursoAcademicoID if act else None
     except Exception as e:
         raise ValueError(f"Error al consultar curso académico: {e}")
+    
+def consultar_personalID_Actividad(actividadID: int) -> int | None:
+    """Consulta el personal asignado a una actividad."""
+    try:
+        with SessionLocal() as db:
+            act = db.get(Actividad, actividadID)
+            return act.personalID if act else None
+    except Exception as e:
+        raise ValueError(f"Error al consultar personal de actividad: {e}")
+    
 
