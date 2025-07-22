@@ -1,6 +1,6 @@
 # Nuevo módulo para convertir instancias de SQLAlchemy a DTOs
 from pydantic import BaseModel
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from models import AsistenciaSocio, Clase, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Pago, Socio, Actividad, Personal, Trimestre, EstadoInscripcion, EstadoPago, TrimestreEnum
 
 # ─────────────────────────────── DTOs ───────────────────────────────
@@ -39,17 +39,16 @@ class ClaseDTO(BaseModel):
     actividadID: int
     trimestreID: int
     fecha: date | None = None
-    horaInicio: str | None = None
-    horaFin: str | None = None
-    duracion: timedelta | None = None
-    observaciones: str | None = None
+    horaInicio: time | None = None
+    horaFin: time | None = None
+    duracion: int | None = None
+    diasSemana: list[int] | None = None  # 0=Lunes, 6=Domingo
 
 class ClaseUpdateDTO(BaseModel):
     fecha: date | None = None
-    horaInicio: str | None = None
-    horaFin: str | None = None
-    duracion: timedelta | None = None
-    observaciones: str | None = None
+    horaInicio: time | None = None
+    horaFin: time | None = None
+    duracion: int | None = None
     trimestreID: int | None = None
 
 class CursoAcademicoDTO(BaseModel):

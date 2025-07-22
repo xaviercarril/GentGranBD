@@ -1,4 +1,5 @@
 # Nuevo módulo para convertir instancias de SQLAlchemy a DTOs
+from datetime import datetime
 from controladores.dtos_models import AsistenciaSocioDTO, ClaseDTO, CursoAcademicoDTO, FirmaLOPDDTO, InscripcionSocioDTO, LugarDTO, PagoDTO, SocioDTO, ActividadDTO, PersonalDTO, TrimestreDTO
 from models import AsistenciaSocio, Clase, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Pago, Socio, Actividad, Personal, Trimestre
 
@@ -73,10 +74,9 @@ def clase_to_dto(clase: Clase) -> ClaseDTO:
         actividadID=clase.actividadID,
         trimestreID=clase.trimestreID,
         fecha=clase.fecha,
-        horaInicio=clase.horaInicio,
-        horaFin=clase.horaFin,
-        duracion=clase.duracion,
-        observaciones=clase.observaciones
+        horaInicio=clase.horaInicio.time() if isinstance(clase.horaInicio, datetime) else clase.horaInicio,
+        horaFin=clase.horaFin.time() if isinstance(clase.horaFin, datetime) else clase.horaFin,
+        duracion=clase.duracion
     )
     
 def cursoA_to_dto(curso: CursoAcademico) -> CursoAcademicoDTO:

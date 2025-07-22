@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QFormLayout, QLineEdit, QDateEdit, QSpinBox, QMessageBox, QVBoxLayout, QTextEdit, QComboBox, QDoubleSpinBox, QTableView, QLabel
 from PySide6.QtCore import Signal, QDate, Qt
-from controladores.actividades import consultar_actividad, modificar_actividad, listar_inscripciones_por_Actividad
+from controladores.actividades import consultar_actividad, modificar_actividad, listar_inscripciones_por_Actividad, actualizar_estados_inscripciones
 from controladores.personal import consultar_personal, listar_personal
 from controladores.socios import consultar_socio
 from ui.table_models import DictTableModel
@@ -159,6 +159,7 @@ class ActividadDetailWidget(QWidget):
 
         try:
             modificar_actividad(self._actividadID, data)
+            actualizar_estados_inscripciones(self._actividadID)
             self.saved.emit()
         except ValueError as e:
             QMessageBox.warning(self, "Error", str(e))

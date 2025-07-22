@@ -165,37 +165,15 @@ class InscripcionesDialog(QDialog):
             self._carregar_inscripcions()
 
     def _actualitzar_reserves(self, actividadID: int):
-        act = consultar_actividad(actividadID)
-        if not act:
-            return
-
-        todas = listar_inscripciones_por_Actividad(actividadID)
-
-        # Usar el valor correcto del Enum si es un Enum real
-        reservas = [i for i in todas if i["estado"].value == "RESERVA"]
-        reservas.sort(key=lambda i: i["fechaInscripcion"])
-
-        inscritos = [i for i in todas if i["estado"].value == "INSCRIT"]
-        max_alumnes = act.get("numMaxAlumnos", 0)
-        vacantes = max_alumnes - len(inscritos)
-
-        actualizados = 0
-        for ins in reservas[:vacantes]:
-            try:
-                modificar_inscripcion(ins["id"], {"estado": "INSCRIT"})
-                socioID = consultar_socioID_InscripcionSocio(ins["id"])
-                socio = consultar_socio(socioID) if socioID else None
-                if socio:
-                    QMessageBox.information(
-                        self,
-                        "Reserva actualitzada",
-                        f"Soci ID:{socio['id']}, {socio['nombre'] + ' ' + socio['apellido1']} ha passat de RESERVA a INSCRIT a {act['nombre']}"
-                    )
-                actualizados += 1
-            except Exception as e:
-                print(f"Error actualitzant reserva: {e}")
-        
-        if actualizados > 0:
+        from controladores.actividades import actualizar_estados_inscripciones
+        actualizados = actualizar_estados_inscripciones(actividadID)
+        if actualizados:
+            for socio in actualizados:
+                QMessageBox.information(
+                    self,
+                    "Reserva actualitzada",
+                    f"Soci ID:{socio['id']}, {socio['nombre'] + ' ' + socio['apellido1']} ha passat de RESERVA a INSCRIT a {act['nombre']}"
+                )
             self._carregar_inscripcions()
 
     def _carregar_pagos(self, index: int):

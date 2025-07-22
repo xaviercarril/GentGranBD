@@ -9,6 +9,8 @@ from sqlalchemy.exc import IntegrityError
 
 from controladores.dtos_models import ActividadDTO, ActividadUpdateDTO
 from controladores.dtos import actividad_to_dto, inscripcion_to_dto
+from controladores.inscripcion_socio import consultar_socioID_InscripcionSocio, modificar_inscripcion
+from controladores.socios import consultar_socio
 from database import SessionLocal
 from models import (
     Actividad, Clase, InscripcionSocio
@@ -152,3 +154,44 @@ def contar_inscripciones_Actividad(actividadID: int) -> int:
         raise ValueError(f"Error al contar inscripciones: {e}")
     
 
+def actualizar_estados_inscripciones(actividadID: int) -> list[dict] | None:
+    act = consultar_actividad(actividadID)
+    if not act:
+        return
+
+    todas = listar_inscripciones_por_Actividad(actividadID)
+
+    # Separar inscripciones
+    reservas = [i for i in todas if i["estado"].value == "RESERVA"]
+    inscritos = [i for i in todas if i["estado"].value == "INSCRIT"]
+
+    # Ordenar por fecha
+    reservas.sort(key=lambda i: i["fechaInscripcion"])
+    inscritos.sort(key=lambda i: i["fechaInscripcion"])
+
+    max_alumnes = act.get("numMaxAlumnos", 0)
+
+    # Determinar quién debe estar inscrito y quién en reserva
+    nuevos_inscritos = inscritos[:max_alumnes] + reservas[: max(0, max_alumnes - len(inscritos))]
+    nuevos_reservas = inscritos[max_alumnes:] + reservas[max(0, max_alumnes - len(inscritos)) :]
+
+    actualizados = []
+    for ins in nuevos_inscritos:
+        if ins["estado"].value != "INSCRIT":
+            try:
+                modificar_inscripcion(ins["id"], {"estado": "INSCRIT"})
+                socioID = consultar_socioID_InscripcionSocio(ins["id"])
+                socio = consultar_socio(socioID) if socioID else None
+                if socio:
+                    actualizados.append(socio)
+            except Exception as e:
+                print(f"Error promovent a INSCRIT: {e}")
+
+    for ins in nuevos_reservas:
+        if ins["estado"].value != "RESERVA":
+            try:
+                modificar_inscripcion(ins["id"], {"estado": "RESERVA"})
+            except Exception as e:
+                print(f"Error passant a RESERVA: {e}")
+
+    return actualizados

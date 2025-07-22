@@ -1,12 +1,10 @@
 
-from pydantic import BaseModel, ValidationError
-from sqlalchemy.orm import Session
+from pydantic import ValidationError
 from controladores.dtos_models import InscripcionSocioDTO, InscripcionSocioUpdateDTO
 from database import SessionLocal
-from models import InscripcionSocio, Actividad, EstadoInscripcion, Pago, Pago, Socio
-from controladores.dtos import actividad_to_dto, inscripcion_to_dto, socio_to_dto, pago_to_dto
+from models import InscripcionSocio, Pago
+from controladores.dtos import inscripcion_to_dto, pago_to_dto
 from sqlalchemy.exc import IntegrityError
-from datetime import date
 
 # ───────────────── CRUD ─────────────────
 def registrar_inscripcion(data: dict) -> int:
@@ -126,4 +124,3 @@ def listar_pagos_por_InscripcionSocio(inscripcion_id: int) -> list[dict]:
             return [pago_to_dto(pago).model_dump() for pago in pagos]
     except Exception as e:
         raise ValueError(f"Error al listar pagos: {e}")
-    

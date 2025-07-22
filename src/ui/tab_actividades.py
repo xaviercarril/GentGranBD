@@ -1,5 +1,6 @@
 from controladores.actividades import contar_inscripciones_Actividad, listar_actividades, consultar_actividad, eliminar_actividad
-from controladores.personal import consultar_personal  # Import the missing function
+from controladores.personal import consultar_personal
+from controladores.curso_academico import listar_cursosA, listar_actividades_por_CursoAcademico
 from PySide6.QtWidgets import (
   QWidget, QVBoxLayout, QHBoxLayout, QTableView,
   QPushButton, QMessageBox, QLineEdit, QComboBox
@@ -9,15 +10,11 @@ from PySide6.QtCore import QSize, QModelIndex, QItemSelectionModel
 from ui.actividad_dialog import ActividadDialog
 from ui.actividad_detail import ActividadDetailWidget
 from ui.table_models import DictTableModel
-from controladores.curso_academico import listar_cursosA, listar_actividades_por_CursoAcademico
+from ui.asistencia_dialog import AsistenciaDialog
 
 class ActividadesTab(QWidget):
-  # ==========================================================
-  #   ACTIVITATS
-  # ==========================================================
   def __init__(self, parent=None):
     super().__init__(parent)
-
 
     self._curso_selector = QComboBox()
     self._curso_selector.addItem("Tots els cursos", None)
@@ -33,7 +30,6 @@ class ActividadesTab(QWidget):
                 self._curso_selector.setCurrentIndex(i)
                 break
     self._curso_selector.currentIndexChanged.connect(self._refresh_activitats)
-    # Installa event filter para detectar cuando se despliega el ComboBox
     self._curso_selector.view().window().installEventFilter(self)
 
     self.table_activitats = QTableView()
@@ -41,7 +37,6 @@ class ActividadesTab(QWidget):
     self._search_box.setPlaceholderText("Cerca activitats...")
     self._search_box.textChanged.connect(self._refresh_activitats)
 
-    # Configure table
     self.table_activitats.verticalHeader().setVisible(False)
     self.table_activitats.setSelectionBehavior(QTableView.SelectRows)
     self.table_activitats.setSelectionMode(QTableView.SingleSelection)
@@ -56,11 +51,12 @@ class ActividadesTab(QWidget):
       }
     """)
 
+    self.table_activitats.doubleClicked.connect(self._abrir_asistencia)
+
     self.detail_actividad = ActividadDetailWidget()
     self.detail_actividad.saved.connect(self._refresh_activitats)
-    self.detail_actividad.setFixedWidth(350)
+    self.detail_actividad.setFixedWidth(370)
 
-    # Buttons
     self.btn_nova_actividad = QPushButton("Nova Activitat")
     self.btn_nova_actividad.setIcon(QIcon("ui/assets/plus.svg"))
     self.btn_nova_actividad.setIconSize(QSize(16, 16))
@@ -71,9 +67,7 @@ class ActividadesTab(QWidget):
     self.btn_nova_actividad.clicked.connect(self._dialog_nova_actividad)
     btn_eliminar_actividad.clicked.connect(self._eliminar_actividad)
 
-    # Layouts
     main_layout = QVBoxLayout(self)
-
     top_buttons = QHBoxLayout()
     top_buttons.addWidget(self.btn_nova_actividad)
     top_buttons.addWidget(btn_eliminar_actividad)
@@ -144,7 +138,6 @@ class ActividadesTab(QWidget):
         for row_idx, r in enumerate(model.rows):
             if r["id"] == selected_id:
                 index = model.index(row_idx, 0)
-                from PySide6.QtCore import QItemSelectionModel
                 sel_model.setCurrentIndex(index, QItemSelectionModel.SelectCurrent | QItemSelectionModel.Rows)
                 break
 
@@ -152,12 +145,7 @@ class ActividadesTab(QWidget):
     if not text.strip():
       return rows
     text = text.lower()
-    def matches(a):
-      return any(
-        text in str(value).lower() if value else ""
-        for value in a.values()
-      )
-    return [a for a in rows if matches(a)]
+    return [a for a in rows if any(text in str(value).lower() if value else "" for value in a.values())]
 
   def _row_changed_actividad(self, current: QModelIndex, previous: QModelIndex):
     if not current.isValid():
@@ -166,22 +154,25 @@ class ActividadesTab(QWidget):
     actividadID = self.table_activitats.model().rows[current.row()]["id"]
     self.detail_actividad.load(actividadID)
 
+  def _abrir_asistencia(self, index: QModelIndex):
+    if not index.isValid():
+        return
+    actividad = self.table_activitats.model().rows[index.row()]
+    dlg = AsistenciaDialog(actividad["id"], actividad["cursoAcademico_id"], self)
+    dlg.exec()
+
   def _dialog_nova_actividad(self):
-      curso_id = self._curso_selector.currentData()
-
-      # Determinar curso actual por fecha si no hay uno seleccionado
-      if curso_id is None:
-          from datetime import date
-          hoy = date.today()
-          cursos = listar_cursosA()
-          for c in cursos:
-              if c["fechaInicio"] <= hoy <= c["fechaFin"]:
-                  curso_id = c["id"]
-                  break
-
-      dlg = ActividadDialog(self, cursoAcademico_id=curso_id)
-      if dlg.exec():
-          self._refresh_activitats()
+    curso_id = self._curso_selector.currentData()
+    if curso_id is None:
+        from datetime import date
+        hoy = date.today()
+        for c in listar_cursosA():
+            if c["fechaInicio"] <= hoy <= c["fechaFin"]:
+                curso_id = c["id"]
+                break
+    dlg = ActividadDialog(self, cursoAcademico_id=curso_id)
+    if dlg.exec():
+        self._refresh_activitats()
 
   def _eliminar_actividad(self):
     sel = self.table_activitats.selectionModel().selectedRows()
@@ -207,22 +198,22 @@ class ActividadesTab(QWidget):
     self.detail_actividad.load(None)
 
   def _actualizar_cursos(self):
-      self._curso_selector.blockSignals(True)
-      curso_actual = self._curso_selector.currentData()
-      self._curso_selector.clear()
-      self._curso_selector.addItem("Tots els cursos", None)
-      for curso in listar_cursosA():
-          self._curso_selector.addItem(curso["nombre"], curso["id"])
-      index = self._curso_selector.findData(curso_actual)
-      self._curso_selector.setCurrentIndex(index if index >= 0 else 0)
-      self._curso_selector.blockSignals(False)
+    self._curso_selector.blockSignals(True)
+    curso_actual = self._curso_selector.currentData()
+    self._curso_selector.clear()
+    self._curso_selector.addItem("Tots els cursos", None)
+    for curso in listar_cursosA():
+        self._curso_selector.addItem(curso["nombre"], curso["id"])
+    index = self._curso_selector.findData(curso_actual)
+    self._curso_selector.setCurrentIndex(index if index >= 0 else 0)
+    self._curso_selector.blockSignals(False)
 
   def eventFilter(self, source, event):
-      from PySide6.QtCore import QEvent
-      if event.type() == QEvent.Show and source is self._curso_selector.view().window():
-          self._actualizar_cursos()
-      return super().eventFilter(source, event)
-  
+    from PySide6.QtCore import QEvent
+    if event.type() == QEvent.Show and source is self._curso_selector.view().window():
+        self._actualizar_cursos()
+    return super().eventFilter(source, event)
+
   def showEvent(self, event):
-      super().showEvent(event)
-      self._refresh_activitats()
+    super().showEvent(event)
+    self._refresh_activitats()
