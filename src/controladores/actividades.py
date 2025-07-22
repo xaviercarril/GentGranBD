@@ -8,7 +8,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.exc import IntegrityError
 
 from controladores.dtos_models import ActividadDTO, ActividadUpdateDTO
-from controladores.dtos import actividad_to_dto
+from controladores.dtos import actividad_to_dto, inscripcion_to_dto
 from database import SessionLocal
 from models import (
     Actividad, Clase, InscripcionSocio
@@ -101,7 +101,7 @@ def listar_incripciones_por_Actividad(actividadID: int) -> list[dict]:
     try:
         with SessionLocal() as db:
             inscripciones = db.query(InscripcionSocio).filter(InscripcionSocio.actividadID == actividadID).all()
-            return [i.model_dump() for i in inscripciones]
+            return [inscripcion_to_dto(i).model_dump() for i in inscripciones]
     except Exception as e:
         raise ValueError(f"Error al listar inscripciones por actividad: {e}")
     
@@ -141,5 +141,14 @@ def consultar_personalID_Actividad(actividadID: int) -> int | None:
             return act.personalID if act else None
     except Exception as e:
         raise ValueError(f"Error al consultar personal de actividad: {e}")
+
+def contar_inscripciones_Actividad(actividadID: int) -> int:
+    """Cuenta las inscripciones a una actividad."""
+    try:
+        with SessionLocal() as db:
+            count = db.query(InscripcionSocio).filter(InscripcionSocio.actividadID == actividadID).count()
+            return count
+    except Exception as e:
+        raise ValueError(f"Error al contar inscripciones: {e}")
     
 

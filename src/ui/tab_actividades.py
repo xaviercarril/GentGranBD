@@ -1,4 +1,4 @@
-from controladores.actividades import listar_actividades, consultar_actividad, eliminar_actividad
+from controladores.actividades import contar_inscripciones_Actividad, listar_actividades, consultar_actividad, eliminar_actividad
 from controladores.personal import consultar_personal  # Import the missing function
 from PySide6.QtWidgets import (
   QWidget, QVBoxLayout, QHBoxLayout, QTableView,
@@ -23,6 +23,15 @@ class ActividadesTab(QWidget):
     self._curso_selector.addItem("Tots els cursos", None)
     for curso in listar_cursosA():
         self._curso_selector.addItem(curso["nombre"], curso["id"])
+    from datetime import date
+    hoy = date.today()
+    for i in range(1, self._curso_selector.count()):
+        curso_id = self._curso_selector.itemData(i)
+        curso_nombre = self._curso_selector.itemText(i)
+        for curso in listar_cursosA():
+            if curso["id"] == curso_id and curso["fechaInicio"] <= hoy <= curso["fechaFin"]:
+                self._curso_selector.setCurrentIndex(i)
+                break
     self._curso_selector.currentIndexChanged.connect(self._refresh_activitats)
     # Installa event filter para detectar cuando se despliega el ComboBox
     self._curso_selector.view().window().installEventFilter(self)
@@ -83,6 +92,8 @@ class ActividadesTab(QWidget):
     self._refresh_activitats()
 
   def _refresh_activitats(self):
+    """Actualiza la lista de actividades y el detalle."""
+
     curso_id = self._curso_selector.currentData()
     self.btn_nova_actividad.setEnabled(curso_id is not None)
     rows = listar_actividades_por_CursoAcademico(curso_id) if curso_id else listar_actividades()
@@ -91,17 +102,23 @@ class ActividadesTab(QWidget):
       ("Nom", "nombre"),
       ("Personal", "personal_nombre"),
       ("Preu matrícula", "precio_matricula"),
+      ("Inscrits", "inscritos"),
       ("Màxim alumnes", "numMaxAlumnos"),
       ("Descripció", "descripcion")
     ]
 
-    # Enriquecer datos con nombre del personal
+    # Enriquecer datos con nombre del personal y contar inscritos
     for row in rows:
         try:
             personal = consultar_personal(row["personalID"]) if row["personalID"] else None
             row["personal_nombre"] = f"{personal['nombre']} {personal['apellido1']}" if personal else "Desconegut"
         except Exception:
             row["personal_nombre"] = "Desconegut"
+
+        try:
+            row["inscritos"] = contar_inscripciones_Actividad(row["id"])
+        except Exception:
+            row["inscritos"] = "?"
 
     filtered_rows = self._filter_activitats_rows(self._search_box.text(), rows)
 
@@ -150,6 +167,17 @@ class ActividadesTab(QWidget):
 
   def _dialog_nova_actividad(self):
       curso_id = self._curso_selector.currentData()
+
+      # Determinar curso actual por fecha si no hay uno seleccionado
+      if curso_id is None:
+          from datetime import date
+          hoy = date.today()
+          cursos = listar_cursosA()
+          for c in cursos:
+              if c["fechaInicio"] <= hoy <= c["fechaFin"]:
+                  curso_id = c["id"]
+                  break
+
       dlg = ActividadDialog(self, cursoAcademico_id=curso_id)
       if dlg.exec():
           self._refresh_activitats()
