@@ -136,7 +136,7 @@ def generar_carnet_socio(
 
     # ─── Story: Spacer per baixar lleugerament + taula ─────────────
     story = [
-        Spacer(1, 3 * mm),   # baixa tot el bloc 3 mm
+        Spacer(1, 6 * mm),   # baixa tot el bloc 6 mm
         table
     ]
 

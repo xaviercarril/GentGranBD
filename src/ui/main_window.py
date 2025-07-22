@@ -2,7 +2,9 @@ from PySide6.QtWidgets import (
     QMainWindow, QTabWidget, QApplication, QMenuBar, QMenu
 )
 from PySide6.QtGui import QAction
+from PySide6.QtWidgets import QFileDialog
 
+from importador.importar_socios_excel import importar_socios_desde_excel
 from ui.tab_socios import SociosTab
 from ui.tab_actividades import ActividadesTab
 from ui.tab_cursoAcademico import CursoAcademicoDialog
@@ -49,7 +51,20 @@ class MainWindow(QMainWindow):
         action_nou_curs.triggered.connect(self._mostrar_dialog_nou_curs)
         menu_arxiu.addAction(action_nou_curs)
 
+        action_importar_socis = QAction("Importar Socis (CSV/Excel)", self)
+        action_importar_socis.triggered.connect(self._importar_socis)
+        menu_arxiu.addAction(action_importar_socis)
+
     def _mostrar_dialog_nou_curs(self):
         from ui.tab_cursoAcademico import CursoAcademicoDialog
         dlg = CursoAcademicoDialog(self)
         dlg.exec()
+
+    def _importar_socis(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Selecciona un arxiu Excel", "", "Excel Files (*.xlsx *.xls)")
+        if path:
+            try:
+                importar_socios_desde_excel(path)
+            except Exception as e:
+                from PySide6.QtWidgets import QMessageBox
+                QMessageBox.warning(self, "Error", f"No s'han pogut importar els socis: {e}")

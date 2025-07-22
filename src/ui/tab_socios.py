@@ -2,6 +2,7 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtCore import QSize
+from PySide6.QtCore import QEvent, Qt
 from ui.table_models import DictTableModel
 from ui.socio_detail import SocioDetailWidget
 from controladores.socios import (
@@ -80,6 +81,7 @@ class SociosTab(QWidget):
     ly.addWidget(self._search_box)
     ly.addLayout(hlayout, 1)
     self.setLayout(ly)
+    self.table_socis.installEventFilter(self)
 
   def _refresh_socios(self):
     rows = listar_socios()
@@ -221,3 +223,9 @@ class SociosTab(QWidget):
   def showEvent(self, event):
       super().showEvent(event)
       self._refresh_socios()
+  def eventFilter(self, obj, event):
+      if obj == self.table_socis and event.type() == QEvent.KeyPress:
+          if event.key() == Qt.Key_Delete:
+              self._eliminar_socio()
+              return True
+      return super().eventFilter(obj, event)

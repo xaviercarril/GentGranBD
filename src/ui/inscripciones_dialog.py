@@ -241,7 +241,6 @@ class InscripcionesDialog(QDialog):
             from controladores.pagos import registrar_pago
             try:
                 registrar_pago(data)
-                QMessageBox.information(self, "Èxit", "Pagament registrat correctament.")
                 self._carregar_pagos(idx)
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"No s'ha pogut registrar el pagament: {e}")
@@ -274,7 +273,6 @@ class InscripcionesDialog(QDialog):
             )
             if confirmar == QMessageBox.Yes:
                 eliminar_pago(pago_id)
-                QMessageBox.information(self, "Èxit", "Pagament eliminat correctament.")
                 self._carregar_pagos(idx_inscripcio)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"No s'ha pogut eliminar el pagament: {e}")

@@ -40,6 +40,10 @@ def registrar_socio(datos: dict) -> int:
         observaciones=dto.observaciones,
         foto=dto.foto,
     )
+        # 🔸 Solo si el ID está explícitamente en los datos, se fuerza
+    if "id" in datos and datos["id"] is not None:
+        nuevo.id = datos["id"]
+
     with SessionLocal() as db:
         db.add(nuevo)
         try:

@@ -58,7 +58,7 @@ class ActividadesTab(QWidget):
 
     self.detail_actividad = ActividadDetailWidget()
     self.detail_actividad.saved.connect(self._refresh_activitats)
-    self.detail_actividad.setFixedWidth(300)
+    self.detail_actividad.setFixedWidth(350)
 
     # Buttons
     self.btn_nova_actividad = QPushButton("Nova Activitat")
