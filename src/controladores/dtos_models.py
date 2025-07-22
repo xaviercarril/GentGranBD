@@ -99,11 +99,12 @@ class LugarUpdateDTO(BaseModel):
     direccion: str | None = None
 
 class PagoDTO(BaseModel):
+    id: int | None = None
     socioID: int
     actividadID: int
     fecha_pago: date
     importe: float = 0.0
-    estado: str = "PENDIENTE"  # Estado por defecto
+    estado: str = "PENDENT"  # Estado por defecto
 
 class PagoUpdateDTO(BaseModel):
     fecha_pago: date | None = None

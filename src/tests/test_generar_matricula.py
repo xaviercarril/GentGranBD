@@ -41,7 +41,7 @@ def test_crud_matricula(session):
         session,
         inscripcion_id=inscripcion_id,
         fecha_matricula=date.today(),
-        estado=EstadoPago.PENDIENTE
+        estado=EstadoPago.PENDENT
     )
     assert matricula_id is not None
 
@@ -50,7 +50,7 @@ def test_crud_matricula(session):
         session,
         inscripcion_id=inscripcion_id,
         fecha_matricula=date.today(),
-        estado=EstadoPago.PENDIENTE
+        estado=EstadoPago.PENDENT
     )
     assert duplicada is None
 
@@ -58,7 +58,7 @@ def test_crud_matricula(session):
     matricula = consultar_matricula(session, inscripcion_id)
     assert matricula is not None
     assert matricula.importe == 75.0
-    assert matricula.estado == EstadoPago.PENDIENTE
+    assert matricula.estado == EstadoPago.PENDENT
 
     # 4️⃣ Editar matrícula
     nuevos_datos = {

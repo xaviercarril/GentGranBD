@@ -36,7 +36,7 @@ def test_registrar_matricula_y_mensualidad(session):
         'inscripcion_id': insc_id,
         'fecha': date.today(),
         'importe': 50.0,
-        'estado': EstadoPago.PENDIENTE,
+        'estado': EstadoPago.PENDENT,
         'tipo': 'matricula'
     }, tipo='matricula')
 
@@ -60,4 +60,4 @@ def test_registrar_matricula_y_mensualidad(session):
     matricula = consultar_matricula_por_inscripcion(session, insc_id)
     assert matricula is not None
     assert matricula.importe == 50.0
-    assert matricula.estado == EstadoPago.PENDIENTE
+    assert matricula.estado == EstadoPago.PENDENT

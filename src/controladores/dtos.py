@@ -103,11 +103,13 @@ def lugar_to_dto(lugar: Lugar) -> LugarDTO:
 
 def pago_to_dto(pago: Pago) -> PagoDTO:
     return PagoDTO(
+        id=pago.id,
         socioID=pago.socioID,
         actividadID=pago.actividadID,
-        fecha_pago=pago.fecha_pago,
+        fecha_pago=pago.fecha,
         importe=pago.importe,
-        estado=pago.estado
+        estado=pago.estado,
+        observaciones=pago.observaciones
     )
 
 def trimestre_to_dto(trimestre: Trimestre) -> TrimestreDTO:

@@ -1,5 +1,5 @@
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QListWidget, QPushButton, QHBoxLayout, QMessageBox, QComboBox
+    QDialog, QVBoxLayout, QLabel, QListWidget, QPushButton, QHBoxLayout, QMessageBox, QComboBox, QTableView, QHeaderView
 )
 from PySide6.QtCore import Qt
 from controladores.inscripcion_socio import (
@@ -8,7 +8,8 @@ from controladores.inscripcion_socio import (
 from controladores.actividades import consultar_actividad, listar_actividades, listar_inscripciones_por_Actividad
 from controladores.socios import consultar_socio, listar_inscripciones_por_socio
 from datetime import date
-from controladores.inscripcion_socio import modificar_inscripcion
+from controladores.inscripcion_socio import modificar_inscripcion, listar_pagos_por_InscripcionSocio
+from ui.table_models import DictTableModel
 
 class InscripcionesDialog(QDialog):
     def __init__(self, socio_id: int, parent=None):
@@ -16,25 +17,56 @@ class InscripcionesDialog(QDialog):
         self.setWindowTitle("Gestió d'inscripcions del soci")
         self.socio_id = socio_id
 
-        self.layout = QVBoxLayout(self)
+        self.left_layout = QVBoxLayout()
 
         self.combo_cursos = QComboBox()
         self.combo_cursos.currentIndexChanged.connect(self._carregar_inscripcions)
-        self.layout.addWidget(QLabel("Curs acadèmic:"))
-        self.layout.addWidget(self.combo_cursos)
+        self.left_layout.addWidget(QLabel("Curs acadèmic:"))
+        self.left_layout.addWidget(self.combo_cursos)
 
         self.label = QLabel("Activitats inscrites:")
-        self.layout.addWidget(self.label)
+        self.left_layout.addWidget(self.label)
 
         self.lista_inscripciones = QListWidget()
-        self.layout.addWidget(self.lista_inscripciones)
+        self.left_layout.addWidget(self.lista_inscripciones)
 
         btn_layout = QHBoxLayout()
         self.btn_afegir = QPushButton("Afegir inscripció")
         self.btn_eliminar = QPushButton("Eliminar inscripció")
         btn_layout.addWidget(self.btn_afegir)
         btn_layout.addWidget(self.btn_eliminar)
-        self.layout.addLayout(btn_layout)
+        self.left_layout.addLayout(btn_layout)
+
+        self.pagos_table = QTableView()
+        self.pagos_table.setMinimumWidth(400)
+        self.pagos_table.setMinimumHeight(200)
+        self.pagos_table.verticalHeader().setVisible(False)
+        self.pagos_table.setSelectionBehavior(QTableView.SelectRows)
+        self.pagos_table.setAlternatingRowColors(True)
+        self.pagos_table.horizontalHeader().setVisible(True)
+        self.pagos_table.horizontalHeader().setStretchLastSection(True)
+
+        self.btn_pagos_layout = QHBoxLayout()
+        self.btn_afegir_pago = QPushButton("Afegir pagament")
+        self.btn_afegir_pago.clicked.connect(self._afegir_pagament)
+        self.btn_eliminar_pago = QPushButton("Eliminar pagament")
+        self.btn_eliminar_pago.clicked.connect(self._eliminar_pagament)
+        self.btn_pagos_layout.addWidget(self.btn_afegir_pago)
+        self.btn_pagos_layout.addWidget(self.btn_eliminar_pago)
+
+        pagos_layout = QVBoxLayout()
+        pagos_layout.addLayout(self.btn_pagos_layout)
+        pagos_layout.addWidget(self.pagos_table)
+
+        main_layout = QHBoxLayout()
+        main_layout.addLayout(self.left_layout)
+        main_layout.addLayout(pagos_layout)
+        self.setLayout(main_layout)
+        self.setMinimumSize(800, 400)
+        main_layout.setStretch(0, 1)
+        main_layout.setStretch(1, 2)
+
+        self.lista_inscripciones.currentRowChanged.connect(self._carregar_pagos)
 
         self.btn_afegir.clicked.connect(self._afegir_inscripcio)
         self.btn_eliminar.clicked.connect(self._eliminar_inscripcio)
@@ -71,6 +103,7 @@ class InscripcionesDialog(QDialog):
             act = consultar_actividad(actividadID) if actividadID else None
             if act and (curso_id is None or act["cursoAcademico_id"] == curso_id):
                 self.lista_inscripciones.addItem(f"{act['nombre']} - {ins['estado'].value} - {ins['fechaInscripcion'].strftime('%d-%m-%Y')}")
+        self._carregar_pagos(self.lista_inscripciones.currentRow())
 
     def _afegir_inscripcio(self):
         curso_id = self.combo_cursos.currentData()
@@ -95,9 +128,9 @@ class InscripcionesDialog(QDialog):
 
                 inscripciones_todas = listar_inscripciones_por_Actividad(act["id"])
                 inscritos_actuales = [
-                    i for i in inscripciones_todas if i["estado"].value == "INSCRITO"
+                    i for i in inscripciones_todas if i["estado"].value == "INSCRIT"
                 ]
-                estado = "INSCRITO" if len(inscritos_actuales) < act["numMaxAlumnos"] else "RESERVA"
+                estado = "INSCRIT" if len(inscritos_actuales) < act["numMaxAlumnos"] else "RESERVA"
                 try:
                     registrar_inscripcion({
                         "socioID": self.socio_id,
@@ -142,14 +175,14 @@ class InscripcionesDialog(QDialog):
         reservas = [i for i in todas if i["estado"].value == "RESERVA"]
         reservas.sort(key=lambda i: i["fechaInscripcion"])
 
-        inscritos = [i for i in todas if i["estado"].value == "INSCRITO"]
+        inscritos = [i for i in todas if i["estado"].value == "INSCRIT"]
         max_alumnes = act.get("numMaxAlumnos", 0)
         vacantes = max_alumnes - len(inscritos)
 
         actualizados = 0
         for ins in reservas[:vacantes]:
             try:
-                modificar_inscripcion(ins["id"], {"estado": "INSCRITO"})
+                modificar_inscripcion(ins["id"], {"estado": "INSCRIT"})
                 socioID = consultar_socioID_InscripcionSocio(ins["id"])
                 socio = consultar_socio(socioID) if socioID else None
                 if socio:
@@ -164,3 +197,84 @@ class InscripcionesDialog(QDialog):
         
         if actualizados > 0:
             self._carregar_inscripcions()
+
+    def _carregar_pagos(self, index: int):
+        if index < 0 or index >= len(self._inscripcions):
+            self.pagos_table.setModel(DictTableModel([], []))
+            return
+
+        inscripcio = self._inscripcions[index]
+        try:
+            pagos = listar_pagos_por_InscripcionSocio(inscripcio["id"])
+            headers = [
+                ("Data", "fecha_pago"),
+                ("Import", "importe"),
+                ("Estat", "estado"),
+                ("Observacions", "observaciones")
+            ]
+            for pago in pagos:
+                pago["fecha_pago"] = pago["fecha_pago"].strftime("%d-%m-%Y") if pago["fecha_pago"] else "Desconeguda"
+                pago["importe"] = f"{pago['importe']:.2f} €"
+            self.pagos_table.setModel(DictTableModel(pagos, headers))
+            self.pagos_table.resizeColumnsToContents()
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"No s'han pogut carregar els pagaments: {e}")
+
+
+    def _afegir_pagament(self):
+        from ui.pago_dialog import PagoDialog
+        idx = self.lista_inscripciones.currentRow()
+        if idx == -1 or idx >= len(self._inscripcions):
+            QMessageBox.warning(self, "Error", "Selecciona una inscripció primer.")
+            return
+
+        inscripcio = self._inscripcions[idx]
+        actividad = consultar_actividad(inscripcio["actividadID"])
+        default_importe = actividad.get("precio_matricula", 0.0)
+
+        dialog = PagoDialog(default_importe, self)
+        if dialog.exec():
+            data = dialog.get_data()
+            data["socioID"] = inscripcio["socioID"]
+            data["actividadID"] = inscripcio["actividadID"]
+
+            from controladores.pagos import registrar_pago
+            try:
+                registrar_pago(data)
+                QMessageBox.information(self, "Èxit", "Pagament registrat correctament.")
+                self._carregar_pagos(idx)
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"No s'ha pogut registrar el pagament: {e}")
+
+    def _eliminar_pagament(self):
+        idx_inscripcio = self.lista_inscripciones.currentRow()
+        idx_pago = self.pagos_table.currentIndex().row()
+        
+        if idx_inscripcio == -1 or idx_inscripcio >= len(self._inscripcions):
+            QMessageBox.warning(self, "Error", "Selecciona una inscripció primer.")
+            return
+        
+        if idx_pago == -1:
+            QMessageBox.warning(self, "Error", "Selecciona un pagament per eliminar.")
+            return
+        
+        inscripcio = self._inscripcions[idx_inscripcio]
+        try:
+            pagos = listar_pagos_por_InscripcionSocio(inscripcio["id"])
+            if idx_pago >= len(pagos):
+                QMessageBox.warning(self, "Error", "Pagament seleccionat invàlid.")
+                return
+
+            pago_id = pagos[idx_pago]["id"]
+
+            from controladores.pagos import eliminar_pago
+            confirmar = QMessageBox.question(
+                self, "Confirmació", "Segur que vols eliminar el pagament seleccionat?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if confirmar == QMessageBox.Yes:
+                eliminar_pago(pago_id)
+                QMessageBox.information(self, "Èxit", "Pagament eliminat correctament.")
+                self._carregar_pagos(idx_inscripcio)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"No s'ha pogut eliminar el pagament: {e}")

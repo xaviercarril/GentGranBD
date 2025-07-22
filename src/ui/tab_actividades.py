@@ -101,7 +101,7 @@ class ActividadesTab(QWidget):
       ("ID", "id"),
       ("Nom", "nombre"),
       ("Personal", "personal_nombre"),
-      ("Preu matrícula", "precio_matricula"),
+      ("Preu matrícula", f"precio_matricula"),
       ("Inscrits", "inscritos"),
       ("Màxim alumnes", "numMaxAlumnos"),
       ("Descripció", "descripcion")
@@ -109,6 +109,7 @@ class ActividadesTab(QWidget):
 
     # Enriquecer datos con nombre del personal y contar inscritos
     for row in rows:
+        row["precio_matricula"] = f"{row['precio_matricula']:.2f} €"
         try:
             personal = consultar_personal(row["personalID"]) if row["personalID"] else None
             row["personal_nombre"] = f"{personal['nombre']} {personal['apellido1']}" if personal else "Desconegut"
@@ -221,3 +222,7 @@ class ActividadesTab(QWidget):
       if event.type() == QEvent.Show and source is self._curso_selector.view().window():
           self._actualizar_cursos()
       return super().eventFilter(source, event)
+  
+  def showEvent(self, event):
+      super().showEvent(event)
+      self._refresh_activitats()

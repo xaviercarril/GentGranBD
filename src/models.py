@@ -21,14 +21,14 @@ class TrimestreEnum(enum.Enum):
 
 
 class EstadoInscripcion(enum.Enum):
-    INSCRITO = "INSCRITO"
+    INSCRIT = "INSCRIT"
     RESERVA = "RESERVA"
 
 
 class EstadoPago(enum.Enum):
-    PENDIENTE = "PENDIENTE"
-    PAGADO = "PAGADO"
-    ANULADO = "ANULADO"
+    PENDENT = "PENDENT"
+    PAGAT = "PAGAT"
+    ANULAT = "ANUL·LAT"
 
 # ---------------------------------------------
 # SOCIO + GDPR CONSENT

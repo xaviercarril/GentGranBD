@@ -217,3 +217,7 @@ class SociosTab(QWidget):
       from ui.inscripciones_dialog import InscripcionesDialog
       dlg = InscripcionesDialog(socio["id"], self)
       dlg.exec()
+
+  def showEvent(self, event):
+      super().showEvent(event)
+      self._refresh_socios()

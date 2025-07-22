@@ -112,8 +112,17 @@ def consultar_socioID_InscripcionSocio(inscripcion_id: int) -> int | None:
 def listar_pagos_por_InscripcionSocio(inscripcion_id: int) -> list[dict]:
     """Lista los pagos asociados a una inscripción de socio."""
     try:
+        socioID = consultar_socioID_InscripcionSocio(inscripcion_id)
+        actividadID = consultar_actividadID_InscripcionSocio(inscripcion_id)
+        if not socioID:
+            raise ValueError("Inscripción no encontrada o socio no asociado")
+        if not actividadID:
+            raise ValueError("Inscripción no encontrada o actividad no asociada")
         with SessionLocal() as db:
-            pagos = db.query(Pago).filter(Pago.inscripcion.id == inscripcion_id).all()
+            pagos = db.query(Pago).filter(
+                Pago.socioID == socioID,
+                Pago.actividadID == actividadID
+            ).all()
             return [pago_to_dto(pago).model_dump() for pago in pagos]
     except Exception as e:
         raise ValueError(f"Error al listar pagos: {e}")

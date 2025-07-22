@@ -8,9 +8,6 @@ from pydantic import BaseModel, ValidationError
 from database import SessionLocal
 from sqlalchemy.exc import IntegrityError
 
-# ────────────────────── DTO ──────────────────────
-
-
 # ───────────────── CRUD ─────────────────
 def registrar_pago(data: dict) -> int:
     """Registra un pago; recibe dict, valida con DTO y devuelve ID."""
@@ -19,10 +16,10 @@ def registrar_pago(data: dict) -> int:
     except ValidationError as e:
         raise ValueError(f"Datos de entrada inválidos: {e}")
 
-    nuevo_pago = Pago(
+    nuevo_pago = Pago( # Asegúrate de que el ID sea opcional o generado automáticamente
         socioID=dto.socioID,
         actividadID=dto.actividadID,
-        fecha_pago=dto.fecha_pago,
+        fecha=dto.fecha_pago,
         importe=dto.importe,
         estado=dto.estado
     )
