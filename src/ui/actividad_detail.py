@@ -1,7 +1,9 @@
-from PySide6.QtWidgets import QWidget, QFormLayout, QLineEdit, QDateEdit, QSpinBox, QMessageBox, QVBoxLayout, QTextEdit, QComboBox, QDoubleSpinBox
+from PySide6.QtWidgets import QWidget, QFormLayout, QLineEdit, QDateEdit, QSpinBox, QMessageBox, QVBoxLayout, QTextEdit, QComboBox, QDoubleSpinBox, QTableView, QLabel
 from PySide6.QtCore import Signal, QDate, Qt
-from controladores.actividades import consultar_actividad, modificar_actividad
+from controladores.actividades import consultar_actividad, modificar_actividad, listar_inscripciones_por_Actividad
 from controladores.personal import consultar_personal, listar_personal
+from controladores.socios import consultar_socio
+from ui.table_models import DictTableModel
 
 class ActividadDetailWidget(QWidget):
     saved = Signal()
@@ -30,6 +32,16 @@ class ActividadDetailWidget(QWidget):
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
+
+        self.label_inscrits = QLabel("Socis inscrits:")
+        self.inscrits_table = QTableView()
+        self.inscrits_table.verticalHeader().setVisible(False)
+        self.inscrits_table.setSelectionBehavior(QTableView.SelectRows)
+        self.inscrits_table.setSelectionMode(QTableView.NoSelection)
+        self.inscrits_table.setAlternatingRowColors(True)
+
+        layout.addWidget(self.label_inscrits)
+        layout.addWidget(self.inscrits_table)
         layout.addStretch()
 
         self.nombre.editingFinished.connect(self._on_editing_finished)
@@ -84,13 +96,40 @@ class ActividadDetailWidget(QWidget):
         self.preuMatricula.setMaximum(999.99)
         self.descripcion.setText(act.get("descripcion", ""))
         print("Cargando actividad:", act)  # debug
+
+        self._load_inscrits_table()
         self._loading = False
-        # self.saved.emit()
+
+    def _load_inscrits_table(self):
+        try:
+            inscripciones = listar_inscripciones_por_Actividad(self._actividadID)
+            headers = [
+                ("Nom", "nombre"),
+                ("Cognom", "apellido1"),
+                ("Data Inscripció", "fechaInscripcion"),
+                ("Estat", "estado")
+            ]
+            for inscripcion in inscripciones:
+                socio = consultar_socio(inscripcion["socioID"])
+                inscripcion["estado"] = inscripcion["estado"].value
+                inscripcion["fechaInscripcion"] = inscripcion["fechaInscripcion"].strftime("%d-%m-%Y")
+                if socio:
+                    inscripcion["nombre"] = socio.get("nombre", "")
+                    inscripcion["apellido1"] = socio.get("apellido1", "")
+                    
+                else:
+                    inscripcion["nombre"] = "Desconegut"
+                    inscripcion["apellido1"] = ""
+            self.inscrits_table.setModel(DictTableModel(inscripciones, headers))
+            self.inscrits_table.resizeColumnsToContents()
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"No s'han pogut carregar les inscripcions: {e}")
 
     def _clear(self):
         self.nombre.clear()
         self.descripcion.clear()
         self.numMaxAlumnos.setValue(0)
+        self.inscrits_table.setModel(DictTableModel([], []))
 
     def _validar(self) -> bool:
         if not self.nombre.text().strip():
@@ -133,6 +172,7 @@ class ActividadDetailWidget(QWidget):
             else:
                 nombre = f"{persona['apellido1']} {persona['apellido2']}, {persona['nombre']}".strip()
             self.personal.addItem(nombre, userData=persona["id"])
+
     def _wrap_focus_out(self, original_focus_out):
         def new_focus_out(event):
             if not self._loading:

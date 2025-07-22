@@ -5,8 +5,8 @@ from PySide6.QtCore import Qt
 from controladores.inscripcion_socio import (
     consultar_actividadID_InscripcionSocio, consultar_socioID_InscripcionSocio, registrar_inscripcion, eliminar_inscripcion
 )
-from controladores.actividades import consultar_actividad, listar_actividades, listar_incripciones_por_Actividad
-from controladores.socios import listar_inscripciones_por_socio
+from controladores.actividades import consultar_actividad, listar_actividades, listar_inscripciones_por_Actividad
+from controladores.socios import consultar_socio, listar_inscripciones_por_socio
 from datetime import date
 from controladores.inscripcion_socio import modificar_inscripcion
 
@@ -70,7 +70,7 @@ class InscripcionesDialog(QDialog):
             actividadID = consultar_actividadID_InscripcionSocio(ins["id"])
             act = consultar_actividad(actividadID) if actividadID else None
             if act and (curso_id is None or act["cursoAcademico_id"] == curso_id):
-                self.lista_inscripciones.addItem(f"{act['nombre']} - {ins['estado'].value} - {ins['fechaInscripcion']}")
+                self.lista_inscripciones.addItem(f"{act['nombre']} - {ins['estado'].value} - {ins['fechaInscripcion'].strftime('%d-%m-%Y')}")
 
     def _afegir_inscripcio(self):
         curso_id = self.combo_cursos.currentData()
@@ -93,9 +93,9 @@ class InscripcionesDialog(QDialog):
                     if consultar_actividad(ins["actividadID"])["id"] == act["id"]
                 ]
 
-                inscripciones_todas = listar_incripciones_por_Actividad(act["id"])
+                inscripciones_todas = listar_inscripciones_por_Actividad(act["id"])
                 inscritos_actuales = [
-                    i for i in inscripciones_todas if i["estado"] == "INSCRITO"
+                    i for i in inscripciones_todas if i["estado"].value == "INSCRITO"
                 ]
                 estado = "INSCRITO" if len(inscritos_actuales) < act["numMaxAlumnos"] else "RESERVA"
                 try:
@@ -128,24 +128,39 @@ class InscripcionesDialog(QDialog):
         )
         if reply == QMessageBox.Yes:
             eliminar_inscripcion(inscripcio["id"])
-            self._carregar_inscripcions()
             self._actualitzar_reserves(actividadID)
+            self._carregar_inscripcions()
 
     def _actualitzar_reserves(self, actividadID: int):
-        
         act = consultar_actividad(actividadID)
         if not act:
             return
-        todas = listar_incripciones_por_Actividad(actividadID)
-        reservas = [i for i in todas if i["estado"] == "RESERVA"]
+
+        todas = listar_inscripciones_por_Actividad(actividadID)
+
+        # Usar el valor correcto del Enum si es un Enum real
+        reservas = [i for i in todas if i["estado"].value == "RESERVA"]
         reservas.sort(key=lambda i: i["fechaInscripcion"])
-        inscritos = [i for i in todas if i["estado"] == "INSCRITO"]
-        max_alumnes = act["numMaxAlumnos"]
+
+        inscritos = [i for i in todas if i["estado"].value == "INSCRITO"]
+        max_alumnes = act.get("numMaxAlumnos", 0)
         vacantes = max_alumnes - len(inscritos)
-        for i in reservas[:vacantes]:
-            modificar_inscripcion(i["id"], {"estado": "INSCRITO"})
-            QMessageBox.information(
-                self,
-                "Reserva actualitzada",
-                f"{consultar_socioID_InscripcionSocio(i['id'])['nombre']} ha passat de RESERVA a INSCRIT a {act['nombre']}"
-            )
+
+        actualizados = 0
+        for ins in reservas[:vacantes]:
+            try:
+                modificar_inscripcion(ins["id"], {"estado": "INSCRITO"})
+                socioID = consultar_socioID_InscripcionSocio(ins["id"])
+                socio = consultar_socio(socioID) if socioID else None
+                if socio:
+                    QMessageBox.information(
+                        self,
+                        "Reserva actualitzada",
+                        f"Soci ID:{socio['id']}, {socio['nombre'] + ' ' + socio['apellido1']} ha passat de RESERVA a INSCRIT a {act['nombre']}"
+                    )
+                actualizados += 1
+            except Exception as e:
+                print(f"Error actualitzant reserva: {e}")
+        
+        if actualizados > 0:
+            self._carregar_inscripcions()

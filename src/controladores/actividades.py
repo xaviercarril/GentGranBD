@@ -96,7 +96,7 @@ def listar_actividades() -> list[dict]:
     except Exception as e:
         raise ValueError(f"Error al listar actividades: {e}")
 
-def listar_incripciones_por_Actividad(actividadID: int) -> list[dict]:
+def listar_inscripciones_por_Actividad(actividadID: int) -> list[dict]:
     """Devuelve inscripciones de una actividad."""
     try:
         with SessionLocal() as db:
