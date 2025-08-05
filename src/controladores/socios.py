@@ -188,6 +188,7 @@ def consultar_firma_LOPD(socioID: int) -> dict | None:
         raise ValueError(f"Error al consultar firma LOPD: {e}")
     
 # ────────────────── Exportación ──────────────────
+
 def generar_carnet_pdf(socioID: int, ruta_pdf: str) -> None:
     """
     Genera un carnet de soci en format PDF.
@@ -201,3 +202,17 @@ def generar_carnet_pdf(socioID: int, ruta_pdf: str) -> None:
         raise FileNotFoundError(f"El archivo de logo no existe en la ruta: {logo_path}")
     with SessionLocal() as db:
         generar_carnet_socio(db, socioID, ruta_pdf, logo_path=logo_path)
+
+# Añadido: generar_pdf_LOPD para exportar consentimiento de protección de datos
+def generar_pdf_LOPD(socioID: int, ruta_pdf: str) -> None:
+    """
+    Genera el PDF de consentiment de protecció de dades (LOPD) per a un soci.
+    """
+    from exportador.pdf_LOPD import generar_pdf_lopd
+
+    with SessionLocal() as db:
+        socio = db.get(Socio, socioID)
+        if not socio:
+            raise ValueError("Soci inexistent")
+        nombre_completo = f"{socio.nombre} {socio.apellido1 or ''} {socio.apellido2 or ''}".strip()
+        generar_pdf_lopd(nombre_completo, socio.dniNie, ruta_pdf)

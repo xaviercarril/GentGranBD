@@ -66,6 +66,11 @@ class SociosTab(QWidget):
     btn_carnet.setIcon(QIcon("ui/assets/id-card.svg"))
     btn_carnet.setIconSize(QSize(16, 16))
     btn_carnet.clicked.connect(self._generar_carnet_socio)
+    # --- PDF LOPD Button ---
+    btn_lopd = QPushButton("Generar LOPD")
+    btn_lopd.setIcon(QIcon("ui/assets/signature.svg"))
+    btn_lopd.setIconSize(QSize(16, 16))
+    btn_lopd.clicked.connect(self._generar_lopd_pdf)
     btn_nou.clicked.connect(self._dialog_nou_socio)
     btn_esborrar.clicked.connect(self._eliminar_socio)
 
@@ -73,6 +78,7 @@ class SociosTab(QWidget):
     top_buttons.addWidget(btn_nou)
     top_buttons.addWidget(btn_esborrar)
     top_buttons.addWidget(btn_carnet)
+    top_buttons.addWidget(btn_lopd)
     top_buttons.addStretch()
 
     page = QWidget()
@@ -87,7 +93,7 @@ class SociosTab(QWidget):
     rows = listar_socios()
     self._all_socios = rows
     headers = [
-      ("ID", "id"),
+      ("Soci ID", "id"),
       ("DNI/NIE", "dniNie"),
       ("Nom", "nombre"),
       ("1r Cognom", "apellido1"),
@@ -102,7 +108,7 @@ class SociosTab(QWidget):
     model = DictTableModel(filtered_rows, headers)
     self.table_socis.setModel(model)
     self.table_socis.resizeColumnsToContents()
-    self.table_socis.hideColumn(0)
+    # self.table_socis.hideColumn(0)
 
     new_sel = self.table_socis.selectionModel()
     try:
@@ -229,3 +235,22 @@ class SociosTab(QWidget):
               self._eliminar_socio()
               return True
       return super().eventFilter(obj, event)
+  
+  def _generar_lopd_pdf(self):
+      sel = self.table_socis.selectionModel().selectedRows()
+      if not sel:
+          QMessageBox.warning(self, "Error", "No s'ha seleccionat cap soci.")
+          return
+
+      row = sel[0].row()
+      socio = self.table_socis.model().rows[row]
+
+      from controladores.socios import generar_pdf_LOPD
+      from PySide6.QtWidgets import QFileDialog
+
+      output_path, _ = QFileDialog.getSaveFileName(self, "Desar PDF LOPD", f"lopd_{socio['nombre']}.pdf", "PDF Files (*.pdf)")
+      if not output_path:
+          return
+
+      generar_pdf_LOPD(socio['id'], output_path)
+      QMessageBox.information(self, "Èxit", "El PDF s'ha generat correctament.")

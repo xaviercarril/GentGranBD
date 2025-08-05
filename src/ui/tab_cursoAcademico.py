@@ -163,17 +163,18 @@ class CursoAcademicoDialog(QDialog):
           inicio_edit.setDate(QDate.currentDate())
           fin_edit.setDate(QDate.currentDate().addMonths(3))
 
-        self._generar_trimestre(curso_id, i, inicio_edit, fin_edit)
+        # self._generar_trimestre(curso_id, i, inicio_edit, fin_edit)
+        self._guardar_trimestre(i)
 
       self.trimestre_box.setEnabled(True)
 
-    def _generar_trimestre(self, curso_id, index, inicio_edit, fin_edit):
-      trimestre_generators = [generar_T1, generar_T2, generar_T3, generar_T4]
-      if index < len(trimestre_generators):
-        trimestre_generators[index](curso_id, inicio_edit.date().toPython(), fin_edit.date().toPython())
-      else:
-        inicio_edit.setEnabled(False)
-        fin_edit.setEnabled(False)
+    # def _generar_trimestre(self, curso_id, index, inicio_edit, fin_edit):
+    #   trimestre_generators = [generar_T1, generar_T2, generar_T3, generar_T4]
+    #   if index < len(trimestre_generators):
+    #     trimestre_generators[index](curso_id, inicio_edit.date().toPython(), fin_edit.date().toPython())
+    #   else:
+    #     inicio_edit.setEnabled(False)
+    #     fin_edit.setEnabled(False)
 
 
     def _guardar_trimestre(self, index):

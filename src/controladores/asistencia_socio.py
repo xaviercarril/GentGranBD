@@ -27,7 +27,7 @@ def registrar_asistenciaSocio(data: dict) -> int:
             db.add(nueva_asistencia)
             db.commit()
             db.refresh(nueva_asistencia)
-            return nueva_asistencia.id
+
     except IntegrityError as e:
         raise ValueError(f"Error al registrar asistencia: {e.orig}")
 
@@ -70,7 +70,7 @@ def eliminar_asistenciaSocio(socioID: int, claseID: int) -> None:
 def consultar_asistenciaSocio(socioID: int, claseID: int) -> dict | None:
     """Consulta asistencia de un socio a una clase; devuelve dict o None."""
     with SessionLocal() as db:
-        asistencia = db.get(AsistenciaSocio, {'socioID': socioID, 'claseID': claseID})
+        asistencia = db.query(AsistenciaSocio).filter_by(socioID=socioID, claseID=claseID).first()
         return asistencia_to_dto(asistencia).model_dump() if asistencia else None
 
 
@@ -96,3 +96,17 @@ def consultar_socio_AsistenciaSocio(asistencia_id: int) -> dict | None:
             return asistencia_to_dto(socio).model_dump() if socio else None
     except Exception as e:
         raise ValueError(f"Error al consultar socio: {e}")
+
+def listar_asistencias(socioID: int, claseID: int) -> list[dict]:
+    """Lista todas las asistencias de un socio a una clase; devuelve una lista de dicts."""
+    with SessionLocal() as db:
+        asistencias = db.query(AsistenciaSocio).filter_by(socioID=socioID, claseID=claseID).all()
+        return [asistencia_to_dto(asistencia).model_dump() for asistencia in asistencias]
+
+def generar_pdf_asistencias(actividadID: int, trimestreID: int,  ruta: str) -> None:
+    """Genera un PDF con las asistencias de una actividad."""
+    from exportador.pdf_asistencias import generar_pdf_parrilla_asistencias
+    try:
+        generar_pdf_parrilla_asistencias(actividadID, trimestreID, ruta)
+    except Exception as e:
+        raise ValueError(f"Error al generar PDF de asistencias: {e}")

@@ -3,7 +3,7 @@ from datetime import date, timedelta
 from dateutil.relativedelta import relativedelta
 from pydantic import BaseModel
 from sqlalchemy.exc import IntegrityError
-from controladores.dtos_models import CursoAcademicoDTO
+from controladores.dtos_models import CursoAcademicoDTO, CursoAcademicoUpdateDTO
 from controladores.trimestre import registrar_trimestre
 from controladores.dtos import actividad_to_dto, cursoA_to_dto, trimestre_to_dto
 from database import SessionLocal

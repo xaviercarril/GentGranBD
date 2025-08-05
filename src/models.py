@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, Interval, String, Date, DateTime, Boolean, Text, DECIMAL,
+    Column, Integer, Interval, PrimaryKeyConstraint, String, Date, DateTime, Boolean, Text, DECIMAL,
     ForeignKey, ForeignKeyConstraint, LargeBinary, Enum
 )
 from sqlalchemy.orm import declarative_base, relationship
@@ -210,7 +210,7 @@ class InscripcionSocio(Base):
 # ---------------------------------------------
 class AsistenciaSocio(Base):
     __tablename__ = "asistencias_socio"
-    id = Column(Integer, primary_key=True)
+
     # Composite primary key (socioID, claseID)
     socioID = Column(Integer, ForeignKey("socios.id"), primary_key=True)
     claseID = Column(Integer, ForeignKey("clases.id"), primary_key=True)
@@ -220,6 +220,9 @@ class AsistenciaSocio(Base):
 
     socio = relationship("Socio", back_populates="asistencias")
     clase = relationship("Clase", back_populates="asistencias")
+    __table_args__ = (
+        PrimaryKeyConstraint('socioID', 'claseID'),
+    )
 
 # ---------------------------------------------
 # ENROLLMENT FEE PAYMENTS
