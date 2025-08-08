@@ -1,6 +1,6 @@
-from controladores.dtos import personal_to_dto
+from controladores.dtos import actividad_to_dto, personal_to_dto
 from controladores.dtos_models import PersonalDTO, PersonalUpdateDTO
-from models import Personal, Profesor, Voluntario
+from models import Actividad, Personal, Profesor, Voluntario
 from pydantic import BaseModel, ValidationError
 from database import SessionLocal
 from sqlalchemy.exc import IntegrityError
@@ -116,7 +116,7 @@ def listar_actividades_por_Personal(personalID: int) -> list[dict]:
     """Lista las actividades en las que un personal está asignado."""
     try:
         with SessionLocal() as db:
-            actividades = db.query(Personal.actividades).filter(Personal.id == personalID).all()
-            return [a.model_dump() for a in actividades]
+            actividades = db.query(Actividad).filter(Actividad.personalID == personalID).all()
+            return [actividad_to_dto(a).model_dump() for a in actividades]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por personal: {e}")

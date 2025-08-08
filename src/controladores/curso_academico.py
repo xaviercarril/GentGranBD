@@ -83,15 +83,11 @@ def modificar_cursoA(cursoAcademicoID: int, cambios: dict) -> None:
     db.commit()
 
 def consultar_cursoA(cursoAcademicoID: int) -> dict | None:
-  try:
+
     with SessionLocal() as db:
       curso = db.get(CursoAcademico, cursoAcademicoID)
-      if curso:
-        return cursoA_to_dto(curso).model_dump()
-      return None
-  except Exception as e:
-    raise ValueError(f"Error al consultar curso académico: {e}")
-  
+      return cursoA_to_dto(curso).model_dump() if curso else None
+
 def eliminar_cursoA(cursoAcademicoID: int) -> None:
   """Elimina un curso académico por su ID."""
   try:

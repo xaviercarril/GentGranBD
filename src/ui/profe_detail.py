@@ -1,8 +1,10 @@
 from PySide6.QtWidgets import (
-    QWidget, QFormLayout, QLineEdit, QVBoxLayout, QLabel, QMessageBox, QTextEdit
+    QWidget, QFormLayout, QLineEdit, QVBoxLayout, QLabel, QMessageBox, QTextEdit, QTableView
 )
 from PySide6.QtCore import Qt, Signal
-from controladores.personal import modificar_personal, consultar_personal
+from controladores.personal import modificar_personal, consultar_personal, listar_actividades_por_Personal
+from controladores.curso_academico import consultar_cursoA
+from ui.table_models import DictTableModel
 
 class ProfeDetailWidget(QWidget):
     """Panell lateral de detall i edició auto-guardada."""
@@ -28,7 +30,9 @@ class ProfeDetailWidget(QWidget):
         self.obs = QTextEdit()
 
         # ── Disseny ──────────────────────────────────────────
-        form = QFormLayout(self)
+        layout = QVBoxLayout(self)
+        
+        form = QFormLayout()
         form.addRow("Nom*:", self.nom)
         form.addRow("1r Cognom*:", self.cognom1)
         form.addRow("2n Cognom:", self.cognom2)
@@ -36,6 +40,18 @@ class ProfeDetailWidget(QWidget):
         form.addRow("Email:", self.email)
         form.addRow("Tel. mòbil:", self.tel_mob)
         form.addRow("Observacions:", self.obs)
+
+        self.label_imparteix = QLabel("Activitats que imparteix:")
+        self.imparteix_table = QTableView()
+        self.imparteix_table.verticalHeader().setVisible(False)
+        self.imparteix_table.setSelectionBehavior(QTableView.SelectRows)
+        self.imparteix_table.setSelectionMode(QTableView.NoSelection)
+        self.imparteix_table.setAlternatingRowColors(True)
+
+        layout.addLayout(form)
+        layout.addWidget(self.label_imparteix)
+        layout.addWidget(self.imparteix_table)
+        layout.addStretch()
 
         for widget in [self.nom, self.cognom1, self.cognom2, self.dni, self.email, self.tel_mob]:
             widget.editingFinished.connect(self._guardar)
@@ -62,6 +78,8 @@ class ProfeDetailWidget(QWidget):
         self.email.setText(profe.get("email", ""))
         self.tel_mob.setText(profe.get("telfMovil", ""))
         self.obs.setText(profe.get("observaciones", ""))
+
+        self._load_imparteix_table()
         self._loading = False
 
     def _clear(self):
@@ -75,6 +93,7 @@ class ProfeDetailWidget(QWidget):
         self.email.clear()
         self.tel_mob.clear()
         self.obs.clear()
+        self.imparteix_table.setModel(DictTableModel([], []))
         self._loading = False
 
     # ------------------------------------------------------------------
@@ -113,3 +132,23 @@ class ProfeDetailWidget(QWidget):
             self.saved.emit()  # Emit saved signal if needed
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No s'han pogut guardar les dades: {e}")
+
+    def _load_imparteix_table(self):
+        """Load activities taught by this professor."""
+        try:
+            
+            actividades = listar_actividades_por_Personal(self._id)
+            headers = [
+                ("Nom", "nombre"),
+                ("Curs Acadèmic", "cursoAcademico")
+            ]
+            for actividad in actividades:
+                cursoAcademicoID = actividad.get("cursoAcademico_id")
+                cursoAcademico = consultar_cursoA(cursoAcademicoID)
+                actividad["cursoAcademico"] = cursoAcademico.get("nombre", "Desconegut")
+                actividad["nombre"] = actividad.get("nombre", "Desconegut")
+            self.imparteix_table.setModel(DictTableModel(actividades, headers))
+            self.imparteix_table.resizeColumnsToContents()
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"No s'han pogut carregar les activitats: {e}")
+            
