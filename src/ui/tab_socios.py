@@ -66,11 +66,11 @@ class SociosTab(QWidget):
     btn_carnet.setIcon(QIcon("ui/assets/id-card.svg"))
     btn_carnet.setIconSize(QSize(16, 16))
     btn_carnet.clicked.connect(self._generar_carnet_socio)
-    # --- PDF LOPD Button ---
-    btn_lopd = QPushButton("Generar LOPD")
+    # --- Gestió LOPD ---
+    btn_lopd = QPushButton("Gestió LOPD")
     btn_lopd.setIcon(QIcon("ui/assets/signature.svg"))
     btn_lopd.setIconSize(QSize(16, 16))
-    btn_lopd.clicked.connect(self._generar_lopd_pdf)
+    btn_lopd.clicked.connect(self._mostrar_firma_lopd)
     btn_nou.clicked.connect(self._dialog_nou_socio)
     btn_esborrar.clicked.connect(self._eliminar_socio)
 
@@ -236,7 +236,7 @@ class SociosTab(QWidget):
               return True
       return super().eventFilter(obj, event)
   
-  def _generar_lopd_pdf(self):
+  def _mostrar_firma_lopd(self):
       sel = self.table_socis.selectionModel().selectedRows()
       if not sel:
           QMessageBox.warning(self, "Error", "No s'ha seleccionat cap soci.")
@@ -245,12 +245,7 @@ class SociosTab(QWidget):
       row = sel[0].row()
       socio = self.table_socis.model().rows[row]
 
-      from controladores.socios import generar_pdf_LOPD
-      from PySide6.QtWidgets import QFileDialog
+      from ui.firma_lopd_dialog import FirmaLOPDDialog
 
-      output_path, _ = QFileDialog.getSaveFileName(self, "Desar PDF LOPD", f"lopd_{socio['nombre']}.pdf", "PDF Files (*.pdf)")
-      if not output_path:
-          return
-
-      generar_pdf_LOPD(socio['id'], output_path)
-      QMessageBox.information(self, "Èxit", "El PDF s'ha generat correctament.")
+      dlg = FirmaLOPDDialog(socio["id"], self)
+      dlg.exec()

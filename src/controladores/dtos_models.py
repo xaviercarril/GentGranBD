@@ -64,12 +64,13 @@ class CursoAcademicoUpdateDTO(BaseModel):
 
 class FirmaLOPDDTO(BaseModel):
     socioID: int
-    fecha: date | None = None
-    firma: bytes | None = None
+    fechaFirma: date | None = None
+    documento: bytes | None = None
+
 
 class FirmaLOPDUpdateDTO(BaseModel):
-    fecha: date | None = None
-    firma: bytes | None = None
+    fechaFirma: date | None = None
+    documento: bytes | None = None
 
 class InscripcionSocioDTO(BaseModel):
     id: int | None = None
