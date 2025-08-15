@@ -8,10 +8,16 @@ python-dateutil>=2.8.2
 
 # === UI ===
 PySide6>=6.5
+PySide6-Addons>=6.5
 
 # === PDF Export ===
 reportlab>=4.0
 pillow>=10.0
+
+# === Import/Excel ===
+pandas>=2.2
+openpyxl>=3.1
+xlrd>=2.0
 
 # === Testing ===
 pytest>=8.0
