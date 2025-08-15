@@ -32,9 +32,17 @@ jobs:
       - name: Install NSIS
         run: choco install nsis -y
 
+      - name: Determine dist dir
+        id: distdir
+        shell: pwsh
+        run: |
+          $d = Get-ChildItem -Path dist -Directory | Where-Object { $_.Name -like 'GentGranBD*' } | Select-Object -First 1
+          if (-not $d) { Write-Error 'No dist directory found under dist/'; exit 1 }
+          echo "distdir=$($d.FullName)" >> $env:GITHUB_OUTPUT
+
       - name: Build NSIS installer
         run: |
-          makensis installer\installer.nsi
+          makensis -DDISTDIR="${{ steps.distdir.outputs.distdir }}" installer\installer.nsi
         working-directory: ${{ github.workspace }}
 
       - name: Upload artifacts
@@ -42,5 +50,5 @@ jobs:
         with:
           name: GentGranBD-windows
           path: |
-            dist\GentGranBD
+            ${{ steps.distdir.outputs.distdir }}
             GentGranBD-Setup-*.exe
