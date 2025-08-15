@@ -1,6 +1,7 @@
 # === Core ===
 SQLAlchemy>=2.0
 pydantic>=2.0
+python-dateutil>=2.8.2
 
 # === SQLite driver (opcional si usas sqlite3 del stdlib) ===
 # aiosqlite==0.20.0  # Només si uses async, sinó no cal
