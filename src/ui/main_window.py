@@ -4,7 +4,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QFileDialog
 
-from importador.importar_socios_excel import importar_socios_desde_excel
 from ui.tab_socios import SociosTab
 from ui.tab_actividades import ActividadesTab
 from ui.tab_cursoAcademico import CursoAcademicoDialog
@@ -61,9 +60,11 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def _importar_socis(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Selecciona un arxiu Excel", "", "Excel Files (*.xlsx *.xls)")
+        path, _ = QFileDialog.getOpenFileName(self, "Selecciona un arxiu Excel", "", "Excel Files (*.xlsx *.xls *.csv)")
         if path:
             try:
+                # Lazy import to avoid pandas overhead at startup
+                from importador.importar_socios_excel import importar_socios_desde_excel
                 importar_socios_desde_excel(path)
             except Exception as e:
                 from PySide6.QtWidgets import QMessageBox

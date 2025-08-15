@@ -1,4 +1,3 @@
-import pandas as pd
 from datetime import datetime
 from controladores.socios import registrar_socio
 
@@ -7,6 +6,7 @@ def importar_socios_desde_excel(ruta_archivo: str) -> int:
     Importa socios desde un archivo Excel o CSV.
     Retorna el número de socios importados.
     """
+    import pandas as pd  # lazy import
     df = pd.read_excel(ruta_archivo) if ruta_archivo.endswith(('.xls', '.xlsx')) else pd.read_csv(ruta_archivo)
 
     df = df.fillna("")  # Reemplaza NaN por cadenas vacías

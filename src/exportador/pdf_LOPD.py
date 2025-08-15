@@ -4,8 +4,14 @@ from reportlab.lib.units import cm
 from reportlab.lib import utils
 import os
 from datetime import date
+from pathlib import Path
 
-def generar_pdf_lopd(nombre_completo: str, dni: str, ruta_salida: str, logo_path="/Users/xavier.carril/Desktop/Gent Gran BD/src/extra/logo.png"):
+def generar_pdf_lopd(nombre_completo: str, dni: str, ruta_salida: str, logo_path: str | None = None):
+    if not logo_path:
+        # Default to bundled extra/logo.png relative to CWD or source
+        # CWD is set to app dir in app.py for frozen builds
+        cand = Path("extra") / "logo.png"
+        logo_path = str(cand)
     c = canvas.Canvas(ruta_salida, pagesize=A4)
     width, height = A4
 

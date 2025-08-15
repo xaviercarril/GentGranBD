@@ -10,6 +10,7 @@ PySide6>=6.5
 
 # === PDF Export ===
 reportlab>=4.0
+pillow>=10.0
 
 # === Testing ===
 pytest>=8.0
@@ -18,3 +19,4 @@ pytest>=8.0
 black
 flake8
 mypy
+pyinstaller>=6.6
