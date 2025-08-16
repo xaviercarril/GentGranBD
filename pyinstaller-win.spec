@@ -1,7 +1,8 @@
-# Windows one-folder with installer preparation
+# Windows one-file executable with installer preparation
 # Build app with: py -m PyInstaller pyinstaller-win.spec
 
 import os
+from pathlib import Path
 block_cipher = None
 
 app_script = os.path.join('src', 'ui', 'app.py')
@@ -46,11 +47,15 @@ a = Analysis([
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+ico = 'src/extra/icon.ico' if Path('src/extra/icon.ico').exists() else None
+
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='GentGranBD',
     debug=False,
     bootloader_ignore_signals=False,
@@ -59,12 +64,5 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     target_arch=None,
-)
-
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    name='GentGranBD'
+    icon=ico,
 )
