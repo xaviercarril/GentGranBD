@@ -19,36 +19,36 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
+        - name: Build Windows app (one-file)
+          run: |
+            pyinstaller pyinstaller-win.spec --noconfirm
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
-      - name: Build Windows app (one-folder)
-        run: |
-          pyinstaller pyinstaller-win.spec --noconfirm
+  - name: Build Windows app (one-file)
+        - name: Locate EXE
+          id: findexe
+          shell: pwsh
+          run: |
+            $exe = Get-ChildItem -Path dist -Filter GentGranBD.exe -File -Recurse | Select-Object -First 1
+            if (-not $exe) { Write-Error 'No GentGranBD.exe found under dist/'; exit 1 }
+            "exepath=$($exe.FullName)" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+        id: findexe
+        - name: Build NSIS installer (one-file)
+          run: |
+            makensis -DAPP_EXE="${{ steps.findexe.outputs.exepath }}" installer\installer.nsi
+          working-directory: ${{ github.workspace }}
+          echo "exepath=$($exe.FullName)" >> $env:GITHUB_OUTPUT
 
-      - name: Install NSIS
-        run: choco install nsis -y
-
-      - name: Determine dist dir
-        id: distdir
-        shell: pwsh
+    - name: Build NSIS installer (one-file)
         run: |
-          $d = Get-ChildItem -Path dist -Directory | Where-Object { $_.Name -like 'GentGranBD*' } | Select-Object -First 1
-          if (-not $d) { Write-Error 'No dist directory found under dist/'; exit 1 }
-          echo "distdir=$($d.FullName)" >> $env:GITHUB_OUTPUT
-
-      - name: Build NSIS installer
-        run: |
-          makensis -DDISTDIR="${{ steps.distdir.outputs.distdir }}" installer\installer.nsi
+      makensis -DAPP_EXE="${{ steps.findexe.outputs.exepath }}" installer\installer.nsi
         working-directory: ${{ github.workspace }}
-
+              ${{ steps.findexe.outputs.exepath }}
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: GentGranBD-windows
           path: |
-            ${{ steps.distdir.outputs.distdir }}
+            ${{ steps.findexe.outputs.exepath }}
             GentGranBD-Setup-*.exe

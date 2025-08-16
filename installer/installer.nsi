@@ -10,6 +10,7 @@
 !ifndef DISTDIR
 !define DISTDIR "dist\GentGranBD"
 !endif
+; Allow passing a single EXE path for one-file builds: makensis -DAPP_EXE=dist\GentGranBD.exe
 
 OutFile "GentGranBD-Setup-${VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
@@ -20,7 +21,11 @@ Page instfiles
 
 Section "Install"
   SetOutPath "$INSTDIR"
-  File /r "${DISTDIR}\*.*"
+  !ifdef APP_EXE
+    File /oname=GentGranBD.exe "${APP_EXE}"
+  !else
+    File /r "${DISTDIR}\*.*"
+  !endif
   CreateShortCut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\GentGranBD.exe"
 SectionEnd
 
