@@ -47,7 +47,25 @@ a = Analysis([
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-ico = 'src/extra/icon.ico' if Path('src/extra/icon.ico').exists() else None
+def _ensure_ico(png_path: str, ico_path: str) -> str | None:
+    p_png = Path(png_path)
+    p_ico = Path(ico_path)
+    if p_ico.exists():
+        return str(p_ico)
+    if not p_png.exists():
+        return None
+    try:
+        # Generate a multi-size ICO from PNG using Pillow
+        from PIL import Image
+        img = Image.open(p_png).convert("RGBA")
+        sizes = [(16,16), (24,24), (32,32), (48,48), (64,64), (128,128), (256,256)]
+        # Save ICO with multiple sizes; Pillow will resize as needed
+        img.save(p_ico, format='ICO', sizes=sizes)
+        return str(p_ico)
+    except Exception:
+        return None
+
+ico = _ensure_ico('src/extra/icon.png', 'src/extra/icon.ico') or (str(Path('src/extra/icon.ico')) if Path('src/extra/icon.ico').exists() else None)
 
 exe = EXE(
     pyz,
