@@ -7,3 +7,4 @@ venv
 ./src/tests/__pycache__
 dist
 build
+src/gentgran.db

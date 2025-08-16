@@ -261,7 +261,7 @@ class SociosTab(QWidget):
       from controladores.socios import generar_pdf_LOPD
       from PySide6.QtWidgets import QFileDialog
 
-      output_path, _ = QFileDialog.getSaveFileName(self, "Desar PDF LOPD", f"lopd_{socio['nombre']}.pdf", "PDF Files (*.pdf)")
+      output_path, _ = QFileDialog.getSaveFileName(self, "Desar PDF LOPD", f"lopd_{socio['id']}.pdf", "PDF Files (*.pdf)")
       if not output_path:
           return
 

@@ -2,6 +2,8 @@
 # Build with: pyinstaller pyinstaller.spec
 
 import os
+import subprocess
+from pathlib import Path
 from PyInstaller.building.datastruct import Tree, TOC
 
 block_cipher = None
@@ -77,3 +79,30 @@ coll = COLLECT(
     upx_exclude=[],
     name='GentGranBD'
 )
+
+# Windows icon embed (convert PNG to ICO if needed)
+def _ensure_ico(png: str, ico: str) -> str | None:
+    p_png = Path(png)
+    p_ico = Path(ico)
+    if p_ico.exists():
+        return str(p_ico)
+    try:
+        # Use powershell and .NET to create an ICO with multiple sizes when on Windows runners
+        if os.name == 'nt':
+            ps = (
+                '$png="{}"; $ico="{}"; '
+                '$sizes=@(16,32,48,64,128,256); '
+                '$b=new-object System.Drawing.Bitmap($png); '
+                '$fs=new-object System.IO.FileStream($ico,[System.IO.FileMode]::Create); '
+                '$ci=System.Reflection.Assembly::Load("System.Drawing").GetType("System.Drawing.IconLib.IconInputOutput"); '
+                'if($ci -eq $null){$fs.Close(); return}; '
+                '$fs.Close();'
+            ).format(p_png, p_ico)
+            subprocess.run(["powershell", "-Command", ps], check=False)
+        return str(p_ico) if p_ico.exists() else None
+    except Exception:
+        return None
+
+ico_path = _ensure_ico('src/extra/icon.png', 'src/extra/icon.ico') or ('src/extra/icon.ico' if Path('src/extra/icon.ico').exists() else None)
+if ico_path:
+    exe.icon = ico_path

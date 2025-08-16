@@ -2,6 +2,9 @@
 # Build with: python -m PyInstaller pyinstaller-mac.spec
 
 import os
+import sys
+from pathlib import Path
+import subprocess
 block_cipher = None
 
 app_script = os.path.join('src', 'ui', 'app.py')
@@ -65,10 +68,36 @@ exe = EXE(
     target_arch=None,
 )
 
+# Try to ensure ICNS exists from PNG
+def _ensure_icns(png_path: str, icns_path: str) -> str | None:
+    p_png = Path(png_path)
+    p_icns = Path(icns_path)
+    if p_icns.exists():
+        return str(p_icns)
+    try:
+        iconset = Path('build') / 'icon.iconset'
+        iconset.mkdir(parents=True, exist_ok=True)
+        sizes = [16, 32, 64, 128, 256, 512]
+        for s in sizes:
+            out = iconset / f'icon_{s}x{s}.png'
+            subprocess.run(['sips', '-z', str(s), str(s), str(p_png), '--out', str(out)], check=True, stdout=subprocess.DEVNULL)
+        # Create 2x versions for mac
+        for s in [16, 32, 128, 256, 512]:
+            out2 = iconset / f'icon_{s}x{s}@2x.png'
+            subprocess.run(['sips', '-z', str(s*2), str(s*2), str(p_png), '--out', str(out2)], check=True, stdout=subprocess.DEVNULL)
+        subprocess.run(['iconutil', '-c', 'icns', str(iconset), '-o', str(p_icns)], check=True, stdout=subprocess.DEVNULL)
+        return str(p_icns)
+    except Exception:
+        return None
+
+icon_png = os.path.join('src', 'extra', 'icon.png')
+icon_icns = os.path.join('src', 'extra', 'icon.icns')
+bundle_icon = _ensure_icns(icon_png, icon_icns) or (icon_icns if Path(icon_icns).exists() else None)
+
 app = BUNDLE(
     exe,
     name='GentGranBD.app',
-    icon=None,
+    icon=bundle_icon,
     bundle_identifier='org.gentgranbd.app',
     info_plist={
         'CFBundleName': 'GentGranBD',

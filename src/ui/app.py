@@ -1,5 +1,6 @@
 import sys
 from PySide6.QtWidgets import QApplication
+from PySide6.QtGui import QIcon
 from ui.main_window import MainWindow
 from database import engine
 from models import Base
@@ -84,6 +85,10 @@ def main():
 
     Base.metadata.create_all(bind=engine)
     app = QApplication(sys.argv)
+    try:
+        app.setWindowIcon(QIcon(str(Path("extra") / "icon.png")))
+    except Exception:
+        pass
     win = MainWindow()
     win.show()
     sys.exit(app.exec())
