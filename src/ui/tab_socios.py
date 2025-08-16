@@ -171,13 +171,22 @@ class SociosTab(QWidget):
   def _generar_carnet_socio(self):
     sel = self.table_socis.selectionModel().selectedRows()
     if not sel:
+      QMessageBox.warning(self, "Error", "No s'ha seleccionat cap soci.")
       return
 
     row = sel[0].row()
     socio = self.table_socis.model().rows[row]
 
-    pdf_path = "/tmp/temp_carnet.pdf"
-    generar_carnet_pdf(socio['id'], pdf_path)
+    from PySide6.QtWidgets import QFileDialog
+    suggested = f"carnet_{socio['id']:06d}.pdf"
+    pdf_path, _ = QFileDialog.getSaveFileName(self, "Desar carnet PDF", suggested, "PDF Files (*.pdf)")
+    if not pdf_path:
+      return
+    try:
+      generar_carnet_pdf(socio['id'], pdf_path)
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"No s'ha pogut generar el carnet:\n{e}")
+      return
 
     try:
       from PySide6.QtPdf import QPdfDocument
@@ -198,7 +207,11 @@ class SociosTab(QWidget):
       if sys.platform.startswith("darwin"):
         os.system(f'open "{pdf_path}"')
       elif sys.platform.startswith("win"):
-        os.startfile(pdf_path)
+        try:
+          os.startfile(pdf_path)
+        except Exception:
+          # Fallback via Explorer
+          os.system(f'start "" "{pdf_path}"')
       else:
         os.system(f'xdg-open "{pdf_path}"')
 

@@ -199,7 +199,8 @@ def generar_carnet_pdf(socioID: int, ruta_pdf: str) -> None:
 
     logo_path = "./extra/logo.png"  # Ruta del logo opcional
     if not os.path.exists(logo_path):
-        raise FileNotFoundError(f"El archivo de logo no existe en la ruta: {logo_path}")
+        # No bloquear la generación si falta el logo; es opcional
+        logo_path = None
     with SessionLocal() as db:
         generar_carnet_socio(db, socioID, ruta_pdf, logo_path=logo_path)
 
