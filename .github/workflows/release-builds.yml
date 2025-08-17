@@ -45,9 +45,10 @@ jobs:
           # Build NSIS installer from the found EXE
           makensis -DAPP_EXE="$($exe.FullName)" installer\installer.nsi
 
-          $setup = Get-ChildItem -Path . -Filter 'GentGranBD-Setup-*.exe' -File | Select-Object -First 1
+          $setup = Get-ChildItem -Path installer -Filter 'GentGranBD-Setup-*.exe' -File | Select-Object -First 1
           if (-not $setup) { Write-Error 'Installer not found after NSIS'; exit 1 }
-          Rename-Item $setup.FullName ("GentGranBD-Setup-Windows-${env:RELEASE_TAG}.exe") -Force
+          $setupDest = Join-Path $PWD ("GentGranBD-Setup-Windows-${env:RELEASE_TAG}.exe")
+          Move-Item $setup.FullName $setupDest -Force
 
       - name: Upload assets to Release
         uses: softprops/action-gh-release@v1
