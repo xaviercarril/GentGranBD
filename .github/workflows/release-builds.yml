@@ -1,0 +1,94 @@
+name: Release Builds (Windows + macOS)
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    if: github.event.release.target_commitish == 'main'
+    runs-on: windows-latest
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+          python -m pip install pyinstaller
+
+      - name: Build Windows app (one-file)
+        run: pyinstaller pyinstaller-win.spec --noconfirm
+
+      - name: Install NSIS
+        run: choco install nsis -y
+
+      - name: Locate EXE and tag-rename
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Path dist -Filter GentGranBD.exe -File -Recurse | Select-Object -First 1
+          if (-not $exe) { Write-Error 'No GentGranBD.exe found under dist/'; exit 1 }
+          $dest = Join-Path $PWD ("GentGranBD-Windows-${env:RELEASE_TAG}.exe")
+          Copy-Item $exe.FullName $dest -Force
+
+          # Build NSIS installer from the found EXE
+          makensis -DAPP_EXE="$($exe.FullName)" installer\installer.nsi
+
+          $setup = Get-ChildItem -Path . -Filter 'GentGranBD-Setup-*.exe' -File | Select-Object -First 1
+          if (-not $setup) { Write-Error 'Installer not found after NSIS'; exit 1 }
+          Rename-Item $setup.FullName ("GentGranBD-Setup-Windows-${env:RELEASE_TAG}.exe") -Force
+
+      - name: Upload assets to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            GentGranBD-Windows-${{ env.RELEASE_TAG }}.exe
+            GentGranBD-Setup-Windows-${{ env.RELEASE_TAG }}.exe
+
+  build-macos:
+    if: github.event.release.target_commitish == 'main'
+    runs-on: macos-latest
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements.txt
+          python3 -m pip install pyinstaller
+
+      - name: Build macOS .app
+        run: |
+          pyinstaller pyinstaller-mac.spec --noconfirm
+
+      - name: Package .app as zip
+        run: |
+          APP_PATH="dist/GentGranBD.app"
+          if [ ! -d "$APP_PATH" ]; then echo "App not found at $APP_PATH"; exit 1; fi
+          ZIP_NAME="GentGranBD-macOS-${RELEASE_TAG}.zip"
+          # Preserve bundle structure and metadata
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
+
+      - name: Upload asset to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: GentGranBD-macOS-${{ env.RELEASE_TAG }}.zip
