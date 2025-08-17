@@ -1,42 +1,106 @@
 from datetime import datetime
-from controladores.socios import registrar_socio
+from typing import Callable, Optional
+from sqlalchemy.exc import IntegrityError
+from database import SessionLocal
+from controladores.socios import construir_socio_modelo
 
-def importar_socios_desde_excel(ruta_archivo: str) -> int:
+
+ProgressCb = Optional[Callable[[int, int], None]]  # (procesadas, total)
+WarnCb = Optional[Callable[[int, str], None]]      # (fila_index, mensaje)
+ErrorCb = Optional[Callable[[int, str], None]]     # (fila_index, mensaje)
+
+
+def importar_socios_desde_excel(
+    ruta_archivo: str,
+    on_progress: ProgressCb = None,
+    on_warning: WarnCb = None,
+    on_error: ErrorCb = None,
+) -> int:
     """
-    Importa socios desde un archivo Excel o CSV.
-    Retorna el número de socios importados.
+    Importa socios desde un archivo Excel o CSV con verbosidad y rollback en error.
+    - Muestra progreso por callback (procesadas/total).
+    - Emite warnings por campos faltantes no críticos (p.ej. email vacío).
+    - Si ocurre un error duro (validación/duplicado), aborta y hace rollback total.
+
+    Retorna el número de socios importados (commit único) si todo va bien.
     """
     import pandas as pd  # lazy import
-    df = pd.read_excel(ruta_archivo) if ruta_archivo.endswith(('.xls', '.xlsx')) else pd.read_csv(ruta_archivo)
 
+    df = pd.read_excel(ruta_archivo) if ruta_archivo.endswith((".xls", ".xlsx")) else pd.read_csv(ruta_archivo)
     df = df.fillna("")  # Reemplaza NaN por cadenas vacías
 
-    contador = 0
-    for _, row in df.iterrows():
+    total = len(df)
+    procesadas = 0
+    creados = 0
+
+    with SessionLocal() as db:
         try:
-            datos = {
-              "id": row.get("Nº SOCI", None),  # Asume que el ID puede ser opcional
-              "nombre": row.get("NOM", "").strip(),
-              "apellido1": row.get("1r COGNOM", "").strip(),
-              "apellido2": row.get("2n COGNOM", "").strip() or None,
-              "dniNie": row.get("D.N.I.", "").strip() or None,
-              "direccion": row.get("ADREÇA", "").strip() or None,
-              "telefonoFijo": str(row.get("TELÈFON", "")).strip() or None,
-              "telefonoMovil": str(row.get("MÒBIL", "")).strip() or None,
-              "email": str(row.get("E-MAIL", "")).strip() or None,
-              "grupoDifusion": str(row.get("E", "")).strip() or None,
-              "fechaAlta": _parse_fecha(row.get("DATA D'ALTA", "")),
-              "fechaBaja": _parse_fecha(row.get("BAIXAS", ""), optional=True),
-              "observaciones": str(row.get("OBSERVACIONES", "")).strip() or None,
-            }
+            # Desactivar autoflush para performance en lote
+            db.autoflush = False
+            for idx, row in df.iterrows():
+                try:
+                    datos = {
+                        "id": row.get("Nº SOCI", None),
+                        "nombre": row.get("NOM", "").strip(),
+                        "apellido1": row.get("1r COGNOM", "").strip(),
+                        "apellido2": row.get("2n COGNOM", "").strip() or None,
+                        "dniNie": row.get("D.N.I.", "").strip() or None,
+                        "direccion": row.get("ADREÇA", "").strip() or None,
+                        "telefonoFijo": str(row.get("TELÈFON", "")).strip() or None,
+                        "telefonoMovil": str(row.get("MÒBIL", "")).strip() or None,
+                        "email": str(row.get("E-MAIL", "")).strip() or None,
+                        "grupoDifusion": str(row.get("E", "")).strip() or None,
+                        "fechaAlta": _parse_fecha(row.get("DATA D'ALTA", "")),
+                        "fechaBaja": _parse_fecha(row.get("BAIXAS", ""), optional=True),
+                        "observaciones": str(row.get("OBSERVACIONES", "")).strip() or None,
+                    }
 
-            registrar_socio(datos)
-            contador += 1
-        except Exception as e:
-            print(f"Error al importar fila: {e}")
-            continue
+                    # Warnings no críticos
+                    if not datos["dniNie"] and on_warning:
+                        on_warning(idx, "DNI/NIE vacío; se intentará continuar si el modelo lo permite")
+                    if not datos["email"] and on_warning:
+                        on_warning(idx, "Email vacío")
 
-    return contador
+                    socio = construir_socio_modelo(datos)
+                    db.add(socio)
+                    # Forçar flush per detectar duplicats en aquesta fila dins de la transacció
+                    db.flush()
+                    creados += 1
+                except IntegrityError as e:
+                    db.rollback()
+                    if on_error:
+                        dni = datos.get("dniNie")
+                        num = datos.get("id")
+                        if num:
+                            on_error(idx, f"Soci duplicat (Nº soci {num}). Ja existeix. Corregeix el fitxer i torna-ho a provar.")
+                        elif dni:
+                            on_error(idx, f"Soci duplicat (DNI/NIE {dni}). Ja existeix. Corregeix el fitxer i torna-ho a provar.")
+                        else:
+                            on_error(idx, "Registre duplicat. Ja existeix. Corregeix el fitxer i torna-ho a provar.")
+                    raise
+                except Exception as e:
+                    db.rollback()
+                    if on_error:
+                        # Mensajes más claros para usuario final
+                        msg = str(e)
+                        if "DNI" in msg or "dniNie" in msg:
+                            msg = "El DNI/NIE falta o no té un format vàlid."
+                        elif "nombre" in msg or "Nom" in msg:
+                            msg = "El nom és obligatori."
+                        on_error(idx, msg)
+                    raise
+                finally:
+                    procesadas += 1
+                    if on_progress:
+                        on_progress(procesadas, total)
+
+            # Si llegó aquí, confirmar en bloque
+            db.commit()
+            return creados
+        except Exception:
+            # rollback global por seguridad
+            db.rollback()
+            raise
 
 def _parse_fecha(fecha_raw, optional=False):
     if not fecha_raw:

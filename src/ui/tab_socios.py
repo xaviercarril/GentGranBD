@@ -28,7 +28,8 @@ class SociosTab(QWidget):
     self.table_socis.verticalHeader().setVisible(False)
     # -- Configuració de selecció i estil --
     self.table_socis.setSelectionBehavior(QTableView.SelectRows)
-    self.table_socis.setSelectionMode(QTableView.SingleSelection)
+    # Permetre selecció múltiple de files
+    self.table_socis.setSelectionMode(QTableView.ExtendedSelection)
     self.table_socis.setAlternatingRowColors(True)
     self.table_socis.setStyleSheet("""
       QTableView::item:selected {
@@ -89,6 +90,10 @@ class SociosTab(QWidget):
     self.setLayout(ly)
     self.table_socis.installEventFilter(self)
 
+  def refresh(self):
+    """Actualitza la taula de socis (wrapping públic)."""
+    self._refresh_socios()
+
   def _refresh_socios(self):
     rows = listar_socios()
     self._all_socios = rows
@@ -129,16 +134,43 @@ class SociosTab(QWidget):
       QMessageBox.warning(self, "Error", "No s'ha seleccionat cap soci.")
       return
 
-    row = sel[0].row()
-    socio = self.table_socis.model().rows[row]
-    nom_complet = f"{socio['nombre']} {socio.get('apellido1', '')}".strip()
+    # Recollir socis seleccionats
+    model = self.table_socis.model()
+    seleccionats = []
+    for idx in sel:
+      try:
+        r = idx.row()
+        seleccionats.append(model.rows[r])
+      except Exception:
+        continue
+
+    if not seleccionats:
+      QMessageBox.warning(self, "Error", "No s'ha pogut obtenir la selecció.")
+      return
+
+    if len(seleccionats) == 1:
+      socio = seleccionats[0]
+      nom_complet = f"{socio['nombre']} {socio.get('apellido1', '')}".strip()
+      text = (
+        f"Vols eliminar el soci «{nom_complet}» (ID {socio['id']})?\n"
+        "Aquesta acció no es pot desfer."
+      )
+    else:
+      # Mostra un resum (primeres 5 línies) i el recompte total
+      mostrats = ", ".join(
+        [f"{s['nombre']} {s.get('apellido1','')} (ID {s['id']})".strip() for s in seleccionats[:5]]
+      )
+      resta = len(seleccionats) - 5
+      extra = f" i {resta} més" if resta > 0 else ""
+      text = (
+        f"Vols eliminar {len(seleccionats)} socis seleccionats?\n"
+        f"{mostrats}{extra}\n"
+        "Aquesta acció no es pot desfer."
+      )
 
     box = QMessageBox(self)
     box.setWindowTitle("Confirmar eliminació")
-    box.setText(
-      f"Vols eliminar el soci «{nom_complet}» (ID {socio['id']})?\n"
-      "Aquesta acció no es pot desfer."
-    )
+    box.setText(text)
     icon_path = "ui/assets/trash.svg"
     pix = QPixmap(icon_path)
     if pix.isNull() and icon_path.lower().endswith(".svg"):
@@ -153,13 +185,31 @@ class SociosTab(QWidget):
     box.button(QMessageBox.No).setText("No")
 
     reply = box.exec()
-
     if reply != QMessageBox.Yes:
       return
 
-    eliminar_socio(socio["id"])
+    # Eliminar en bloc amb resum de resultats
+    errors = []
+    eliminats = 0
+    for s in seleccionats:
+      try:
+        eliminar_socio(s["id"])
+        eliminats += 1
+      except Exception as e:
+        nom = f"{s['nombre']} {s.get('apellido1','')}".strip()
+        errors.append(f"{nom} (ID {s['id']}): {e}")
+
     self._refresh_socios()
     self.detail.load(None)
+
+    if errors:
+      QMessageBox.warning(
+        self,
+        "Resultat eliminació",
+        f"S'han eliminat {eliminats} de {len(seleccionats)} socis.\nErrors:\n" + "\n".join(errors[:5]) + ("\n…" if len(errors) > 5 else "")
+      )
+    else:
+      QMessageBox.information(self, "Resultat eliminació", f"S'han eliminat {eliminats} socis.")
 
   def _row_changed(self, curr, _prev):
     if not curr.isValid():

@@ -58,6 +58,66 @@ def registrar_socio(datos: dict) -> int:
         return nuevo.id
 
 
+def construir_socio_modelo(datos: dict) -> Socio:
+    """Valida los datos (SocioDTO) y devuelve una instancia ORM `Socio` sin persistir.
+    Útil para importaciones en lote con una sola transacción.
+    """
+    def _label(campo: str) -> str:
+        mapping = {
+            "dniNie": "DNI/NIE",
+            "nombre": "Nom",
+            "apellido1": "1r Cognom",
+            "apellido2": "2n Cognom",
+            "direccion": "Adreça",
+            "telefonoFijo": "Telèfon",
+            "telefonoMovil": "Mòbil",
+            "email": "E-mail",
+            "grupoDifusion": "Grup difusió",
+            "fechaAlta": "Data d'alta",
+            "fechaBaja": "Data de baixa",
+            "observaciones": "Observacions",
+            "foto": "Foto",
+        }
+        return mapping.get(campo, campo)
+
+    try:
+        dto = SocioDTO(**datos)
+    except ValidationError as e:
+        # Formatea errores de validación en mensajes comprensibles
+        msgs = []
+        for err in e.errors():
+            loc = err.get("loc", [])
+            field = loc[-1] if loc else "camp"
+            label = _label(str(field))
+            msg = err.get("msg", "valor invàlid")
+            # Simplifica mensajes comunes
+            if "field required" in msg or "missing" in msg or "required" in msg:
+                msg = "és obligatori"
+            elif "type" in msg or "valid" in msg:
+                msg = "té un format no vàlid"
+            msgs.append(f"{label}: {msg}")
+        raise ValueError("; ".join(msgs) or "Dades invàlides")
+
+    nuevo = Socio(
+        dniNie=dto.dniNie,
+        nombre=dto.nombre,
+        apellido1=dto.apellido1,
+        apellido2=dto.apellido2,
+        direccion=dto.direccion,
+        telefonoFijo=dto.telefonoFijo,
+        telefonoMovil=dto.telefonoMovil,
+        email=dto.email,
+        grupoDifusion=dto.grupoDifusion,
+        fechaAlta=dto.fechaAlta or date.today(),
+        fechaBaja=dto.fechaBaja,
+        observaciones=dto.observaciones,
+        foto=dto.foto,
+    )
+    if "id" in datos and datos["id"] is not None:
+        nuevo.id = datos["id"]
+    return nuevo
+
+
 def modificar_socio(socioID: int, cambios: dict) -> None:
     try:
         dto = SocioUpdateDTO(**cambios)
