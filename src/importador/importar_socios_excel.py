@@ -48,7 +48,7 @@ def importar_socios_desde_excel(
         else:
             raise ValueError("Formato de archivo no soportado. Usa .xlsx, .xls o .csv")
 
-        if df is None or getattr(df, "empty", True):
+        if df is None or df.empty:
             raise EmptyDataError("El archivo no contiene datos.")
 
     except FileNotFoundError:
