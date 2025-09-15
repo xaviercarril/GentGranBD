@@ -1,0 +1,62 @@
+name: Create GitLab Release
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  gitlab-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Prepare and create GitLab release
+        env:
+          GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+          GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}
+          GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GITLAB_TOKEN:-}" ] || [ -z "${GITLAB_PROJECT_ID:-}" ]; then
+            echo "GITLAB_TOKEN and GITLAB_PROJECT_ID secrets must be set." >&2
+            exit 1
+          fi
+
+          API_URL="${GITLAB_API_URL:-https://gitlab.com/api/v4}"
+          TAG="main-${GITHUB_SHA:0:7}"
+          NAME="Release ${TAG}"
+          # Keep description simple to avoid JSON escaping issues
+          BODY="Auto-generated from ${GITHUB_REPOSITORY} push to main. Commit: ${GITHUB_SHA}"
+
+          echo "Creating GitLab release ${TAG} in project ${GITLAB_PROJECT_ID} via ${API_URL}"
+
+          # Create release (creates tag from 'ref' if missing)
+          http_status=$(curl -s -o /tmp/resp.json -w "%{http_code}" --request POST \
+            --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+            --header "Content-Type: application/json" \
+            "${API_URL}/projects/${GITLAB_PROJECT_ID}/releases" \
+            --data "{\"name\": \"${NAME}\", \"tag_name\": \"${TAG}\", \"ref\": \"${GITHUB_SHA}\", \"description\": \"${BODY}\"}")
+
+          if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
+            echo "GitLab release ${TAG} created."
+          elif [ "$http_status" = "409" ]; then
+            echo "Release ${TAG} already exists. Attempting to update description."
+            http_status=$(curl -s -o /tmp/resp.json -w "%{http_code}" --request PUT \
+              --header "PRIVATE-TOKEN: ${GITLAB_TOKEN}" \
+              --header "Content-Type: application/json" \
+              "${API_URL}/projects/${GITLAB_PROJECT_ID}/releases/${TAG}" \
+              --data "{\"description\": \"${BODY}\"}")
+            if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
+              echo "Updated GitLab release ${TAG}."
+            else
+              echo "Failed to update existing release. HTTP $http_status" >&2
+              cat /tmp/resp.json >&2
+              exit 1
+            fi
+          else
+            echo "Failed to create release. HTTP $http_status" >&2
+            cat /tmp/resp.json >&2
+            exit 1
+          fi
+
