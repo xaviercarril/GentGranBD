@@ -57,7 +57,7 @@ def importar_socios_desde_excel(
         raise ValueError("El archivo tiene un formato inválido. Revisa separadores y cabeceras.")
     except Exception as e:
         # Mensaje genérico para cualquier otro error de lectura
-        raise ValueError(f"No se pudo leer el archivo. Verifica que no esté dañado y que el formato sea válido. Detalle: {e}")
+        raise ValueError("No se pudo leer el archivo. Verifica que el formato sea válido y que el archivo no esté dañado.")
 
     df = df.fillna("")  # Reemplaza NaN por cadenas vacías
 
@@ -77,7 +77,7 @@ def importar_socios_desde_excel(
                         "apellido1": str(row.get("1r COGNOM", "")).strip(),
                         "apellido2": str(row.get("2n COGNOM", "")).strip() or None,
                         "dniNie": str(row.get("D.N.I.", "")).strip() or None,
-                        "direccion": str(row.get("ADREÇA", "")).strip() or None,
+                        "direccion": str(row.get("ADREÇA", "") if pd.notna(row.get("ADREÇA")) else "").strip() or None,
                         "telefonoFijo": str(row.get("TELÈFON", "")).strip() or None,
                         "telefonoMovil": str(row.get("MÒBIL", "")).strip() or None,
                         "email": str(row.get("E-MAIL", "")).strip() or None,
