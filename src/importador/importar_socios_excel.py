@@ -52,7 +52,7 @@ def importar_socios_desde_excel(
             raise EmptyDataError("El archivo no contiene datos.")
 
     except FileNotFoundError:
-        raise ValueError(f"No se encontró el archivo: {ruta_archivo}")
+        raise
     except EmptyDataError:
         raise ValueError("El archivo está vacío o no contiene filas válidas.")
     except ParserError:
