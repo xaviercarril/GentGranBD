@@ -51,8 +51,6 @@ def importar_socios_desde_excel(
         if df is None or df.empty:
             raise EmptyDataError("El archivo no contiene datos.")
 
-    except FileNotFoundError:
-        raise
     except EmptyDataError:
         raise ValueError("El archivo está vacío o no contiene filas válidas.")
     except ParserError:
