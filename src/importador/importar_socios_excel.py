@@ -1,3 +1,6 @@
+import os
+import pandas as pd  # lazy import
+from pandas.errors import EmptyDataError, ParserError
 from datetime import datetime
 from typing import Callable, Optional
 from sqlalchemy.exc import IntegrityError
@@ -24,9 +27,38 @@ def importar_socios_desde_excel(
 
     Retorna el número de socios importados (commit único) si todo va bien.
     """
-    import pandas as pd  # lazy import
 
-    df = pd.read_excel(ruta_archivo) if ruta_archivo.endswith((".xls", ".xlsx")) else pd.read_csv(ruta_archivo)
+    # Lectura robusta del archivo con mensajes claros para el usuario
+    try:
+        if not ruta_archivo or not isinstance(ruta_archivo, str):
+            raise ValueError("No se ha proporcionado una ruta de archivo válida.")
+
+        if not os.path.exists(ruta_archivo):
+            raise FileNotFoundError(f"El archivo no se encontró: {ruta_archivo}")
+
+        ext = os.path.splitext(ruta_archivo)[1].lower()
+        if ext in {".xls", ".xlsx"}:
+            df = pd.read_excel(ruta_archivo)
+        elif ext == ".csv":
+            try:
+                df = pd.read_csv(ruta_archivo)
+            except UnicodeDecodeError:
+                # Intento con una codificación común alternativa
+                df = pd.read_csv(ruta_archivo, encoding="latin-1")
+        else:
+            raise ValueError("Formato de archivo no soportado. Usa .xlsx, .xls o .csv")
+
+        if df.empty:
+            raise EmptyDataError("El archivo no contiene datos.")
+
+    except EmptyDataError:
+        raise ValueError("El archivo está vacío o no contiene filas válidas.")
+    except ParserError:
+        raise ValueError("El archivo tiene un formato inválido. Revisa separadores y cabeceras.")
+    except Exception as e:
+        # Mensaje genérico para cualquier otro error de lectura, incluyendo detalles originales
+        raise ValueError(f"No se pudo leer el archivo. Verifica que el formato sea válido y que el archivo no esté dañado. Detalles: {str(e)}")
+
     df = df.fillna("")  # Reemplaza NaN por cadenas vacías
 
     total = len(df)
@@ -41,11 +73,11 @@ def importar_socios_desde_excel(
                 try:
                     datos = {
                         "id": row.get("Nº SOCI", None),
-                        "nombre": row.get("NOM", "").strip(),
-                        "apellido1": row.get("1r COGNOM", "").strip(),
-                        "apellido2": row.get("2n COGNOM", "").strip() or None,
-                        "dniNie": row.get("D.N.I.", "").strip() or None,
-                        "direccion": row.get("ADREÇA", "").strip() or None,
+                        "nombre": str(row.get("NOM", "")).strip(),
+                        "apellido1": str(row.get("1r COGNOM", "")).strip(),
+                        "apellido2": str(row.get("2n COGNOM", "")).strip() or None,
+                        "dniNie": str(row.get("D.N.I.", "")).strip() or None,
+                        "direccion": str(row.get("ADREÇA", "") if pd.notna(row.get("ADREÇA")) else "").strip() or None,
                         "telefonoFijo": str(row.get("TELÈFON", "")).strip() or None,
                         "telefonoMovil": str(row.get("MÒBIL", "")).strip() or None,
                         "email": str(row.get("E-MAIL", "")).strip() or None,
