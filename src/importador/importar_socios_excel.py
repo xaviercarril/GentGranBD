@@ -34,7 +34,7 @@ def importar_socios_desde_excel(
             raise ValueError("No se ha proporcionado una ruta de archivo válida.")
 
         if not os.path.exists(ruta_archivo):
-            raise FileNotFoundError(ruta_archivo)
+            raise FileNotFoundError(f"El archivo no se encontró: {ruta_archivo}")
 
         ext = os.path.splitext(ruta_archivo)[1].lower()
         if ext in {".xls", ".xlsx"}:
@@ -48,7 +48,7 @@ def importar_socios_desde_excel(
         else:
             raise ValueError("Formato de archivo no soportado. Usa .xlsx, .xls o .csv")
 
-        if df is None or df.empty:
+        if df.empty:
             raise EmptyDataError("El archivo no contiene datos.")
 
     except EmptyDataError:
