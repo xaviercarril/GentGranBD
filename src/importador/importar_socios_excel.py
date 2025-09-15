@@ -56,8 +56,8 @@ def importar_socios_desde_excel(
     except ParserError:
         raise ValueError("El archivo tiene un formato inválido. Revisa separadores y cabeceras.")
     except Exception as e:
-        # Mensaje genérico para cualquier otro error de lectura
-        raise ValueError("No se pudo leer el archivo. Verifica que el formato sea válido y que el archivo no esté dañado.")
+        # Mensaje genérico para cualquier otro error de lectura, incluyendo detalles originales
+        raise ValueError(f"No se pudo leer el archivo. Verifica que el formato sea válido y que el archivo no esté dañado. Detalles: {str(e)}")
 
     df = df.fillna("")  # Reemplaza NaN por cadenas vacías
 
