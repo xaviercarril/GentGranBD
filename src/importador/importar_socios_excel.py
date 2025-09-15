@@ -57,9 +57,6 @@ def importar_socios_desde_excel(
         raise ValueError("El archivo está vacío o no contiene filas válidas.")
     except ParserError:
         raise ValueError("El archivo tiene un formato inválido. Revisa separadores y cabeceras.")
-    except ValueError as e:
-        # Re-lanzar ValueError con mensaje ya amigable
-        raise
     except Exception as e:
         # Mensaje genérico para cualquier otro error de lectura
         raise ValueError(f"No se pudo leer el archivo. Verifica que no esté dañado y que el formato sea válido. Detalle: {e}")
