@@ -1,86 +1,102 @@
-from controladores.dtos import firma_to_dto
-from models import FirmaLOPD, Socio
-from sqlalchemy import Column, Integer, String, Date, LargeBinary, ForeignKey
-from sqlalchemy.orm import relationship
-from pydantic import BaseModel, ValidationError
-from database import SessionLocal
-from sqlalchemy.exc import IntegrityError
-from dataclasses import dataclass
+"""Helpers per gestionar la firma digital de la LOPD."""
 
-# ───────────────── CRUD ─────────────────
-def registrar_firmaLOPD(datos: dict) -> int:
-    """Registra una nueva firma LOPD; recibe dict, valida con DTO y devuelve ID."""
+from __future__ import annotations
+
+from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
+
+from controladores.dtos import firma_to_dto, socio_to_dto
+from controladores.dtos_models import FirmaLOPDDTO, FirmaLOPDUpdateDTO
+from database import SessionLocal
+from models import FirmaLOPD, Socio
+
+
+def registrar_firma_lopd(datos: dict) -> None:
+    """Crea o reemplaza la firma LOPD per a un soci."""
+
     try:
         dto = FirmaLOPDDTO(**datos)
-    except ValidationError as e:
-        raise ValueError(f"Datos de entrada inválidos: {e}")
-
-    nueva_firma = FirmaLOPD(
-        socioID=dto.socioID,
-        fecha=dto.fecha,
-        firma=dto.firma
-    )
-
-    try:
-        with SessionLocal() as db:
-            db.add(nueva_firma)
-            db.commit()
-            db.refresh(nueva_firma)
-            return nueva_firma.id
-    except IntegrityError as e:
-        raise ValueError(f"Error al registrar firma LOPD: {e.orig}")
-    
-def modificar_firmaLOPD(socioID: int, cambios: dict) -> None:
-    """Modifica una firma LOPD; recibe ID de socio y dict con cambios."""
-    try:
-        dto = FirmaLOPDUpdateDTO(**cambios)
-    except ValidationError as e:
-        raise ValueError(f"Datos inválidos: {e}")
+    except ValidationError as exc:
+        raise ValueError(f"Dades de firma invàlides: {exc}") from exc
 
     with SessionLocal() as db:
-        firma = db.get(FirmaLOPD, socioID)
+        socio = db.get(Socio, dto.socioID)
+        if not socio:
+            raise ValueError("Soci inexistent")
+
+        firma = db.get(FirmaLOPD, dto.socioID)
         if not firma:
-            raise ValueError("Firma LOPD inexistent")
+            firma = FirmaLOPD(
+                socioID=dto.socioID,
+                fechaFirma=dto.fechaFirma,
+                documento=dto.documento,
+            )
+            db.add(firma)
+        else:
+            firma.fechaFirma = dto.fechaFirma
+            firma.documento = dto.documento
 
         try:
-            for key, value in dto.model_dump().items():
-                setattr(firma, key, value)
             db.commit()
-        except AttributeError as e:
+        except IntegrityError as exc:
             db.rollback()
-            raise ValueError(f"Campo desconocido: {e}")
-        except IntegrityError as e:
-            db.rollback()
-            raise ValueError(f"Error de integridad: {e.orig}")
+            raise ValueError(f"No s'ha pogut registrar la firma LOPD: {exc.orig}") from exc
 
-def consultar_firmaLOPD(socioID: int) -> dict:
-    """Consulta una firma LOPD por ID de socio."""
+
+def modificar_firma_lopd(socio_id: int, canvis: dict) -> None:
+    """Actualitza parcialment una firma LOPD existent."""
+
+    try:
+        dto = FirmaLOPDUpdateDTO(**canvis)
+    except ValidationError as exc:
+        raise ValueError(f"Canvis invàlids: {exc}") from exc
+
     with SessionLocal() as db:
-        firma = db.get(FirmaLOPD, socioID)
+        firma = db.get(FirmaLOPD, socio_id)
         if not firma:
-            raise ValueError("Firma LOPD no encontrada")
+            raise ValueError("La firma LOPD no existeix")
+
+        if dto.fechaFirma is not None:
+            firma.fechaFirma = dto.fechaFirma
+        if dto.documento is not None:
+            firma.documento = dto.documento
+
+        try:
+            db.commit()
+        except IntegrityError as exc:
+            db.rollback()
+            raise ValueError(f"Error en modificar la firma: {exc.orig}") from exc
+
+
+def consultar_firma_lopd(socio_id: int) -> dict | None:
+    """Recupera la firma LOPD d'un soci. Retorna dict o ``None``."""
+
+    with SessionLocal() as db:
+        firma = db.get(FirmaLOPD, socio_id)
+        if not firma:
+            return None
         return firma_to_dto(firma).model_dump()
-        
-def eliminar_firmaLOPD(socioID: int) -> None:
-    """Elimina una firma LOPD por ID de socio."""
+
+
+def eliminar_firma_lopd(socio_id: int) -> None:
+    """Elimina la firma LOPD d'un soci."""
+
     with SessionLocal() as db:
-        firma = db.get(FirmaLOPD, socioID)
+        firma = db.get(FirmaLOPD, socio_id)
         if not firma:
-            raise ValueError("Firma LOPD no encontrada")
+            raise ValueError("La firma LOPD no existeix")
         db.delete(firma)
         db.commit()
 
-# ────────────────── Consultas ──────────────────
-def consultar_socio_por_FirmaLOPD(firma_id: int) -> dict | None:
-    """Consulta un socio por ID de firma LOPD y devuelve sus datos como dict."""
-    try:
-        with SessionLocal() as db:
-            firma = db.get(FirmaLOPD, firma_id)
-            if not firma:
-                return None
-            socio = db.get(Socio, firma.socioID)
-            if not socio:
-                return None
-            return socio.model_dump() if socio else None
-    except Exception as e:
-        raise ValueError(f"Error al consultar socio por firma LOPD: {e}")
+
+def consultar_socio_per_firma(firma_id: int) -> dict | None:
+    """Retorna les dades del soci associat a una firma LOPD."""
+
+    with SessionLocal() as db:
+        firma = db.get(FirmaLOPD, firma_id)
+        if not firma:
+            return None
+        socio = db.get(Socio, firma.socioID)
+        if not socio:
+            return None
+        return socio_to_dto(socio).model_dump()

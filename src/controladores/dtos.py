@@ -90,8 +90,8 @@ def cursoA_to_dto(curso: CursoAcademico) -> CursoAcademicoDTO:
 def firma_to_dto(firma: FirmaLOPD) -> FirmaLOPDDTO:
     return FirmaLOPDDTO(
         socioID=firma.socioID,
-        fecha=firma.fecha,
-        firma=firma.firma
+        fechaFirma=firma.fechaFirma,
+        documento=firma.documento
     )
 
 def lugar_to_dto(lugar: Lugar) -> LugarDTO:
