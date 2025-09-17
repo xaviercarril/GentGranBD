@@ -1,0 +1,255 @@
+\documentclass[12pt]{article}
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\geometry{margin=2.5cm}
+\hypersetup{colorlinks=true,linkcolor=black,urlcolor=black}
+
+\title{Manual de usuario\\Asociaci\'on Gent Gran de Castelldefels -- Gesti\'on}
+\author{}
+\date{\today}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\newpage
+
+\section{Introducci\'on}
+Este programa permite:
+\begin{itemize}[leftmargin=*]
+  \item Gestionar \textbf{Socis}: alta (\textbf{Nou soci}), edici\'on, baja (\textbf{Baixa}) y b\'usqueda.
+  \item Generar \textbf{carnets de soci} en PDF desde \textbf{Socis} con el bot\'on \textbf{Generar Carnet}.
+  \item Administrar \textbf{Activitats}: creaci\'on (\textbf{Nova Activitat}), edici\'on de datos, asignaci\'on de personal, aforo y precio, y eliminaci\'on (\textbf{Eliminar Activitat}).
+  \item Gestionar \textbf{inscripcions i pagaments}: inscribir socios (\textbf{Afegir inscripci\'o}), mover de \texttt{RESERVA} a \texttt{INSCRIT} cuando hay plazas, registrar pagos (\textbf{Afegir pagament}) y eliminarlos.
+  \item Controlar la \textbf{assist\`encia}: generaci\'on de clases (\textbf{Generar classes auto.} o \textbf{Afegir una classe}), marcado de asistencia por fila/columna y exportaci\'on a PDF.
+  \item Gestionar \textbf{LOPD -- Signatura}: generar el PDF, iniciar firma digital en m\'ovil (\textbf{Iniciar firma digital}), guardar o eliminar el documento firmado.
+  \item Administrar \textbf{Cursos Acad\`emics}: crear (\textbf{Nou Curs Acad\`emic}), ajustar fechas de trimestres y eliminar cursos (\textbf{Eliminar Curs Acad\`emic}). Requisito previo para crear activitats y registrar assist\`encia.
+  \item \textbf{Importar Socis} desde CSV/Excel con barra de progreso y resumen de avisos/errores.
+  \item Utilizar b\'usqueda “\textbf{Cerca...}” en tablas y edici\'on con guardado autom\'atico en los paneles de detalle.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por una captura real de la ventana principal si se desea
+  \includegraphics[width=0.9\textwidth]{./images/1_principal.png}
+  \caption{Vista general de la ventana principal.}
+  \label{fig:principal}
+\end{figure}
+
+% Se eliminan Requisitos previos y Puesta en marcha seg\'un especificaci\'on.
+
+\section{Primer uso: crear el curso acad\'emico inicial}
+\label{sec:primer-curso}
+Antes de dar de alta actividades, registrar asistencia o gestionar inscripciones, es imprescindible crear al menos un curso acad\'emico. Sin este paso, el resto de funcionalidades quedar\'a limitado o vac\'io.
+
+\begin{enumerate}[leftmargin=*]
+  \item Abra el men\'u \textbf{Arxiu} y seleccione \textbf{Gestionar Curs Acad\`emic}.
+  \item Pulse \textbf{Nou Curs Acad\`emic} e introduzca el nombre, fecha de inicio y fecha de fin.
+  \item Confirme la creaci\'on. El sistema generar\'a autom\'aticamente los cuatro trimestres.
+  \item Compruebe que el nuevo curso aparece seleccionado y que cada trimestre tiene fechas correctas.
+\end{enumerate}
+
+\textbf{Recordatorio:} Repita estos pasos al inicio de cada nuevo curso acad\'emico. Las actividades, la asistencia y las inscripciones siempre se vinculan a un curso vigente.
+
+\section{Elementos comunes de la interfaz}
+\begin{itemize}[leftmargin=*]
+  \item El men\'u superior \textbf{Arxiu} ofrece acceso a \textbf{Gestionar Curs Acad\`emic} y a \textbf{Importar Socis}.
+  \item Las pesta\~nas principales (\textbf{Socis}, \textbf{Activitats} y \textbf{Personal}) comparten una tabla a la izquierda y un panel de detalle a la derecha con guardado autom\'atico.
+  \item Las cajas “Cerca...” filtran en tiempo real sobre el contenido de la tabla.
+  \item Los botones de acci\'on (crear, eliminar, exportar) muestran mensajes de confirmaci\'on antes de realizar cambios permanentes.
+\end{itemize}
+
+La distribuci\'on general de la ventana principal puede verse en la Figura~\ref{fig:principal}.
+
+\section{Gesti\'on de cursos acad\'emicos}
+\label{sec:cursos}
+Tras crear el primer curso acad\'emico, utilice el mismo di\'alogo para administrar cursos futuros.
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Nou Curs Acad\`emic} crea un nuevo registro con cuatro trimestres predeterminados.
+  \item Seleccione un curso para revisar o ajustar las fechas de cada trimestre; los cambios se guardan al cambiar la fecha.
+  \item \textbf{Eliminar Curs Acad\`emic} borra el curso seleccionado y sus trimestres tras confirmaci\'on.
+\end{itemize}
+
+La interfaz del gestor de cursos se muestra en la Figura~\ref{fig:cursos}.
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura del gestor de cursos acad\'emicos con los trimestres
+  \includegraphics[width=0.9\textwidth]{./images/2_cursosAcademics.png}
+  \caption{Gestor de cursos acad\'emicos.}
+  \label{fig:cursos}
+\end{figure}
+
+\section{Pesta\~na Socis}
+La pesta\~na \textbf{Socis} centraliza el padr\'on de la entidad. V\'ease la Figura~\ref{fig:socis}.
+\begin{itemize}[leftmargin=*]
+  \item Utilice la caja de b\'usqueda para filtrar por nombre, DNI o cualquier otro campo visible.
+  \item El panel de detalle permite editar datos personales, contactos y observaciones; los cambios se guardan autom\'aticamente.
+  \item Active la casilla \textbf{Baixa} para marcar la baja de un socio y definir la fecha correspondiente.
+  \item \textbf{Nou soci} abre el formulario completo de alta, incluida la fotograf\'ia.
+  \item \textbf{Eliminar} borra uno o varios socios previa confirmaci\'on.
+  \item \textbf{Generar Carnet} crea un PDF con el carnet del socio seleccionado.
+  \item Con doble clic se accede al gestor de inscripciones y pagos (Secci\'on~\ref{sec:inscripciones}).
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura de la pesta\~na Socios con la tabla y el panel de detalle
+  \includegraphics[width=0.9\textwidth]{./images/1_principal.png}
+  \caption{Detalle de la pesta\~na Socios.}
+  \label{fig:socis}
+\end{figure}
+
+\subsection{Di\'alogo ``Nou soci''}
+El formulario de alta requiere DNI/NIE, nombre y primer apellido. La foto se carga desde el bot\'on dedicado. Un ejemplo del formulario se muestra en la Figura~\ref{fig:nou-soci}.
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura del di\'alogo ``Nou soci''
+  \includegraphics[width=0.5\textwidth]{./images/4_altaSocios.png}
+  \caption{Di\'alogo de alta de socios.}
+  \label{fig:nou-soci}
+\end{figure}
+
+\subsection{Generar Carnet}
+Para generar el carnet de un socio:
+\begin{enumerate}[leftmargin=*]
+  \item Seleccione un socio en la tabla de \textbf{Socis}.
+  \item Pulse el bot\'on \textbf{Generar Carnet}.
+  \item Elija la ubicaci\'on y el nombre del archivo PDF y confirme. El sistema crear\'a el carnet y lo abrir\'a con el visor predeterminado.
+  \item Si desea imprimirlo, utilice las opciones de impresi\'on del visor de PDF.
+\end{enumerate}
+
+\section{Gesti\'on de inscripcions i pagaments}
+\label{sec:inscripciones}
+El di\'alogo d'inscripcions s'obre amb doble clic sobre un soci. La disposici\'on del di\'alogo puede verse en la Figura~\ref{fig:inscripciones}.
+
+\begin{itemize}[leftmargin=*]
+  \item Filtre por curso acad\'emico con el desplegable superior. Si no hay cursos, cree uno seg\'un la Secci\'on~\ref{sec:primer-curso}.
+  \item \textbf{Afegir inscripci\'o} solicita la actividad y crea la inscripci\'on en estado \texttt{INSCRIT} o \texttt{RESERVA} seg\'un la disponibilidad de plazas.
+  \item \textbf{Eliminar inscripci\'o} libera la plaza y actualiza autom\'aticamente las reservas pendientes.
+  \item La tabla de la derecha muestra los pagos; utilice \textbf{Afegir pagament} o \textbf{Eliminar pagament} para gestionarlos.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura del gestor de inscripciones y pagos
+  \includegraphics[width=0.9\textwidth]{./images/5_pagament.png}
+  \caption{Gesti\'on de inscripciones y pagos.}
+  \label{fig:inscripciones}
+\end{figure}
+
+\section{LOPD y firma digital}
+El asistente de LOPD permite generar y almacenar el documento firmado del socio. El asistente en funcionamiento se muestra en la Figura~\ref{fig:lopd}.
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Desar PDF en...} genera una copia sin firmar para revisarla.
+  \item \textbf{Iniciar firma digital} arranca un servidor local y muestra un enlace que puede abrirse desde un dispositivo m\'ovil de la misma red.
+  \item Cuando se recibe la firma, el sistema guarda el PDF firmado y actualiza la fecha correspondiente.
+  \item Los botones adicionales permiten abrir, exportar o eliminar el documento firmado.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura del asistente LOPD con el enlace activo
+  \includegraphics[width=0.7\textwidth]{./images/6_lopd.png}
+  \caption{Asistente de firma LOPD.}
+  \label{fig:lopd}
+\end{figure}
+
+\section{Pesta\~na Activitats}
+\textbf{Recordatorio:} Antes de crear actividades, aseg\'urese de que existe el curso acad\'emico pertinente (Secci\'on~\ref{sec:primer-curso}). La vista de la pesta\~na se ilustra en la Figura~\ref{fig:activitats}.
+
+\begin{itemize}[leftmargin=*]
+  \item El selector superior elige el curso acad\'emico. Sin curso, el bot\'on \textbf{Nova Activitat} est\'a deshabilitado.
+  \item La tabla muestra nombre, responsable, precio, inscritos y aforo m\'aximo.
+  \item El panel derecho guarda autom\'aticamente cambios en nombre, personal asignado, descripci\'on o aforo.
+  \item \textbf{Nova Activitat} abre el formulario de alta vinculado al curso seleccionado.
+  \item \textbf{Eliminar Activitat} borra la actividad previa confirmaci\'on.
+  \item Con doble clic se accede al gestor de asistencia (Secci\'on~\ref{sec:asistencia}).
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura de la pesta\~na Actividades filtrada por un curso
+  \includegraphics[width=0.8\textwidth]{./images/7_activitats.png}
+  \caption{Detalle de la pesta\~na Actividades.}
+  \label{fig:activitats}
+\end{figure}
+
+\section{Gesti\'on de asistencia}
+\label{sec:asistencia}
+El di\'alogo de asistencia gestiona la parrilla de clases de una actividad. La parrilla y sus controles se ilustran en la Figura~\ref{fig:asistencia}.
+
+\begin{itemize}[leftmargin=*]
+  \item Seleccione el trimestre correspondiente. Si no hay trimestres visibles, revise el curso en la Secci\'on~\ref{sec:cursos}.
+  \item \textbf{Exportar a PDF} genera un informe con todas las sesiones y asistencias.
+  \item \textbf{Generar classes auto.} crea sesiones peri\'odicas seg\'un d\'ias de la semana, horario y frecuencia.
+  \item \textbf{Afegir una classe} permite registrar una sesi\'on puntual.
+  \item Marque o desmarque asistencia de forma individual, por fila (socio) o por columna (clase).
+  \item La tecla \texttt{Supr} elimina las clases seleccionadas tras confirmaci\'on.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura del gestor de asistencia con la parrilla completa
+  \includegraphics[width=0.8\textwidth]{./images/8_asistencia.png}
+  \caption{Parrilla de asistencia.}
+  \label{fig:asistencia}
+\end{figure}
+
+\section{Pesta\~na Personal}
+La pesta\~na \textbf{Personal} agrupa professors y voluntaris en dos subpesta\~nas. Un ejemplo se muestra en la Figura~\ref{fig:personal}.
+
+\begin{itemize}[leftmargin=*]
+  \item Cada subpesta\~na dispone de b\'usqueda, tabla y panel de detalle con guardado autom\'atico.
+  \item Los botones \textbf{Nou Professor} y \textbf{Nou Voluntari} abren los formularios de alta.
+  \item Las acciones de eliminaci\'on requieren confirmaci\'on y actualizan la informaci\'on del panel.
+  \item Los datos del personal alimentan los desplegables de responsables en las actividades.
+\end{itemize}
+
+\begin{figure}[htbp]
+  \centering
+  % Sustituir por captura de la subpesta\~na Professors
+  \includegraphics[width=0.9\textwidth]{./images/9_personal.png}
+  \caption{Subpesta\~na de gesti\'on de personal.}
+  \label{fig:personal}
+\end{figure}
+
+\section{Importar socios}
+El di\'alogo de importaci\'on se encuentra en el men\'u \textbf{Arxiu} con la opci\'on \textbf{Importar Socis (CSV/\allowbreak Excel)}.
+
+\begin{itemize}[leftmargin=*]
+  \item Acepta ficheros \texttt{.xlsx}, \texttt{.xls} o \texttt{.csv}.
+  \item Durante la importaci\'on se muestra una barra de progreso y, al finalizar, un resumen con socios creados, avisos y errores.
+  \item Los avisos se presentan en una ventana desplazable para revisarlos en detalle.
+  \item Al terminar, la pesta\~na Socios se refresca autom\'aticamente.
+\end{itemize}
+
+\section{Mantenimiento y copias de seguridad}
+\begin{itemize}[leftmargin=*]
+  \item Realice copias peri\'odicas del fichero \texttt{gentgran.db}, especialmente antes de importar datos.
+  \item Guarde los PDFs generados (carnets, LOPD, asistencia) en carpetas compartidas para facilitar el acceso del personal autorizado.
+  \item Revise cada trimestre que las fechas de los cursos y trimestres activos sean correctas.
+\end{itemize}
+
+\section{Resoluci\'on de problemas}
+\begin{itemize}[leftmargin=*]
+  \item Si el sistema no se abre, confirme que el sistema operativo ha autorizado el ejecutable y que tiene permisos sobre la carpeta.
+  \item Los errores al guardar datos suelen derivar de campos obligatorios vac\'ios o identificadores duplicados (como el DNI).
+  \item Si fallan las exportaciones a PDF, verifique la ruta de destino y que no est\'e protegida contra escritura.
+  \item En incidencias con la firma LOPD, compruebe que el dispositivo m\'ovil comparte la misma red y que el cortafuegos permite conexiones locales.
+\end{itemize}
+
+\section{Pr\'oximos pasos sugeridos}
+\begin{enumerate}[leftmargin=*]
+  \item Reemplace cada recuadro de figura por la captura correspondiente utilizando \verb|\includegraphics|.
+  \item Compile el documento con \texttt{pdflatex doc/manual\_usuario/manual\_usuario.tex} y distribuya el PDF junto con el ejecutable.
+\end{enumerate}
+
+\end{document}
