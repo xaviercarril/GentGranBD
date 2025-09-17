@@ -30,7 +30,7 @@ from controladores.socios import (
     guardar_documento_firma_LOPD,
     obtener_documento_firma_LOPD,
 )
-from server_firma.server import SignatureServer  # direct import to avoid package export issues
+from server_firma import SignatureServer
 
 
 class LOPDFirmaDialog(QDialog):
