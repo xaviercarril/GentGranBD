@@ -1,8 +1,9 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
-    QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QTimeEdit, QSpinBox, QGroupBox, QWidget, QGridLayout, QTableWidgetSelectionRange
+    QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QTimeEdit, QSpinBox, QGroupBox, QGridLayout
 )
 from PySide6.QtCore import Qt, QTime
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import QFileDialog
 from controladores.socios import consultar_socio
 from controladores.trimestre import listar_clases_por_trimestre
@@ -27,8 +28,16 @@ class AsistenciaDialog(QDialog):
         self.btn_generar_dialog.clicked.connect(self._abrir_dialog_generar)
         self.btn_añadir_manual.clicked.connect(self._abrir_dialog_afegir)
         self.btn_exportar.clicked.connect(self._exportar_asistencia_pdf)
-        
+
+        self._syncing_table = False
         self.table = QTableWidget()
+        self.table.itemChanged.connect(self._on_item_changed)
+        self.table.setSelectionMode(QTableWidget.ExtendedSelection)
+        self.table.setSelectionBehavior(QTableWidget.SelectItems)
+        self.table.horizontalHeader().setSectionsClickable(True)
+        self.table.verticalHeader().setSectionsClickable(True)
+        self.table.verticalHeader().sectionClicked.connect(self._seleccionar_fila)
+        self.table.horizontalHeader().sectionClicked.connect(self._seleccionar_columna)
 
         top_layout = QHBoxLayout()
         label_trimestre = QLabel("Trimestre:")
@@ -61,97 +70,110 @@ class AsistenciaDialog(QDialog):
         clases.sort(key=lambda c: (c["fecha"], c.get("horaInicio")))
         inscripciones = listar_inscripciones_por_Actividad(self.actividadID)
         inscripciones = [i for i in inscripciones if i.get("estado").value == "INSCRIT"]
-        # Inicializar cell_widgets
-        self.cell_widgets = [[None for _ in range(len(clases))] for _ in range(len(inscripciones))]
+        row_count = len(inscripciones)
+        col_count = len(clases)
 
-        self.table.setStyleSheet("""
-            QTableWidget::item {
-                padding: 10px;
-                border: 1px solid #cccccc;
-                background-color: #fdfdfd;
-            }
-            QTableWidget::item:selected {
-                background-color: #d0e8ff;
-            }
-        """)
-        self.table.clear()
-        self.table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
-        self.table.verticalHeader().setDefaultAlignment(Qt.AlignVCenter | Qt.AlignLeft)
-        self.table.setAlternatingRowColors(True)
-        self.table.setShowGrid(True)
-        self.table.setWordWrap(True)
-        self.table.setRowCount(len(inscripciones))
-        self.table.setColumnCount(len(clases))
-        self.table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
-        self.table.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
-        self.table.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
-        self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
-        self.table.setWordWrap(False)
-        self.table.horizontalHeader().setMinimumSectionSize(80)
-        self.table.horizontalHeader().setDefaultSectionSize(90)
-        self.table.horizontalHeader().setStretchLastSection(False)
-        self.table.resizeColumnsToContents()
-        self.table.resizeRowsToContents()
+        self._syncing_table = True
+        try:
+            self.table.setStyleSheet("""
+                QTableWidget::item {
+                    padding: 10px;
+                    border: 1px solid #cccccc;
+                    background-color: #fdfdfd;
+                }
+                QTableWidget::item:selected {
+                    background-color: #d0e8ff;
+                }
+            """)
+            self.table.clear()
+            self.table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
+            self.table.verticalHeader().setDefaultAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+            self.table.setAlternatingRowColors(True)
+            self.table.setShowGrid(True)
+            self.table.setWordWrap(True)
+            self.table.setRowCount(row_count)
+            self.table.setColumnCount(col_count)
+            self.table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
+            self.table.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
+            self.table.setSizeAdjustPolicy(QTableWidget.AdjustToContents)
+            self.table.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.table.setVerticalScrollBarPolicy(Qt.ScrollBarAsNeeded)
+            self.table.setWordWrap(False)
+            self.table.horizontalHeader().setMinimumSectionSize(80)
+            self.table.horizontalHeader().setDefaultSectionSize(90)
+            self.table.horizontalHeader().setStretchLastSection(False)
 
-        # Habilitar el botón de la esquina superior izquierda de la tabla
-        self.table.setCornerButtonEnabled(True)
+            # Habilitar el botón de la esquina superior izquierda de la tabla
+            self.table.setCornerButtonEnabled(True)
 
-        from collections import defaultdict
-        meses = defaultdict(list)
-        for col, clase in enumerate(clases):
-            fecha = clase["fecha"]
-            texto = fecha.strftime("%d/%m")
-            if clase.get("horaInicio") and clase.get("horaFin"):
-                texto += f"\n{clase['horaInicio'].strftime('%H:%M')}–{clase['horaFin'].strftime('%H:%M')}"
-            item = QTableWidgetItem(texto)
-            item.setFlags(Qt.ItemIsEnabled)
-            item.setTextAlignment(Qt.AlignCenter)
-            self.table.setHorizontalHeaderItem(col, item)
-            meses[fecha.strftime("%B %Y")].append(col)
+            self.cell_items = [[None for _ in range(col_count)] for _ in range(row_count)]
+            self.default_cell_colors = [[None for _ in range(col_count)] for _ in range(row_count)]
 
-        # Aplicar color o separación visual por mes
-        for i, (mes, columnas) in enumerate(meses.items()):
-            color = "#e6f2ff" if i % 2 == 0 else "#ffffff"
-            for col in columnas:
-                for row in range(self.table.rowCount()):
-                    cell = self.table.cellWidget(row, col)
-                    if cell:
-                        cell.setStyleSheet(f"background-color: {color}; border-radius: 4px;")
+            from collections import defaultdict
 
-        for row, insc in enumerate(inscripciones):
-            socio = consultar_socio(insc["socioID"])
-            item = QTableWidgetItem(f"{socio['nombre']} {socio['apellido1']}")
-            item.setFlags(Qt.ItemIsEnabled)
-            item.setTextAlignment(Qt.AlignCenter)
-            self.table.setVerticalHeaderItem(row, item)
-            for col in range(len(clases)):
-                cb = QCheckBox()
-                cb.setStyleSheet("QCheckBox { margin-left: auto; margin-right: auto; }")
-                asiste = consultar_asistenciaSocio(insc["socioID"], clases[col]["id"])
-                cb.setChecked(asiste is not None)
-                cb.stateChanged.connect(lambda _, s=insc["socioID"], c=clases[col]["id"], ch=cb: self._guardar_asistencia(s, c, ch))
-                container = QWidget()
-                container.setStyleSheet("background-color: white; border-radius: 4px;")
-                layout = QHBoxLayout(container)
-                layout.addWidget(cb)
-                layout.setAlignment(Qt.AlignCenter)
-                layout.setContentsMargins(0, 0, 0, 0)
-                self.table.setCellWidget(row, col, container)
-                self.cell_widgets[row][col] = container
-        # Habilitar selección completa de filas y columnas
-        self.table.setSelectionMode(QTableWidget.ExtendedSelection)
-        self.table.setSelectionBehavior(QTableWidget.SelectItems)
-        self.table.horizontalHeader().setSectionsClickable(True)
-        self.table.verticalHeader().setSectionsClickable(True)
-        self.table.verticalHeader().sectionClicked.connect(lambda row: self._seleccionar_fila(row))
-        self.table.horizontalHeader().sectionClicked.connect(lambda col: self._seleccionar_columna(col))
+            meses = defaultdict(list)
+            for col, clase in enumerate(clases):
+                fecha = clase["fecha"]
+                texto = fecha.strftime("%d/%m")
+                if clase.get("horaInicio") and clase.get("horaFin"):
+                    texto += f"\n{clase['horaInicio'].strftime('%H:%M')}–{clase['horaFin'].strftime('%H:%M')}"
+                header_item = QTableWidgetItem(texto)
+                header_item.setFlags(Qt.ItemIsEnabled)
+                header_item.setTextAlignment(Qt.AlignCenter)
+                self.table.setHorizontalHeaderItem(col, header_item)
+                meses[fecha.strftime("%B %Y")].append(col)
+
+            colores_por_columna = {}
+            for i, (_, columnas) in enumerate(meses.items()):
+                color = QColor("#e6f2ff") if i % 2 == 0 else QColor("#ffffff")
+                for col in columnas:
+                    colores_por_columna[col] = color
+
+            for row, insc in enumerate(inscripciones):
+                socio = consultar_socio(insc["socioID"])
+                header_item = QTableWidgetItem(f"{socio['nombre']} {socio['apellido1']}")
+                header_item.setFlags(Qt.ItemIsEnabled)
+                header_item.setTextAlignment(Qt.AlignCenter)
+                self.table.setVerticalHeaderItem(row, header_item)
+
+                for col, clase in enumerate(clases):
+                    asistencia = consultar_asistenciaSocio(insc["socioID"], clase["id"])
+                    item = QTableWidgetItem()
+                    item.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                    item.setCheckState(Qt.Checked if asistencia else Qt.Unchecked)
+                    item.setData(Qt.UserRole, (insc["socioID"], clase["id"]))
+                    item.setData(Qt.TextAlignmentRole, Qt.AlignCenter)
+
+                    default_color = colores_por_columna.get(col)
+                    if default_color:
+                        item.setBackground(default_color)
+                    else:
+                        item.setData(Qt.BackgroundRole, None)
+
+                    self.table.setItem(row, col, item)
+                    self.cell_items[row][col] = item
+                    self.default_cell_colors[row][col] = default_color
+
+            self.table.resizeColumnsToContents()
+            self.table.resizeRowsToContents()
+        finally:
+            self._syncing_table = False
 
     def _reset_colores(self):
-        for fila in range(len(self.cell_widgets)):
-            for col in range(len(self.cell_widgets[fila])):
-                if self.cell_widgets[fila][col]:
-                    self.cell_widgets[fila][col].setStyleSheet("background-color: white; border-radius: 4px;")
+        cell_items = getattr(self, "cell_items", [])
+        default_colors = getattr(self, "default_cell_colors", [])
+        for fila in range(len(cell_items)):
+            for col in range(len(cell_items[fila])):
+                item = cell_items[fila][col]
+                if not item:
+                    continue
+                color = None
+                if fila < len(default_colors) and col < len(default_colors[fila]):
+                    color = default_colors[fila][col]
+                if color:
+                    item.setBackground(color)
+                else:
+                    item.setData(Qt.BackgroundRole, None)
 
     def _seleccionar_columna(self, columna):
         # Permitir aplicar cambios a todas las columnas seleccionadas si hay más de una
@@ -160,23 +182,34 @@ class AsistenciaDialog(QDialog):
             for col in columnas:
                 self._seleccionar_columna(col)
             return
+        cell_items = getattr(self, "cell_items", [])
+        if not cell_items:
+            return
+        col_count = len(cell_items[0]) if cell_items else 0
+        if columna < 0 or columna >= col_count:
+            return
+
         self._reset_colores()
         self.table.clearSelection()
         self.table.selectColumn(columna)
-        for fila in range(len(self.cell_widgets)):
-            if self.cell_widgets[fila][columna]:
-                self.cell_widgets[fila][columna].setStyleSheet("background-color: #d0e8ff; border-radius: 4px;")
-        # Marcar/desmarcar todos los checkboxes de la columna
-        todos_marcados = all(
-            self.cell_widgets[fila][columna].findChild(QCheckBox).isChecked()
-            for fila in range(len(self.cell_widgets))
-            if self.cell_widgets[fila][columna]
-        )
-        for fila in range(len(self.cell_widgets)):
-            if self.cell_widgets[fila][columna]:
-                checkbox = self.cell_widgets[fila][columna].findChild(QCheckBox)
-                if checkbox:
-                    checkbox.setChecked(not todos_marcados)
+
+        columna_items = []
+        for fila in range(len(cell_items)):
+            item = cell_items[fila][columna]
+            if not item:
+                continue
+            item.setBackground(QColor("#d0e8ff"))
+            columna_items.append(item)
+
+        if not columna_items:
+            return
+
+        todos_marcados = all(item.checkState() == Qt.Checked for item in columna_items)
+        nuevo_estado = Qt.Unchecked if todos_marcados else Qt.Checked
+
+        for item in columna_items:
+            if item.checkState() != nuevo_estado:
+                item.setCheckState(nuevo_estado)
 
     def _seleccionar_fila(self, fila):
         # Permitir aplicar cambios a todas las filas seleccionadas si hay más de una
@@ -185,23 +218,33 @@ class AsistenciaDialog(QDialog):
             for f in filas:
                 self._seleccionar_fila(f)
             return
+        cell_items = getattr(self, "cell_items", [])
+        if not cell_items:
+            return
+        if fila < 0 or fila >= len(cell_items):
+            return
+
         self._reset_colores()
         self.table.clearSelection()
         self.table.selectRow(fila)
-        for col in range(len(self.cell_widgets[fila])):
-            if self.cell_widgets[fila][col]:
-                self.cell_widgets[fila][col].setStyleSheet("background-color: #d0e8ff; border-radius: 4px;")
-        # Marcar/desmarcar todos los checkboxes de la fila
-        todos_marcados = all(
-            self.cell_widgets[fila][col].findChild(QCheckBox).isChecked()
-            for col in range(len(self.cell_widgets[fila]))
-            if self.cell_widgets[fila][col]
-        )
-        for col in range(len(self.cell_widgets[fila])):
-            if self.cell_widgets[fila][col]:
-                checkbox = self.cell_widgets[fila][col].findChild(QCheckBox)
-                if checkbox:
-                    checkbox.setChecked(not todos_marcados)
+
+        fila_items = []
+        for col in range(len(cell_items[fila])):
+            item = cell_items[fila][col]
+            if not item:
+                continue
+            item.setBackground(QColor("#d0e8ff"))
+            fila_items.append(item)
+
+        if not fila_items:
+            return
+
+        todos_marcados = all(item.checkState() == Qt.Checked for item in fila_items)
+        nuevo_estado = Qt.Unchecked if todos_marcados else Qt.Checked
+
+        for item in fila_items:
+            if item.checkState() != nuevo_estado:
+                item.setCheckState(nuevo_estado)
     
     def keyPressEvent(self, event):
         from PySide6.QtGui import QKeyEvent
@@ -223,8 +266,8 @@ class AsistenciaDialog(QDialog):
                     eliminar_clase(clase["id"])
                 self._cargar_parrilla()
 
-    def _guardar_asistencia(self, socio_id, clase_id, checkbox):
-        if checkbox.isChecked():
+    def _guardar_asistencia(self, socio_id, clase_id, checked):
+        if checked:
             registrar_asistenciaSocio({
                 "socioID": socio_id,
                 "claseID": clase_id,
@@ -232,6 +275,16 @@ class AsistenciaDialog(QDialog):
             })
         else:
             eliminar_asistenciaSocio(socio_id, clase_id)
+
+    def _on_item_changed(self, item):
+        if self._syncing_table:
+            return
+        data = item.data(Qt.UserRole)
+        if not data or not isinstance(data, tuple) or len(data) != 2:
+            return
+        socio_id, clase_id = data
+        checked = item.checkState() == Qt.Checked
+        self._guardar_asistencia(socio_id, clase_id, checked)
 
     def _abrir_dialog_generar(self):
         dlg = GenerarClasesDialog(self.actividadID, self.cursoAcademicoID, self)
