@@ -16,7 +16,7 @@ from pydantic import BaseModel, ValidationError
 from controladores.dtos_models import SocioDTO, SocioUpdateDTO
 from database import SessionLocal  # fábrica de sesiones
 from models import AsistenciaSocio, FirmaLOPD, InscripcionSocio, Socio
-from controladores.dtos import asistencia_to_dto, inscripcion_to_dto, socio_to_dto
+from controladores.dtos import asistencia_to_dto, inscripcion_to_dto, socio_to_dto, firma_to_dto
 
 # ───────────────── CRUD ─────────────────
 def registrar_socio(datos: dict) -> int:
