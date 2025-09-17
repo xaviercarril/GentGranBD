@@ -8,6 +8,7 @@ from __future__ import annotations
 
 
 from datetime import date
+from pathlib import Path
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
 
@@ -15,7 +16,7 @@ from pydantic import BaseModel, ValidationError
 from controladores.dtos_models import SocioDTO, SocioUpdateDTO
 from database import SessionLocal  # fábrica de sesiones
 from models import AsistenciaSocio, FirmaLOPD, InscripcionSocio, Socio
-from controladores.dtos import asistencia_to_dto, firma_to_dto, inscripcion_to_dto, socio_to_dto
+from controladores.dtos import asistencia_to_dto, inscripcion_to_dto, socio_to_dto
 
 # ───────────────── CRUD ─────────────────
 def registrar_socio(datos: dict) -> int:
@@ -237,15 +238,66 @@ def listar_inscripciones_por_socio(socioID: int) -> list[dict]:
         raise ValueError(f"Error al listar inscripciones: {e}")
     
 def consultar_firma_LOPD(socioID: int) -> dict | None:
-    """Consulta la firma LOPD de un socio."""
+    """Consulta l'estat de la firma LOPD d'un soci (sense recuperar el PDF)."""
     try:
         with SessionLocal() as db:
             firma = db.get(FirmaLOPD, socioID)
             if not firma:
                 return None
-            return firma_to_dto(firma).model_dump()
+            return {
+                "socioID": firma.socioID,
+                "fechaFirma": firma.fechaFirma,
+                "tieneDocumento": bool(firma.documento),
+            }
     except Exception as e:
         raise ValueError(f"Error al consultar firma LOPD: {e}")
+
+
+def obtener_documento_firma_LOPD(socioID: int) -> tuple[bytes, date]:
+    """Retorna el PDF signat i la data de firma."""
+
+    try:
+        with SessionLocal() as db:
+            firma = db.get(FirmaLOPD, socioID)
+            if not firma or not firma.documento:
+                raise ValueError("No hi ha cap document signat")
+            return firma.documento, firma.fechaFirma
+    except Exception as e:
+        raise ValueError(f"Error al obtenir el document LOPD: {e}")
+
+
+def guardar_documento_firma_LOPD(socioID: int, documento: bytes, fechaFirma: date | None = None) -> None:
+    """Crea o actualitza el PDF signat de la LOPD."""
+
+    if not documento:
+        raise ValueError("El document rebut està buit")
+
+    fecha = fechaFirma or date.today()
+
+    with SessionLocal() as db:
+        socio = db.get(Socio, socioID)
+        if not socio:
+            raise ValueError("Soci inexistent")
+
+        firma = db.get(FirmaLOPD, socioID)
+        if not firma:
+            firma = FirmaLOPD(socioID=socioID, fechaFirma=fecha, documento=documento)
+            db.add(firma)
+        else:
+            firma.fechaFirma = fecha
+            firma.documento = documento
+        db.commit()
+
+
+def eliminar_documento_firma_LOPD(socioID: int) -> None:
+    """Elimina el PDF signat de la LOPD per a un soci."""
+
+    with SessionLocal() as db:
+        firma = db.get(FirmaLOPD, socioID)
+        if not firma:
+            raise ValueError("No hi ha cap document registrat")
+        db.delete(firma)
+        db.commit()
     
 # ────────────────── Exportación ──────────────────
 
@@ -265,10 +317,16 @@ def generar_carnet_pdf(socioID: int, ruta_pdf: str) -> None:
         generar_carnet_socio(db, socioID, ruta_pdf, logo_path=logo_path)
 
 # Añadido: generar_pdf_LOPD para exportar consentimiento de protección de datos
-def generar_pdf_LOPD(socioID: int, ruta_pdf: str) -> None:
-    """
-    Genera el PDF de consentiment de protecció de dades (LOPD) per a un soci.
-    """
+def generar_pdf_LOPD(
+    socioID: int,
+    ruta_pdf: str,
+    *,
+    firma: bytes | str | Path | None = None,
+    fechaFirma: date | None = None,
+    abrir: bool = True,
+) -> None:
+    """Genera el PDF LOPD; pot incrustar una signatura si es facilita."""
+
     from exportador.pdf_LOPD import generar_pdf_lopd
 
     with SessionLocal() as db:
@@ -276,4 +334,11 @@ def generar_pdf_LOPD(socioID: int, ruta_pdf: str) -> None:
         if not socio:
             raise ValueError("Soci inexistent")
         nombre_completo = f"{socio.nombre} {socio.apellido1 or ''} {socio.apellido2 or ''}".strip()
-        generar_pdf_lopd(nombre_completo, socio.dniNie, ruta_pdf)
+        generar_pdf_lopd(
+            nombre_completo,
+            socio.dniNie,
+            ruta_pdf,
+            firma=firma,
+            fecha_firma=fechaFirma,
+            abrir=abrir,
+        )

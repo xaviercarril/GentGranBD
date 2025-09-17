@@ -1,12 +1,21 @@
 import sys
+import os
+from pathlib import Path
+import shutil
+
+# Ensure running as a script works (python src/ui/app.py)
+try:
+    _src_dir = Path(__file__).resolve().parents[1]
+    if str(_src_dir) not in sys.path:
+        sys.path.insert(0, str(_src_dir))
+except Exception:
+    pass
+
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QIcon
 from ui.main_window import MainWindow
 from database import engine
 from models import Base
-from pathlib import Path
-import os
-import shutil
 
 def main():
     # 1) Pick a sensible working directory that contains our resources
