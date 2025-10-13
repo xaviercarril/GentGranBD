@@ -129,6 +129,7 @@ class SocioDTO(BaseModel):
 
 
 class SocioUpdateDTO(BaseModel):
+    id: int | None = None
     dniNie: str | None = None
     nombre: str | None = None
     apellido1: str | None = None

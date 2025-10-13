@@ -1,7 +1,50 @@
 # Nuevo módulo para convertir instancias de SQLAlchemy a DTOs
+import math
+from decimal import Decimal
 from datetime import datetime
 from controladores.dtos_models import AsistenciaSocioDTO, ClaseDTO, CursoAcademicoDTO, FirmaLOPDDTO, InscripcionSocioDTO, LugarDTO, PagoDTO, SocioDTO, ActividadDTO, PersonalDTO, TrimestreDTO
 from models import AsistenciaSocio, Clase, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Pago, Socio, Actividad, Personal, Trimestre
+
+
+def normalize_phone(value) -> str | None:
+    """Normalitza telèfons provinents de decimals o floats (p. ex. '6.0')."""
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return "1" if value else "0"
+
+    if isinstance(value, int):
+        return str(value)
+
+    if isinstance(value, float):
+        if math.isnan(value):
+            return None
+        if value.is_integer():
+            return str(int(value))
+        text = format(value, "f").rstrip("0").rstrip(".")
+        return text or "0"
+
+    if isinstance(value, Decimal):
+        if value == value.to_integral():
+            return str(int(value))
+        text = format(value, "f").rstrip("0").rstrip(".")
+        return text or "0"
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    lowered = text.lower()
+    if lowered in {"nan", "none", "na"}:
+        return None
+
+    if "." in text:
+        whole, frac = text.split(".", 1)
+        if frac and set(frac) <= {"0"}:
+            text = whole
+
+    return text
 
 
 def inscripcion_to_dto(inscripcion: InscripcionSocio) -> InscripcionSocioDTO:
@@ -24,8 +67,8 @@ def socio_to_dto(socio: Socio) -> SocioDTO:
         apellido1=socio.apellido1,
         apellido2=socio.apellido2,
         direccion=socio.direccion,
-        telefonoFijo=socio.telefonoFijo,
-        telefonoMovil=socio.telefonoMovil,
+        telefonoFijo=normalize_phone(socio.telefonoFijo),
+        telefonoMovil=normalize_phone(socio.telefonoMovil),
         email=socio.email,
         grupoDifusion=socio.grupoDifusion,
         fechaAlta=socio.fechaAlta,

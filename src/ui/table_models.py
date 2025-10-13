@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
 
 
@@ -38,8 +40,22 @@ class DictTableModel(QAbstractTableModel):
         value = self.rows[idx.row()].get(key, "")
 
         # Mostra cel·la buida quan el valor és None
-        return "----" if value is None else str(value)
-        
+        if value is None:
+            return "----"
+
+        if isinstance(value, Decimal):
+            # Manté números enters sense decimals (ex. telèfons emmagatzemats com a decimals)
+            text = format(value, "f")
+            return text.rstrip("0").rstrip(".") or "0"
+
+        if isinstance(value, float):
+            if value.is_integer():
+                return str(int(value))
+            text = f"{value}"
+            return text.rstrip("0").rstrip(".") or "0"
+
+        return str(value)
+
     def headerData(self, sec, orient, role=Qt.DisplayRole):
         if role == Qt.DisplayRole and orient == Qt.Horizontal:
             return self.labels[sec]
