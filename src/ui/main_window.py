@@ -1,3 +1,8 @@
+import json
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
+
 from PySide6.QtWidgets import (
     QMainWindow, QTabWidget, QApplication, QMenuBar, QMenu
 )
@@ -56,6 +61,15 @@ class MainWindow(QMainWindow):
         action_importar_socis = QAction("Importar Socis (CSV/Excel)", self)
         action_importar_socis.triggered.connect(self._importar_socis)
         menu_arxiu.addAction(action_importar_socis)
+        menu_arxiu.addSeparator()
+
+        action_backup_db = QAction("Còpia de seguretat de la BD…", self)
+        action_backup_db.triggered.connect(self._backup_database)
+        menu_arxiu.addAction(action_backup_db)
+
+        action_restore_db = QAction("Restaurar BD des d'una còpia…", self)
+        action_restore_db.triggered.connect(self._restore_database)
+        menu_arxiu.addAction(action_restore_db)
 
     def _mostrar_dialog_nou_curs(self):
         from ui.tab_cursoAcademico import CursoAcademicoDialog
@@ -148,3 +162,182 @@ class MainWindow(QMainWindow):
         buttons.accepted.connect(dlg.accept)
         layout.addWidget(buttons)
         dlg.exec()
+
+    def _backup_meta_path(self) -> Path:
+        from database import _user_data_dir
+        return Path(_user_data_dir()) / "backup_info.json"
+
+    def _get_last_backup_timestamp(self) -> datetime | None:
+        path = self._backup_meta_path()
+        if not path.exists():
+            return None
+        try:
+            data = json.loads(path.read_text())
+            iso_value = data.get("last_backup_iso")
+            if not iso_value:
+                return None
+            return datetime.fromisoformat(iso_value)
+        except Exception:
+            return None
+
+    def _set_last_backup_timestamp(self, ts: datetime) -> None:
+        path = self._backup_meta_path()
+        try:
+            path.write_text(json.dumps({"last_backup_iso": ts.isoformat()}))
+        except Exception:
+            pass
+
+    def _should_prompt_backup(self) -> bool:
+        last = self._get_last_backup_timestamp()
+        if not last:
+            return True
+        return datetime.now() - last > timedelta(days=7)
+
+    def _backup_database(self):
+        from database import engine
+
+        db_location = engine.url.database
+        if not db_location:
+            QMessageBox.critical(self, "Error", "No s'ha pogut determinar la ruta de la base de dades.")
+            return
+
+        db_path = Path(db_location)
+        if not db_path.exists():
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No s'ha trobat la base de dades a {db_path}",
+            )
+            return
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        suggested = f"{db_path.stem}_backup_{timestamp}{db_path.suffix or '.db'}"
+        default_dir = db_path.parent if db_path.parent.exists() else Path.home()
+        target_str, _ = QFileDialog.getSaveFileName(
+            self,
+            "Desar còpia de seguretat",
+            str(default_dir / suggested),
+            "SQLite (*.db);;Tots els arxius (*)",
+        )
+        if not target_str:
+            return
+
+        target_path = Path(target_str)
+        try:
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(db_path, target_path)
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Error en la còpia",
+                f"No s'ha pogut crear la còpia de seguretat:\n{exc}",
+            )
+            return
+
+        self._set_last_backup_timestamp(datetime.now())
+
+        QMessageBox.information(
+            self,
+            "Còpia creada",
+            f"Base de dades copiada a:\n{target_path}",
+        )
+
+    def _restore_database(self):
+        from database import engine
+
+        db_location = engine.url.database
+        if not db_location:
+            QMessageBox.critical(self, "Error", "No s'ha pogut determinar la ruta de la base de dades.")
+            return
+
+        db_path = Path(db_location)
+        target_dir = db_path.parent if db_path.parent.exists() else Path.home()
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Restaurar base de dades")
+        box.setText(
+            "Aquesta acció sobreescriurà la base de dades actual amb "
+            "el fitxer seleccionat.\nVols continuar?"
+        )
+        box.setIcon(QMessageBox.Warning)
+        box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        box.button(QMessageBox.Yes).setText("Sí")
+        box.button(QMessageBox.No).setText("No")
+        reply = box.exec()
+        if reply != QMessageBox.Yes:
+            return
+
+        source_str, _ = QFileDialog.getOpenFileName(
+            self,
+            "Selecciona la còpia de seguretat",
+            str(target_dir),
+            "SQLite (*.db);;Tots els arxius (*)",
+        )
+        if not source_str:
+            return
+
+        source_path = Path(source_str)
+        if not source_path.exists():
+            QMessageBox.critical(
+                self,
+                "Error",
+                f"No s'ha trobat el fitxer seleccionat:\n{source_path}",
+            )
+            return
+
+        if source_path.resolve() == db_path.resolve():
+            QMessageBox.information(
+                self,
+                "Cap acció realitzada",
+                "El fitxer seleccionat és la base de dades actual.",
+            )
+            return
+
+        tmp_target = db_path.with_name(db_path.name + ".tmp_restore")
+        try:
+            db_path.parent.mkdir(parents=True, exist_ok=True)
+            engine.dispose()  # Allibera connexions actives abans de sobreescriure
+            shutil.copy2(source_path, tmp_target)
+            shutil.move(tmp_target, db_path)
+        except Exception as exc:
+            if tmp_target.exists():
+                tmp_target.unlink(missing_ok=True)
+            QMessageBox.critical(
+                self,
+                "Error en la restauració",
+                f"No s'ha pogut restaurar la base de dades:\n{exc}",
+            )
+            return
+
+        QMessageBox.information(
+            self,
+            "Restauració completada",
+            f"Base de dades restaurada des de:\n{source_path}",
+        )
+        try:
+            self.socios_tab.refresh()
+        except Exception:
+            pass
+
+    def closeEvent(self, event):
+        try:
+            prompt_needed = self._should_prompt_backup()
+        except Exception:
+            prompt_needed = False
+
+        if prompt_needed:
+            box = QMessageBox(self)
+            box.setWindowTitle("Còpia de seguretat recomanada")
+            box.setText(
+                "Fa més d'una setmana que no es fa cap còpia de seguretat.\n"
+                "Vols fer-ne una ara?"
+            )
+            box.setIcon(QMessageBox.Question)
+            box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            box.button(QMessageBox.Yes).setText("Sí")
+            box.button(QMessageBox.No).setText("No")
+            reply = box.exec()
+            if reply == QMessageBox.Yes:
+                self._backup_database()
+
+        super().closeEvent(event)
