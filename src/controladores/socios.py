@@ -15,12 +15,25 @@ from pydantic import BaseModel, ValidationError
 
 from controladores.dtos_models import SocioDTO, SocioUpdateDTO
 from database import SessionLocal  # fábrica de sesiones
-from models import AsistenciaSocio, FirmaLOPD, InscripcionSocio, Socio
-from controladores.dtos import asistencia_to_dto, inscripcion_to_dto, socio_to_dto, firma_to_dto
+from models import AsistenciaSocio, FirmaLOPD, InscripcionSocio, Socio, Pago
+from controladores.dtos import asistencia_to_dto, inscripcion_to_dto, socio_to_dto, firma_to_dto, normalize_phone
+
+
+def _normalize_phone_fields(datos: dict | None) -> dict:
+    """Devuelve una còpia amb els telèfons sense decimals."""
+    if datos is None:
+        return {}
+    cleaned = dict(datos)
+    if "telefonoFijo" in cleaned:
+        cleaned["telefonoFijo"] = normalize_phone(cleaned.get("telefonoFijo"))
+    if "telefonoMovil" in cleaned:
+        cleaned["telefonoMovil"] = normalize_phone(cleaned.get("telefonoMovil"))
+    return cleaned
 
 # ───────────────── CRUD ─────────────────
 def registrar_socio(datos: dict) -> int:
     """Crea un socio y devuelve su ID."""
+    datos = _normalize_phone_fields(datos)
     try:
         dto = SocioDTO(**datos)
     except ValidationError as e:
@@ -49,9 +62,14 @@ def registrar_socio(datos: dict) -> int:
         db.add(nuevo)
         try:
             db.commit()
-        except IntegrityError:
+        except IntegrityError as e:
             db.rollback()
-            raise ValueError("Error al registrar socio: DNI/NIE duplicado")
+            msg = str(e.orig).lower() if hasattr(e, "orig") else str(e).lower()
+            if "dni" in msg or "nie" in msg:
+                raise ValueError("Error al registrar soci: DNI/NIE duplicat")
+            if "id" in msg or "primary" in msg:
+                raise ValueError("Error al registrar soci: ID duplicat")
+            raise ValueError("Error al registrar soci: dades duplicades")
         except Exception as e:
             db.rollback()
             raise ValueError(f"Error inesperado al registrar socio: {e}")
@@ -63,6 +81,8 @@ def construir_socio_modelo(datos: dict) -> Socio:
     """Valida los datos (SocioDTO) y devuelve una instancia ORM `Socio` sin persistir.
     Útil para importaciones en lote con una sola transacción.
     """
+    datos = _normalize_phone_fields(datos)
+
     def _label(campo: str) -> str:
         mapping = {
             "dniNie": "DNI/NIE",
@@ -120,6 +140,7 @@ def construir_socio_modelo(datos: dict) -> Socio:
 
 
 def modificar_socio(socioID: int, cambios: dict) -> None:
+    cambios = _normalize_phone_fields(cambios)
     try:
         dto = SocioUpdateDTO(**cambios)
     except ValidationError as e:
@@ -131,15 +152,42 @@ def modificar_socio(socioID: int, cambios: dict) -> None:
             raise ValueError("Soci inexistent")
 
         try:
-            for k, v in dto.model_dump(exclude_unset=True).items():
+            aplicats = dto.model_dump(exclude_unset=True)
+            nou_id = aplicats.pop("id", None)
+
+            for k, v in aplicats.items():
                 setattr(socio, k, v)
+
+            if nou_id is not None and nou_id != socio.id:
+                if nou_id <= 0:
+                    raise ValueError("L'ID ha de ser un enter positiu.")
+                existent = db.get(Socio, nou_id)
+                if existent:
+                    raise ValueError(f"Ja existeix un soci amb l'ID {nou_id}.")
+
+                te_inscripcions = db.query(InscripcionSocio).filter(InscripcionSocio.socioID == socio.id).first()
+                te_asistencies = db.query(AsistenciaSocio).filter(AsistenciaSocio.socioID == socio.id).first()
+                te_pagaments = db.query(Pago).filter(Pago.socioID == socio.id).first()
+                te_lopd = db.query(FirmaLOPD).filter(FirmaLOPD.socioID == socio.id).first()
+                if any((te_inscripcions, te_asistencies, te_pagaments, te_lopd)):
+                    raise ValueError("No es pot modificar l'ID d'un soci que té registres relacionats.")
+
+                socio.id = nou_id
             db.commit()
+        except ValueError:
+            db.rollback()
+            raise
         except AttributeError as e:
             db.rollback()
             raise ValueError(f"Camp desconegut: {e}")
         except IntegrityError as e:
             db.rollback()
-            raise ValueError(f"Error al modificar socio: {e.orig}")
+            msg = str(e.orig).lower() if hasattr(e, "orig") else str(e).lower()
+            if "dni" in msg or "nie" in msg:
+                raise ValueError("Error al modificar soci: DNI/NIE duplicat.")
+            if "id" in msg or "primary" in msg:
+                raise ValueError("Error al modificar soci: ID duplicat.")
+            raise ValueError(f"Error al modificar soci: {e.orig}")
 
 def consultar_socio(socioID: int) -> dict | None:
     """Retorna TOT el soci (inclosa foto) com a dict o None."""
@@ -194,7 +242,13 @@ def listar_socios() -> list[dict]:
             socios = db.query(Socio).all()
             if not socios:
                 return None
-            return [socio_to_dto(s).model_dump() for s in socios]
+            result = []
+            for s in socios:
+                data = socio_to_dto(s).model_dump()
+                data["telefonoFijo"] = normalize_phone(data.get("telefonoFijo"))
+                data["telefonoMovil"] = normalize_phone(data.get("telefonoMovil"))
+                result.append(data)
+            return result
     except Exception as e:
         raise ValueError(f"Error al llistar socis: {e}")
 

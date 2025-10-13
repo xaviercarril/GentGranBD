@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (
     QWidget, QFormLayout, QLineEdit, QDateEdit, QTextEdit,
     QPushButton, QLabel, QFileDialog, QHBoxLayout, QMessageBox, QCheckBox
 )
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QIntValidator
 from PySide6.QtCore import Qt, QDate, Signal
 
 from controladores.socios import (
@@ -23,6 +23,10 @@ class SocioDetailWidget(QWidget):
         self._id: int | None = None
         self._foto_path: str | None = None   # ruta temporal de la nova foto
         # ── widgets ──
+        self.id_field = QLineEdit()
+        self.id_field.setFixedWidth(300)
+        self.id_field.setPlaceholderText("S'assigna automàticament si es deixa en blanc")
+        self.id_field.setValidator(QIntValidator(0, 999999999, self))
         self.dni = QLineEdit()
         self.dni.setFixedWidth(300)
         self.nom = QLineEdit()
@@ -68,6 +72,7 @@ class SocioDetailWidget(QWidget):
         # ── layout ──
         f = QFormLayout(self)
         f.addRow("Foto:", foto_box)
+        f.addRow("ID soci:", self.id_field)
         f.addRow("DNI/NIE*:", self.dni)
         f.addRow("Nom*:", self.nom)
         f.addRow("1r Cognom*:", self.c1); f.addRow("2n Cognom:", self.c2)
@@ -86,6 +91,7 @@ class SocioDetailWidget(QWidget):
         for w in (self.dni, self.nom, self.c1, self.c2, self.dir,
                   self.tf, self.tm, self.email, self.grup):
             w.editingFinished.connect(self._guardar)
+        self.id_field.editingFinished.connect(self._guardar)
         self.fe_alta.dateChanged.connect(self._guardar)
         self.fe_baixa.dateChanged.connect(self._guardar)
         self.obs.textChanged.connect(self._guardar)
@@ -106,6 +112,11 @@ class SocioDetailWidget(QWidget):
         if not s:
             self._clear(); self._loading = False; return
         # assigna
+        self._id = s.get("id", socioID)
+        if self._id is not None:
+            self.id_field.setText(str(self._id))
+        else:
+            self.id_field.clear()
         self.dni.setText(s["dniNie"]);   self.nom.setText(s["nombre"])
         self.c1.setText(s.get("apellido1", "") or ""); self.c2.setText(s.get("apellido2", "") or "")
         self.dir.setText(s.get("direccion", "") or "")
@@ -136,6 +147,7 @@ class SocioDetailWidget(QWidget):
     def _clear(self):
         for w in (self.dni, self.nom, self.c1, self.c2, self.dir, self.tf,
                   self.tm, self.email, self.grup): w.clear()
+        self.id_field.clear()
         self.fe_alta.clear(); self.fe_baixa.clear(); self.obs.clear()
         self.cb_baixa.setChecked(False)
         self.fe_baixa.setEnabled(False)
@@ -197,6 +209,17 @@ class SocioDetailWidget(QWidget):
             ),
             "observaciones": self.obs.toPlainText() or None,
         }
+        id_text = self.id_field.text().strip()
+        if id_text:
+            try:
+                valor_id = int(id_text)
+                if valor_id <= 0:
+                    raise ValueError("L'ID ha de ser un enter positiu.")
+                data["id"] = valor_id
+            except ValueError as exc:
+                raise ValueError("L'ID ha de ser un número enter.") from exc
+        elif self._id is not None:
+            data["id"] = self._id
         # Només afegim la foto si l'usuari n'ha seleccionat una de nova
         if self._foto_path:
             with open(self._foto_path, "rb") as fh:
@@ -211,13 +234,26 @@ class SocioDetailWidget(QWidget):
         if not self._validar():
             return
 
-        data = self._build_data()
+        try:
+            data = self._build_data()
+        except ValueError as e:
+            QMessageBox.warning(self, "Error", str(e))
+            if self._id is not None:
+                self.id_field.setText(str(self._id))
+            return
+
+        nou_id = data.get("id", self._id)
         try:
             modificar_socio(self._id, data)
             self._foto_path = None          # reset because it's saved
+            if nou_id is not None:
+                self._id = nou_id
+                self.id_field.setText(str(nou_id))
             self.saved.emit()               # notifica MainWindow per refrescar taula
         except ValueError as e:
             QMessageBox.warning(self, "Error", str(e))
+            if self._id is not None:
+                self.id_field.setText(str(self._id))
             return
 
         # Widget no és QDialog; no cal accept()

@@ -2,11 +2,10 @@ from PySide6.QtWidgets import (
     QDialog, QFormLayout, QLineEdit, QDateEdit, QTextEdit, QPushButton,
     QFileDialog, QLabel, QHBoxLayout, QMessageBox
 )
-from PySide6.QtGui import QPixmap
+from PySide6.QtGui import QPixmap, QIntValidator
 from PySide6.QtCore import Qt, QDate
 from datetime import date
 from controladores.socios import registrar_socio, modificar_socio
-import os
 
 
 class SocioDialog(QDialog):
@@ -22,6 +21,9 @@ class SocioDialog(QDialog):
         self.setWindowTitle("Editar soci" if socio else "Nou soci")
 
         # ── Widgets ──────────────────────────────────────────
+        self.id_input = QLineEdit()
+        self.id_input.setPlaceholderText("Automàtic si es deixa en blanc")
+        self.id_input.setValidator(QIntValidator(0, 999999999, self))
         self.dni = QLineEdit();      self.nom = QLineEdit()
         self.c1 = QLineEdit();       self.c2 = QLineEdit()
         self.dir = QLineEdit()
@@ -38,6 +40,7 @@ class SocioDialog(QDialog):
 
         # ── Disseny ──────────────────────────────────────────
         form = QFormLayout(self)
+        form.addRow("ID soci:", self.id_input)
         form.addRow("DNI/NIE *:", self.dni)
         form.addRow("Nom *:", self.nom)
         form.addRow("1r Cognom *:", self.c1)
@@ -60,6 +63,9 @@ class SocioDialog(QDialog):
         btn_save = QPushButton("Desar")
         btn_save.clicked.connect(self._guardar)
         form.addRow(btn_save)
+
+        if socio:
+            self._carregar_socio(socio)
 
     # ─────────────────────────────────────────────────────────
     # Utils
@@ -87,6 +93,16 @@ class SocioDialog(QDialog):
         return True
 
     def _build_data(self) -> dict:
+        id_text = self.id_input.text().strip()
+        id_value = None
+        if id_text:
+            try:
+                id_value = int(id_text)
+                if id_value <= 0:
+                    raise ValueError("L'ID ha de ser un enter positiu.")
+            except ValueError as exc:
+                raise ValueError("L'ID ha de ser un número enter vàlid.") from exc
+
         data = {
             "dniNie": self.dni.text().strip(),
             "nombre": self.nom.text().strip(),
@@ -101,6 +117,10 @@ class SocioDialog(QDialog):
             "fechaBaja": None,
             "observaciones": self.obs.toPlainText() or None,
         }
+        if id_value is not None:
+            data["id"] = id_value
+        elif self._edit_mode and self._socioID is not None:
+            data["id"] = self._socioID
         if self._foto_path:
             with open(self._foto_path, "rb") as fh:
                 data["foto"] = fh.read()
@@ -110,10 +130,20 @@ class SocioDialog(QDialog):
         if not self._validar():
             return
 
-        data = self._build_data()
+        try:
+            data = self._build_data()
+        except ValueError as e:
+            QMessageBox.warning(self, "Error", str(e))
+            if self._edit_mode and self._socioID is not None:
+                self.id_input.setText(str(self._socioID))
+            return
+
         try:
             if self._edit_mode:
                 modificar_socio(self._socioID, data)
+                if data.get("id") is not None:
+                    self._socioID = data["id"]
+                    self.id_input.setText(str(self._socioID))
             else:
                 registrar_socio(data)
         except ValueError as e:
@@ -121,3 +151,23 @@ class SocioDialog(QDialog):
             return
 
         self.accept()
+
+    def _carregar_socio(self, socio: dict):
+        """Omple el formulari amb les dades existents."""
+        self.id_input.setText(str(socio.get("id", "") or ""))
+        self.dni.setText(socio.get("dniNie", "") or "")
+        self.nom.setText(socio.get("nombre", "") or "")
+        self.c1.setText(socio.get("apellido1", "") or "")
+        self.c2.setText(socio.get("apellido2", "") or "")
+        self.dir.setText(socio.get("direccion", "") or "")
+        self.tel_fix.setText(socio.get("telefonoFijo", "") or "")
+        self.tel_mob.setText(socio.get("telefonoMovil", "") or "")
+        self.email.setText(socio.get("email", "") or "")
+        self.grup.setText(socio.get("grupoDifusion", "") or "")
+        fecha_alta = socio.get("fechaAlta")
+        if fecha_alta:
+            if isinstance(fecha_alta, date):
+                self.data_alta.setDate(QDate(fecha_alta.year, fecha_alta.month, fecha_alta.day))
+            else:
+                self.data_alta.setDate(QDate.fromString(str(fecha_alta)))
+        self.obs.setPlainText(socio.get("observaciones", "") or "")
