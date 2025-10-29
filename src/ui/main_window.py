@@ -82,7 +82,10 @@ class MainWindow(QMainWindow):
             prog = None
             try:
                 # Lazy import to avoid pandas overhead at startup
-                from importador.importar_socios_excel import importar_socios_desde_excel
+                from importador.importar_socios_excel import (
+                    exportar_filas_erroneas,
+                    importar_socios_desde_excel,
+                )
 
                 # Setup progress dialog
                 prog = QProgressDialog("Important socis…", "Cancel·lar", 0, 100, self)
@@ -111,7 +114,7 @@ class MainWindow(QMainWindow):
                 def on_error(idx: int, msg: str):
                     errors.append(f"Fila {idx+1}: {msg}")
 
-                creados = importar_socios_desde_excel(
+                creados, filas_erroneas = importar_socios_desde_excel(
                     path,
                     on_progress=on_progress,
                     on_warning=on_warning,
@@ -128,6 +131,8 @@ class MainWindow(QMainWindow):
                     summary.append(f"S'han detectat {len(warnings)} avisos (p. ex. camps buits).")
                 if errors:
                     summary.append(f"S'han detectat {len(errors)} errors.")
+                    if filas_erroneas:
+                        summary.append("Pots guardar un fitxer amb les files que han fallat.")
                 QMessageBox.information(self, "Resultat importació", "\n".join(summary))
                 # Refresh Socis tab so new entries are visible immediately
                 try:
@@ -136,6 +141,8 @@ class MainWindow(QMainWindow):
                     pass
                 if warnings:
                     self._show_scrollable_text("Avisos de la importació", "\n".join(warnings))
+                if filas_erroneas:
+                    self._solicitar_guardat_errors_importacio(filas_erroneas, exportar_filas_erroneas)
             except Exception as e:
                 if prog:
                     prog.close()
@@ -147,6 +154,38 @@ class MainWindow(QMainWindow):
                     "Errors d'importació",
                     "\n".join(detail_lines)
                 )
+
+    def _solicitar_guardat_errors_importacio(self, filas_erroneas, exportador):
+        suggested_name = f"errors_socis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        ruta, selected_filter = QFileDialog.getSaveFileName(
+            self,
+            "Guardar errors d'importació",
+            suggested_name,
+            "Excel (*.xlsx);;CSV (*.csv)"
+        )
+        if not ruta:
+            return
+
+        suffix = Path(ruta).suffix
+        if not suffix:
+            if selected_filter.startswith("CSV"):
+                ruta = f"{ruta}.csv"
+            else:
+                ruta = f"{ruta}.xlsx"
+
+        try:
+            exportador(filas_erroneas, ruta)
+            QMessageBox.information(
+                self,
+                "Errors guardats",
+                f"S'ha guardat el fitxer amb {len(filas_erroneas)} files errònies."
+            )
+        except Exception as exc:
+            QMessageBox.critical(
+                self,
+                "Error en guardar",
+                f"No s'ha pogut guardar el fitxer amb errors:\n{exc}"
+            )
 
     def _show_scrollable_text(self, title: str, text: str):
         dlg = QDialog(self)
