@@ -1,6 +1,6 @@
 from sqlalchemy import (
     Column, Integer, Interval, PrimaryKeyConstraint, String, Date, DateTime, Boolean, Text, DECIMAL,
-    ForeignKey, ForeignKeyConstraint, LargeBinary, Enum
+    ForeignKey, ForeignKeyConstraint, LargeBinary, Enum, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 import enum
@@ -191,7 +191,6 @@ class Clase(Base):
 class InscripcionSocio(Base):
     __tablename__ = "inscripciones"
     id = Column(Integer, primary_key=True)
-    # Composite primary key (socioID, actividadID)
     socioID = Column(Integer, ForeignKey("socios.id"))
     actividadID = Column(Integer, ForeignKey("actividades.id"))
 
@@ -204,6 +203,10 @@ class InscripcionSocio(Base):
     actividad = relationship("Actividad", back_populates="inscripciones")
 
     matriculas = relationship("Pago", back_populates="inscripcion", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        UniqueConstraint("socioID", "actividadID", name="uq_inscripciones_socio_actividad"),
+    )
 
 # ---------------------------------------------
 # ATTENDANCE TRACKING

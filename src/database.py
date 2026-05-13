@@ -39,11 +39,34 @@ def _sqlite_url(path: Path) -> str:
     return f"sqlite:///{path.resolve().as_posix()}"
 
 
-# Ruta de la base de datos SQLite
-DATABASE_URL = _sqlite_url(_db_path())
+def _database_url() -> str:
+    """Return the configured DB URL.
+
+    By default the desktop app keeps using the local SQLite database. For the
+    PostgreSQL POC, set DATABASE_URL or GENTGRAN_DATABASE_URL in the environment.
+    """
+    return (
+        os.getenv("GENTGRAN_DATABASE_URL")
+        or os.getenv("DATABASE_URL")
+        or _sqlite_url(_db_path())
+    )
+
+
+def _connect_args(database_url: str) -> dict:
+    if database_url.startswith("sqlite"):
+        return {"check_same_thread": False}
+    return {}
+
+
+DATABASE_URL = _database_url()
 
 # Crear el motor de conexión
-engine = create_engine(DATABASE_URL, echo=False, future=True)
+engine = create_engine(
+    DATABASE_URL,
+    echo=os.getenv("SQLALCHEMY_ECHO", "").lower() in {"1", "true", "yes"},
+    future=True,
+    connect_args=_connect_args(DATABASE_URL),
+)
 
 # Crear clase de sesión
 SessionLocal = sessionmaker(

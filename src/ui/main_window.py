@@ -1,14 +1,17 @@
 import json
 import shutil
+import sys
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from PySide6.QtCore import QProcess
 from PySide6.QtWidgets import (
     QMainWindow, QTabWidget, QApplication, QMenuBar, QMenu
 )
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import QFileDialog
-from PySide6.QtWidgets import QProgressDialog, QMessageBox
+from PySide6.QtWidgets import QMessageBox, QProgressBar
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPlainTextEdit, QDialogButtonBox
 
 from ui.tab_socios import SociosTab
@@ -16,39 +19,57 @@ from ui.tab_actividades import ActividadesTab
 from ui.tab_cursoAcademico import CursoAcademicoDialog
 from ui.tab_personal import PersonalTab
 
+
+def _startup_log(message: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{timestamp} [main_window.py] {message}"
+    print(line, flush=True)
+    try:
+        log_path = Path(__file__).resolve().parents[2] / "logs" / "app-startup.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except Exception:
+        pass
+
+
 class MainWindow(QMainWindow):
     """Finestra principal amb pestanyes (Socis, Activitats, …)."""
 
     def __init__(self):
         super().__init__()
+        _startup_log("MainWindow init started")
         self._sel_model = None  # Model de selecció per a la taula de socis
         self.setWindowTitle("Associació Gent Gran de Castelldefels – Gestió")
         self.resize(900, 600)
 
-        # Obtiene lista de pantallas
         app = QApplication.instance()
-        screens = app.screens()
-
-        if len(screens) > 1:
-            second_screen = screens[1]
-            geometry = second_screen.geometry()
+        screen = app.primaryScreen() if app else None
+        if screen:
+            geometry = screen.availableGeometry()
             self.move(
-                geometry.left() + (geometry.width() - self.width()) // 2,
-                geometry.top() + (geometry.height() - self.height()) // 2
+                geometry.left() + max(0, (geometry.width() - self.width()) // 2),
+                geometry.top() + max(0, (geometry.height() - self.height()) // 2),
             )
+            _startup_log(f"Window centered on primary screen: {geometry}")
         else:
-            print("Solo hay una pantalla detectada")
+            _startup_log("No primary screen detected")
 
         # ── QTabWidget ───────────────────────────────────────────
+        _startup_log("Creating tabs")
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
 
+        _startup_log("Creating SociosTab")
         self.socios_tab = SociosTab()
         self.tabs.addTab(self.socios_tab, "Socis")
+        _startup_log("Creating ActividadesTab")
         self.tabs.addTab(ActividadesTab(), "Activitats")
+        _startup_log("Creating PersonalTab")
         self.tabs.addTab(PersonalTab(), "Personal")
 
         # ── Menú superior ───────────────────────────────────────
+        _startup_log("Creating menu")
         # Crear barra de menú
         menu_bar = self.menuBar()
         menu_arxiu = menu_bar.addMenu("Arxiu")
@@ -70,6 +91,7 @@ class MainWindow(QMainWindow):
         action_restore_db = QAction("Restaurar BD des d'una còpia…", self)
         action_restore_db.triggered.connect(self._restore_database)
         menu_arxiu.addAction(action_restore_db)
+        _startup_log("MainWindow init finished")
 
     def _mostrar_dialog_nou_curs(self):
         from ui.tab_cursoAcademico import CursoAcademicoDialog
@@ -79,81 +101,108 @@ class MainWindow(QMainWindow):
     def _importar_socis(self):
         path, _ = QFileDialog.getOpenFileName(self, "Selecciona un arxiu Excel", "", "Excel Files (*.xlsx *.xls *.csv)")
         if path:
-            prog = None
-            try:
-                # Lazy import to avoid pandas overhead at startup
-                from importador.importar_socios_excel import (
-                    exportar_filas_erroneas,
-                    importar_socios_desde_excel,
+            progress_dialog = QDialog(self)
+            progress_dialog.setWindowTitle("Importació de Socis")
+            progress_dialog.setModal(False)
+            progress_layout = QVBoxLayout(progress_dialog)
+            progress_label = QLabel("Important socis…")
+            progress_bar = QProgressBar(progress_dialog)
+            progress_bar.setRange(0, 100)
+            progress_bar.setValue(0)
+            progress_layout.addWidget(progress_label)
+            progress_layout.addWidget(progress_bar)
+            progress_dialog.setMinimumWidth(420)
+            progress_dialog.show()
+
+            process = QProcess(self)
+            process.setProcessChannelMode(QProcess.MergedChannels)
+            project_root = Path(__file__).resolve().parents[2]
+            process.setWorkingDirectory(str(project_root))
+            self._import_process = process
+            output_buffer = {"text": ""}
+            final_result = {"data": None}
+            last_progress = {"pct": -1, "time": 0.0}
+            _startup_log(f"Import started with QProcess: {path}")
+
+            def update_progress(done: int, total: int):
+                pct = int((done / total) * 100) if total else 0
+                now = time.monotonic()
+                if done != total and pct == last_progress["pct"] and now - last_progress["time"] < 0.25:
+                    return
+                last_progress["pct"] = pct
+                last_progress["time"] = now
+                progress_label.setText(f"Important socis… {done}/{total}")
+                progress_bar.setValue(pct)
+
+            def cleanup():
+                self._import_process = None
+
+            def handle_payload(payload: dict):
+                msg_type = payload.get("type")
+                if msg_type == "progress":
+                    update_progress(int(payload.get("done", 0)), int(payload.get("total", 0)))
+                elif msg_type == "result":
+                    final_result["data"] = payload
+                elif msg_type == "error":
+                    final_result["data"] = payload
+
+            def on_ready_read():
+                output_buffer["text"] += bytes(process.readAllStandardOutput()).decode("utf-8", errors="replace")
+                while "\n" in output_buffer["text"]:
+                    line, rest = output_buffer["text"].split("\n", 1)
+                    output_buffer["text"] = rest
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        handle_payload(json.loads(line))
+                    except json.JSONDecodeError:
+                        _startup_log(f"Import process output: {line}")
+
+            def on_finished(exit_code: int, exit_status):
+                on_ready_read()
+                cleanup()
+                progress_bar.setValue(100)
+                progress_dialog.close()
+                progress_dialog.deleteLater()
+
+                result = final_result["data"]
+                if exit_code != 0 or not result or result.get("type") == "error":
+                    message = result.get("message") if isinstance(result, dict) else output_buffer["text"]
+                    _startup_log(f"Import failed in process: exit={exit_code}, message={message}")
+                    self._show_scrollable_text("Errors d'importació", message or "El procés d'importació ha fallat.")
+                    return
+
+                creados = result["created"]
+                warnings = result.get("warnings", [])
+                warning_count = result["warning_count"]
+                error_count = result["error_count"]
+                _startup_log(
+                    f"Import finished: created={creados}, failed={result['failed']}, warnings={warning_count}"
                 )
-
-                # Setup progress dialog
-                prog = QProgressDialog("Important socis…", "Cancel·lar", 0, 100, self)
-                prog.setWindowTitle("Importació de Socis")
-                prog.setAutoClose(True)   # close automatically when reaching max
-                prog.setAutoReset(True)
-                prog.show()
-
-                warnings: list[str] = []
-                errors: list[str] = []
-                total_cache = {"total": 0}
-
-                def on_progress(done: int, total: int):
-                    # First call seeds range if needed
-                    total_cache["total"] = max(total_cache.get("total", 0), total)
-                    pct = int((done / total) * 100) if total else 0
-                    prog.setValue(pct)
-                    QApplication.processEvents()
-                    if prog.wasCanceled():
-                        # Not supported mid-transaction; inform user after
-                        pass
-
-                def on_warning(idx: int, msg: str):
-                    warnings.append(f"Fila {idx+1}: {msg}")
-
-                def on_error(idx: int, msg: str):
-                    errors.append(f"Fila {idx+1}: {msg}")
-
-                creados, filas_erroneas = importar_socios_desde_excel(
-                    path,
-                    on_progress=on_progress,
-                    on_warning=on_warning,
-                    on_error=on_error,
-                )
-                if prog:
-                    prog.setValue(100)
-                    prog.close()
-                    prog.deleteLater()
-                    prog = None
 
                 summary = [f"Importació completada: {creados} socis creats."]
-                if warnings:
-                    summary.append(f"S'han detectat {len(warnings)} avisos (p. ex. camps buits).")
-                if errors:
-                    summary.append(f"S'han detectat {len(errors)} errors.")
-                    if filas_erroneas:
-                        summary.append("Pots guardar un fitxer amb les files que han fallat.")
+                if warning_count:
+                    summary.append(f"S'han detectat {warning_count} avisos (p. ex. camps buits).")
+                if error_count:
+                    summary.append(f"S'han detectat {error_count} errors.")
                 QMessageBox.information(self, "Resultat importació", "\n".join(summary))
-                # Refresh Socis tab so new entries are visible immediately
                 try:
                     self.socios_tab.refresh()
                 except Exception:
                     pass
                 if warnings:
-                    self._show_scrollable_text("Avisos de la importació", "\n".join(warnings))
-                if filas_erroneas:
-                    self._solicitar_guardat_errors_importacio(filas_erroneas, exportar_filas_erroneas)
-            except Exception as e:
-                if prog:
-                    prog.close()
-                    prog.deleteLater()
-                    prog = None
-                # Show detailed, scrollable errors if any were captured
-                detail_lines = errors if 'errors' in locals() and errors else [str(e)]
-                self._show_scrollable_text(
-                    "Errors d'importació",
-                    "\n".join(detail_lines)
-                )
+                    warning_text = "\n".join(warnings)
+                    if warning_count > len(warnings):
+                        warning_text += f"\n\n... i {warning_count - len(warnings)} avisos més."
+                    self._show_scrollable_text("Avisos de la importació", warning_text)
+
+            process.readyReadStandardOutput.connect(on_ready_read)
+            process.finished.connect(on_finished)
+
+            python_exe = Path(sys.executable)
+            script = project_root / "scripts" / "import_socios_cli.py"
+            process.start(str(python_exe), [str(script), path])
 
     def _solicitar_guardat_errors_importacio(self, filas_erroneas, exportador):
         suggested_name = f"errors_socis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
@@ -235,6 +284,15 @@ class MainWindow(QMainWindow):
     def _backup_database(self):
         from database import engine
 
+        if engine.url.get_backend_name() != "sqlite":
+            QMessageBox.information(
+                self,
+                "Còpia no disponible",
+                "La còpia de seguretat integrada només està disponible amb SQLite. "
+                "Amb PostgreSQL cal fer servir pg_dump o les còpies gestionades del servidor.",
+            )
+            return
+
         db_location = engine.url.database
         if not db_location:
             QMessageBox.critical(self, "Error", "No s'ha pogut determinar la ruta de la base de dades.")
@@ -283,6 +341,15 @@ class MainWindow(QMainWindow):
 
     def _restore_database(self):
         from database import engine
+
+        if engine.url.get_backend_name() != "sqlite":
+            QMessageBox.information(
+                self,
+                "Restauració no disponible",
+                "La restauració integrada només està disponible amb SQLite. "
+                "Amb PostgreSQL cal restaurar amb pg_restore/psql o desde el proveedor gestionado.",
+            )
+            return
 
         db_location = engine.url.database
         if not db_location:

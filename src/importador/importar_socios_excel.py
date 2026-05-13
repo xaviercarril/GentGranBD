@@ -10,11 +10,13 @@ from sqlalchemy.exc import IntegrityError
 
 from database import SessionLocal
 from controladores.socios import construir_socio_modelo
+from models import Socio
 
 
 ProgressCb = Optional[Callable[[int, int], None]]  # (procesadas, total)
 WarnCb = Optional[Callable[[int, str], None]]      # (fila_index, mensaje)
 ErrorCb = Optional[Callable[[int, str], None]]     # (fila_index, mensaje)
+IMPORT_COMMIT_BATCH_SIZE = 500
 
 
 @dataclass
@@ -149,6 +151,64 @@ def _normalize_dni_value(value, campo: Optional[str] = None) -> str | None:
     return text
 
 
+def _read_input_file(ruta_archivo: str) -> pd.DataFrame:
+    ext = os.path.splitext(ruta_archivo)[1].lower()
+    if ext in {".xls", ".xlsx"}:
+        return pd.read_excel(ruta_archivo)
+    if ext != ".csv":
+        raise ValueError("Formato de archivo no soportado. Usa .xlsx, .xls o .csv")
+
+    try:
+        with open(ruta_archivo, "r", encoding="utf-8-sig", newline="") as fh:
+            first_line = fh.readline()
+    except UnicodeDecodeError:
+        with open(ruta_archivo, "r", encoding="latin-1", newline="") as fh:
+            first_line = fh.readline()
+
+    if ";" in first_line:
+        read_opts = {"sep": ";", "encoding": "utf-8-sig", "engine": "c"}
+    elif "," in first_line:
+        read_opts = {"sep": ",", "encoding": "utf-8-sig", "engine": "c"}
+    else:
+        read_opts = {"sep": None, "engine": "python"}
+
+    try:
+        return pd.read_csv(ruta_archivo, **read_opts)
+    except UnicodeDecodeError:
+        read_opts["encoding"] = "latin-1"
+        return pd.read_csv(ruta_archivo, **read_opts)
+
+
+def _drop_empty_columns(df: pd.DataFrame) -> pd.DataFrame:
+    """Remove trailing columns created by repeated delimiters in CSV exports."""
+    return df.dropna(axis="columns", how="all")
+
+
+def _commit_batch(db, pending: list[Socio]) -> tuple[int, list[tuple[Socio, str]]]:
+    """Persist a batch, falling back to row-by-row only if the batch fails."""
+    if not pending:
+        return 0, []
+
+    db.add_all(pending)
+    try:
+        db.commit()
+        return len(pending), []
+    except IntegrityError:
+        db.rollback()
+
+    created = 0
+    failed: list[tuple[Socio, str]] = []
+    for socio in pending:
+        db.add(socio)
+        try:
+            db.commit()
+            created += 1
+        except IntegrityError as exc:
+            db.rollback()
+            failed.append((socio, str(exc.orig) if hasattr(exc, "orig") else str(exc)))
+    return created, failed
+
+
 def importar_socios_desde_excel(
     ruta_archivo: str,
     on_progress: ProgressCb = None,
@@ -173,20 +233,8 @@ def importar_socios_desde_excel(
         if not os.path.exists(ruta_archivo):
             raise FileNotFoundError(f"El archivo no se encontró: {ruta_archivo}")
 
-        ext = os.path.splitext(ruta_archivo)[1].lower()
-        if ext in {".xls", ".xlsx"}:
-            df = pd.read_excel(ruta_archivo)
-        elif ext == ".csv":
-            # Permite detectar automáticamente delimitadores como ';' muy comunes en exports de Excel
-            read_opts = {"sep": None, "engine": "python"}
-            try:
-                df = pd.read_csv(ruta_archivo, **read_opts)
-            except UnicodeDecodeError:
-                # Intento con una codificación común alternativa
-                read_opts["encoding"] = "latin-1"
-                df = pd.read_csv(ruta_archivo, **read_opts)
-        else:
-            raise ValueError("Formato de archivo no soportado. Usa .xlsx, .xls o .csv")
+        df = _read_input_file(ruta_archivo)
+        df = _drop_empty_columns(df)
 
         if df.empty:
             raise EmptyDataError("El archivo no contiene datos.")
@@ -210,6 +258,47 @@ def importar_socios_desde_excel(
 
     with SessionLocal() as db:
         db.autoflush = False
+        existing_ids = {row[0] for row in db.query(Socio.id).all()}
+        existing_dnis = {
+            row[0] for row in db.query(Socio.dniNie).all() if _clean_str(row[0])
+        }
+        seen_ids: set[int] = set()
+        seen_dnis: set[str] = set()
+        pending: list[tuple[Socio, int, dict[str, Any], str | None, str | None]] = []
+
+        def flush_pending() -> None:
+            nonlocal creados, pending
+            socios = [item[0] for item in pending]
+            created, batch_failed = _commit_batch(db, socios)
+            creados += created
+            if batch_failed:
+                failed_by_id = {id(socio): msg for socio, msg in batch_failed}
+                for socio, callback_index, fila_original, id_col, dni_col in pending:
+                    if id(socio) not in failed_by_id:
+                        continue
+                    msg = failed_by_id[id(socio)]
+                    lowered = msg.lower()
+                    if "dni" in lowered or "nie" in lowered:
+                        mensaje = f"Soci duplicat (DNI/NIE {socio.dniNie}). Ja existeix. "
+                        columnas = [dni_col] if dni_col else []
+                    elif "id" in lowered or "primary" in lowered:
+                        mensaje = f"Soci duplicat (Nº soci {socio.id}). Ja existeix. "
+                        columnas = [id_col] if id_col else []
+                    else:
+                        mensaje = f"No s'ha pogut importar el soci: {msg}"
+                        columnas = []
+                    if on_error:
+                        on_error(callback_index, mensaje)
+                    failed_rows.append(
+                        RowImportError(
+                            row_index=callback_index + 1,
+                            message=mensaje,
+                            raw_data=fila_original,
+                            error_columns=columnas,
+                        )
+                    )
+            pending = []
+
         for position, (_, row) in enumerate(df.iterrows(), start=0):
             row_number_display = position + 2  # Primera fila de dades és la 2 (la 1 és la capçalera)
             callback_index = row_number_display - 1  # UI suma +1, així veu la fila real
@@ -304,16 +393,28 @@ def importar_socios_desde_excel(
                         columns=[dni_column] if dni_column else [],
                     )
 
+                if datos["id"] in existing_ids or datos["id"] in seen_ids:
+                    raise RowImportValidationError(
+                        f"Soci duplicat (Nº soci {datos['id']}). Ja existeix.",
+                        columns=[id_column] if id_column else [],
+                    )
+                if datos["dniNie"] in existing_dnis or datos["dniNie"] in seen_dnis:
+                    raise RowImportValidationError(
+                        f"Soci duplicat (DNI/NIE {datos['dniNie']}). Ja existeix.",
+                        columns=[dni_column] if dni_column else [],
+                    )
+
                 # Warnings no críticos
                 # if not datos["email"] and on_warning:
                 #     on_warning(callback_index, "Email vacío")
 
                 socio = construir_socio_modelo(datos)
-                db.add(socio)
-                db.commit()
-                creados += 1
+                pending.append((socio, callback_index, fila_original, id_column, dni_column))
+                seen_ids.add(datos["id"])
+                seen_dnis.add(datos["dniNie"])
+                if len(pending) >= IMPORT_COMMIT_BATCH_SIZE:
+                    flush_pending()
             except RowImportValidationError as e:
-                db.rollback()
                 fila_error_columnas = e.columns
                 mensaje = str(e)
                 if on_error:
@@ -388,6 +489,8 @@ def importar_socios_desde_excel(
                 procesadas += 1
                 if on_progress:
                     on_progress(procesadas, total)
+
+        flush_pending()
 
     return creados, failed_rows
 

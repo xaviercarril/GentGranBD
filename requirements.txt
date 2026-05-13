@@ -6,6 +6,9 @@ python-dateutil>=2.8.2
 # === SQLite driver (opcional si usas sqlite3 del stdlib) ===
 # aiosqlite==0.20.0  # Només si uses async, sinó no cal
 
+# === PostgreSQL POC ===
+psycopg[binary]>=3.2
+
 # === UI ===
 PySide6>=6.5
 PySide6-Addons>=6.5
