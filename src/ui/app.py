@@ -48,10 +48,11 @@ def main():
     from PySide6.QtWidgets import QApplication
     from PySide6.QtGui import QIcon
     from ui.main_window import MainWindow
-    from database import DATABASE_URL, engine
+    from database import engine, ensure_schema_updates
     from models import Base
 
-    _log(f"Database backend={engine.url.get_backend_name()} url={DATABASE_URL}")
+    safe_url = engine.url.render_as_string(hide_password=True)
+    _log(f"Database backend={engine.url.get_backend_name()} url={safe_url}")
 
     # 1) Pick a sensible working directory that contains our resources
     resource_candidates: list[Path] = []
@@ -130,6 +131,7 @@ def main():
 
     _log("Creating database schema if needed")
     Base.metadata.create_all(bind=engine)
+    ensure_schema_updates()
     _log("Creating QApplication")
     app = QApplication(sys.argv)
     try:

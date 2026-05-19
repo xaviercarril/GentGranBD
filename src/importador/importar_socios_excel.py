@@ -322,6 +322,15 @@ def importar_socios_desde_excel(
             id_column = _resolve_column(column_lookup, "Nº SOCI", "NUM SOCI")
             nombre_column = _resolve_column(column_lookup, "NOM", "NOMBRE", "NOMBRE SOCI")
             fecha_alta_column = _resolve_column(column_lookup, "DATA D'ALTA", "DATA ALTA", "FECHA ALTA", "F. ALTA")
+            fecha_nacimiento_column = _resolve_column(
+                column_lookup,
+                "DATA NAIXEMENT",
+                "FECHA NACIMIENTO",
+                "DATA DE NAIXEMENT",
+                "FECHA DE NACIMIENTO",
+                "F. NACIMIENTO",
+                "F. NAIXEMENT",
+            )
             fecha_baja_column = _resolve_column(column_lookup, "BAIXAS", "DATA BAIXA", "FECHA BAJA", "F. BAJA")
 
             try:
@@ -348,6 +357,20 @@ def importar_socios_desde_excel(
                 )
                 fecha_baja_raw = row.get(fecha_baja_column, "") if fecha_baja_column else _get_cell(
                     row, column_lookup, "BAIXAS", "DATA BAIXA", "FECHA BAJA", "F. BAJA"
+                )
+                fecha_nacimiento_raw = (
+                    row.get(fecha_nacimiento_column, "")
+                    if fecha_nacimiento_column
+                    else _get_cell(
+                        row,
+                        column_lookup,
+                        "DATA NAIXEMENT",
+                        "FECHA NACIMIENTO",
+                        "DATA DE NAIXEMENT",
+                        "FECHA DE NACIMIENTO",
+                        "F. NACIMIENTO",
+                        "F. NAIXEMENT",
+                    )
                 )
                 socio_id_raw = row.get(id_column, "") if id_column else _get_cell(
                     row, column_lookup, "Nº SOCI", "NUM SOCI"
@@ -382,6 +405,7 @@ def importar_socios_desde_excel(
                     "telefonoMovil": _clean_str(_get_cell(row, column_lookup, "MÒBIL", "MOBIL", "TELÈFON MÒBIL", "MOVIL", "TELEFONO MOVIL")),
                     "email": _clean_str(_get_cell(row, column_lookup, "E-MAIL", "EMAIL", "CORREU", "CORREO")),
                     "grupoDifusion": _clean_str(_get_cell(row, column_lookup, "E", "GRUP DIFUSIO", "GRUPO DIFUSION")),
+                    "fechaNacimiento": _parse_fecha(fecha_nacimiento_raw, optional=True, campo=fecha_nacimiento_column),
                     "fechaAlta": _parse_fecha(fecha_alta_raw, campo=fecha_alta_column),
                     "fechaBaja": _parse_fecha(fecha_baja_raw, optional=True, campo=fecha_baja_column),
                     "observaciones": _clean_str(_get_cell(row, column_lookup, "OBSERVACIONES", "OBSERVACIONS", "OBSERVACIONS 1")),

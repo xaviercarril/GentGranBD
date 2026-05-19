@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 
@@ -75,3 +75,22 @@ SessionLocal = sessionmaker(
     autocommit=False,
     expire_on_commit=False,
 )
+
+
+def ensure_schema_updates() -> None:
+    """Apply small additive schema updates for existing installations."""
+    inspector = inspect(engine)
+    if "socios" not in inspector.get_table_names():
+        return
+
+    socio_columns = {column["name"] for column in inspector.get_columns("socios")}
+    statements: list[str] = []
+    if "fechaNacimiento" not in socio_columns:
+        statements.append('ALTER TABLE socios ADD COLUMN "fechaNacimiento" DATE')
+
+    if not statements:
+        return
+
+    with engine.begin() as conn:
+        for statement in statements:
+            conn.execute(text(statement))

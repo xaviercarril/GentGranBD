@@ -1,12 +1,17 @@
+import subprocess
+import sys
+import tempfile
+
 # src/ui/tab_socios.py
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox
-from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtCore import QSize
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox, QMenu
+from PySide6.QtGui import QIcon, QPixmap, QAction
+from PySide6.QtCore import QSize, QItemSelectionModel
 from PySide6.QtCore import QEvent, Qt
 from ui.table_models import DictTableModel
 from ui.socio_detail import SocioDetailWidget
 from controladores.socios import (
-    listar_socios, eliminar_socio, consultar_socio, generar_carnet_pdf
+    listar_socios, eliminar_socio, consultar_socio, generar_carnet_pdf,
+    generar_ficha_socio_pdf
 )
 from ui.socio_dialog import SocioDialog
 from ui.lopd_dialog import LOPDFirmaDialog
@@ -17,6 +22,9 @@ class SociosTab(QWidget):
   # ==========================================================
   def __init__(self, parent=None):
     super().__init__(parent)
+    self._restoring_selection = False
+    self._sort_key = "id"
+    self._sort_order = Qt.AscendingOrder
     # Taula esquerra
     self.table_socis = QTableView()
 
@@ -32,6 +40,11 @@ class SociosTab(QWidget):
     # Permetre selecció múltiple de files
     self.table_socis.setSelectionMode(QTableView.ExtendedSelection)
     self.table_socis.setAlternatingRowColors(True)
+    self.table_socis.setContextMenuPolicy(Qt.CustomContextMenu)
+    self.table_socis.customContextMenuRequested.connect(self._show_socio_context_menu)
+    header = self.table_socis.horizontalHeader()
+    header.setSectionsClickable(True)
+    header.sectionClicked.connect(self._sort_by_header)
     self.table_socis.setStyleSheet("""
       QTableView::item:selected {
         background: #c5d6a1;
@@ -45,7 +58,7 @@ class SociosTab(QWidget):
 
     # Panell de detall dreta
     self.detail = SocioDetailWidget()
-    self.detail.saved.connect(self._refresh_socios)
+    self.detail.saved.connect(self._on_socio_saved)
 
     # Quan seleccionem fila → carregar detall
     self.table_socis.selectionModel().currentRowChanged.connect(self._row_changed)
@@ -61,26 +74,10 @@ class SociosTab(QWidget):
     btn_nou = QPushButton("Nou soci")
     btn_nou.setIcon(QIcon("ui/assets/plus.svg"))
     btn_nou.setIconSize(QSize(16, 16))
-    btn_esborrar = QPushButton("Eliminar")
-    btn_esborrar.setIcon(QIcon("ui/assets/minus.svg"))
-    btn_esborrar.setIconSize(QSize(16, 16))
-    btn_carnet = QPushButton("Generar Carnet")
-    btn_carnet.setIcon(QIcon("ui/assets/id-card.svg"))
-    btn_carnet.setIconSize(QSize(16, 16))
-    btn_carnet.clicked.connect(self._generar_carnet_socio)
-    # --- PDF LOPD Button ---
-    btn_lopd = QPushButton("LOPD - Signatura")
-    btn_lopd.setIcon(QIcon("ui/assets/signature.svg"))
-    btn_lopd.setIconSize(QSize(16, 16))
-    btn_lopd.clicked.connect(self._abrir_lopd_dialog)
     btn_nou.clicked.connect(self._dialog_nou_socio)
-    btn_esborrar.clicked.connect(self._eliminar_socio)
 
     top_buttons = QHBoxLayout()
     top_buttons.addWidget(btn_nou)
-    top_buttons.addWidget(btn_esborrar)
-    top_buttons.addWidget(btn_carnet)
-    top_buttons.addWidget(btn_lopd)
     top_buttons.addStretch()
 
     page = QWidget()
@@ -93,12 +90,51 @@ class SociosTab(QWidget):
 
   def refresh(self):
     """Actualitza la taula de socis (wrapping públic)."""
+    if hasattr(self, "detail") and not self.detail.confirm_pending_changes():
+      return
     self._refresh_socios()
 
-  def _refresh_socios(self):
-    rows = listar_socios()
+  def _selected_socio_id(self):
+    sel_model = self.table_socis.selectionModel()
+    if not sel_model:
+      return None
+    current = sel_model.currentIndex()
+    if current.isValid():
+      try:
+        return self.table_socis.model().rows[current.row()]["id"]
+      except Exception:
+        pass
+    rows = sel_model.selectedRows()
+    if rows:
+      try:
+        return self.table_socis.model().rows[rows[0].row()]["id"]
+      except Exception:
+        pass
+    return None
+
+  def _select_socio_id(self, socio_id):
+    if socio_id is None:
+      return
+    model = self.table_socis.model()
+    if not model:
+      return
+    for row_idx, row in enumerate(getattr(model, "rows", [])):
+      if row.get("id") == socio_id:
+        idx = model.index(row_idx, 0)
+        self.table_socis.setCurrentIndex(idx)
+        self.table_socis.selectionModel().select(
+          idx,
+          QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
+        self.table_socis.scrollTo(idx, QTableView.PositionAtCenter)
+        return
+
+  def _refresh_socios(self, keep_socio_id=None):
+    if keep_socio_id is None:
+      keep_socio_id = self._selected_socio_id()
+    rows = listar_socios() or []
     self._all_socios = rows
-    headers = [
+    headers = self._headers_with_sort_indicator([
       ("Soci ID", "id"),
       ("DNI/NIE", "dniNie"),
       ("Nom", "nombre"),
@@ -109,8 +145,10 @@ class SociosTab(QWidget):
       ("Mòbil", "telefonoMovil"),
       ("Email", "email"),
       ("Grup Difusió", "grupoDifusion"),
-    ]
+      ("Data naixement", "fechaNacimiento"),
+    ])
     filtered_rows = self._filter_rows(self._search_box.text())
+    filtered_rows = self._sort_rows(filtered_rows)
     model = DictTableModel(filtered_rows, headers)
     self.table_socis.setModel(model)
     self.table_socis.resizeColumnsToContents()
@@ -123,11 +161,106 @@ class SociosTab(QWidget):
       pass
     new_sel.currentRowChanged.connect(self._row_changed)
     self._sel_model = new_sel
+    self._select_socio_id(keep_socio_id)
+
+  def _headers_with_sort_indicator(self, headers):
+    indicator = "▲" if self._sort_order == Qt.AscendingOrder else "▼"
+    return [
+      (f"{label} {indicator}" if key == self._sort_key else label, key)
+      for label, key in headers
+    ]
+
+  def _sort_rows(self, rows):
+    def value_for_sort(row):
+      value = row.get(self._sort_key)
+      if value is None:
+        return (1, "")
+      if self._sort_key == "id":
+        try:
+          return (0, int(value))
+        except (TypeError, ValueError):
+          return (0, str(value))
+      if isinstance(value, str):
+        return (0, value.casefold())
+      return (0, str(value).casefold())
+
+    return sorted(
+      rows,
+      key=value_for_sort,
+      reverse=self._sort_order == Qt.DescendingOrder,
+    )
+
+  def _sort_by_header(self, section):
+    model = self.table_socis.model()
+    if not model or section < 0 or section >= len(getattr(model, "keys", [])):
+      return
+
+    key = model.keys[section]
+    if key == self._sort_key:
+      self._sort_order = (
+        Qt.DescendingOrder
+        if self._sort_order == Qt.AscendingOrder
+        else Qt.AscendingOrder
+      )
+    else:
+      self._sort_key = key
+      self._sort_order = Qt.AscendingOrder
+
+    self._refresh_socios()
 
   def _dialog_nou_socio(self):
     dlg = SocioDialog(self)
     if dlg.exec():
       self._refresh_socios()
+
+  def _show_socio_context_menu(self, pos):
+    index = self.table_socis.indexAt(pos)
+    if not index.isValid():
+      return
+
+    sel_model = self.table_socis.selectionModel()
+    row_already_selected = (
+      sel_model
+      and any(selected.row() == index.row() for selected in sel_model.selectedRows())
+    )
+    if sel_model and not row_already_selected:
+      self.table_socis.setCurrentIndex(index)
+      sel_model.select(
+        index,
+        QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+      )
+
+    menu = QMenu(self)
+
+    inscripciones_action = QAction("Obrir inscripcions", self)
+    inscripciones_action.triggered.connect(
+      lambda _checked=False, idx=index: self._abrir_inscripciones_socio(idx)
+    )
+    menu.addAction(inscripciones_action)
+    menu.addSeparator()
+
+    carnet_action = QAction(QIcon("ui/assets/id-card.svg"), "Visualitzar Carnet", self)
+    carnet_action.triggered.connect(self._generar_carnet_socio)
+    menu.addAction(carnet_action)
+
+    ficha_action = QAction("Visualitzar Fitxa", self)
+    ficha_action.triggered.connect(self._generar_ficha_socio)
+    menu.addAction(ficha_action)
+
+    lopd_action = QAction(QIcon("ui/assets/signature.svg"), "LOPD - Signatura", self)
+    lopd_action.triggered.connect(self._abrir_lopd_dialog)
+    menu.addAction(lopd_action)
+
+    menu.addSeparator()
+
+    eliminar_action = QAction(QIcon("ui/assets/trash.svg"), "Eliminar", self)
+    eliminar_action.triggered.connect(self._eliminar_socio)
+    menu.addAction(eliminar_action)
+
+    menu.exec(self.table_socis.viewport().mapToGlobal(pos))
+
+  def _on_socio_saved(self, socio_id):
+    self._refresh_socios(keep_socio_id=socio_id)
 
   def _eliminar_socio(self):
     sel = self.table_socis.selectionModel().selectedRows()
@@ -213,6 +346,40 @@ class SociosTab(QWidget):
       QMessageBox.information(self, "Resultat eliminació", f"S'han eliminat {eliminats} socis.")
 
   def _row_changed(self, curr, _prev):
+    if self._restoring_selection:
+      return
+    if hasattr(self, "detail") and self.detail.has_pending_changes():
+      desired_socio_id = None
+      if curr.isValid():
+        try:
+          desired_socio_id = self.table_socis.model().rows[curr.row()]["id"]
+        except Exception:
+          desired_socio_id = None
+
+      if not self.detail.confirm_pending_changes(emit_saved=False):
+        self._restoring_selection = True
+        try:
+          if _prev.isValid():
+            self.table_socis.setCurrentIndex(_prev)
+            self.table_socis.selectionModel().select(
+              _prev,
+              QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+            )
+          else:
+            self.table_socis.clearSelection()
+        finally:
+          self._restoring_selection = False
+        return
+
+      if desired_socio_id is not None:
+        self._restoring_selection = True
+        try:
+          self._refresh_socios(keep_socio_id=desired_socio_id)
+        finally:
+          self._restoring_selection = False
+        self.detail.load(desired_socio_id)
+        return
+
     if not curr.isValid():
       self.detail.load(None)
       return
@@ -228,11 +395,7 @@ class SociosTab(QWidget):
     row = sel[0].row()
     socio = self.table_socis.model().rows[row]
 
-    from PySide6.QtWidgets import QFileDialog
-    suggested = f"carnet_{socio['id']:06d}.pdf"
-    pdf_path, _ = QFileDialog.getSaveFileName(self, "Desar carnet PDF", suggested, "PDF Files (*.pdf)")
-    if not pdf_path:
-      return
+    pdf_path = self._temporary_pdf_path(f"carnet_{socio['id']:06d}_")
     try:
       generar_carnet_pdf(socio['id'], pdf_path)
     except Exception as e:
@@ -240,33 +403,56 @@ class SociosTab(QWidget):
       return
 
     try:
-      from PySide6.QtPdf import QPdfDocument
-      from PySide6.QtPrintSupport import QPrinter, QPrintDialog
-
-      doc = QPdfDocument()
-      load_result = doc.load(pdf_path)
-      if load_result != 0:
-        raise Exception("Error loading PDF")
-
-      printer = QPrinter(QPrinter.HighResolution)
-      dialog = QPrintDialog(printer, self)
-      if dialog.exec() == QPrintDialog.Accepted:
-        raise AttributeError("QPdfDocument has no print method")
+      self._open_file(pdf_path)
     except Exception:
+      QMessageBox.information(
+        self,
+        "Carnet generat",
+        f"El carnet s'ha generat correctament:\n{pdf_path}",
+      )
+
+  def _generar_ficha_socio(self):
+    sel = self.table_socis.selectionModel().selectedRows()
+    if not sel:
+      QMessageBox.warning(self, "Error", "No s'ha seleccionat cap soci.")
+      return
+
+    row = sel[0].row()
+    socio = self.table_socis.model().rows[row]
+
+    pdf_path = self._temporary_pdf_path(f"fitxa_socio_{socio['id']:06d}_")
+    try:
+      generar_ficha_socio_pdf(socio["id"], pdf_path)
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"No s'ha pogut generar la fitxa:\n{e}")
+      return
+
+    try:
+      self._open_file(pdf_path)
+    except Exception:
+      QMessageBox.information(
+        self,
+        "Fitxa generada",
+        f"La fitxa s'ha generat correctament:\n{pdf_path}",
+      )
+
+  def _temporary_pdf_path(self, prefix: str) -> str:
+    tmp = tempfile.NamedTemporaryFile(prefix=prefix, suffix=".pdf", delete=False)
+    tmp.close()
+    return tmp.name
+
+  def _open_file(self, path: str):
+    if sys.platform.startswith("darwin"):
+      subprocess.Popen(["open", path])
+    elif sys.platform.startswith("win"):
       import os
-      import sys
-      if sys.platform.startswith("darwin"):
-        os.system(f'open "{pdf_path}"')
-      elif sys.platform.startswith("win"):
-        try:
-          os.startfile(pdf_path)
-        except Exception:
-          # Fallback via Explorer
-          os.system(f'start "" "{pdf_path}"')
-      else:
-        os.system(f'xdg-open "{pdf_path}"')
+      os.startfile(path)
+    else:
+      subprocess.Popen(["xdg-open", path])
 
   def _filtrar_socios(self):
+    if not self.detail.confirm_pending_changes():
+      return
     self._refresh_socios()
 
   def _filter_rows(self, text):
@@ -293,6 +479,9 @@ class SociosTab(QWidget):
   def showEvent(self, event):
       super().showEvent(event)
       self._refresh_socios()
+
+  def confirm_pending_changes(self):
+      return self.detail.confirm_pending_changes()
   def eventFilter(self, obj, event):
       if obj == self.table_socis and event.type() == QEvent.KeyPress:
           if event.key() == Qt.Key_Delete:

@@ -16,6 +16,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from importador.importar_socios_excel import importar_socios_desde_excel
+from database import ensure_schema_updates
 
 
 def parse_args() -> argparse.Namespace:
@@ -49,6 +50,7 @@ def main() -> int:
         error_count += 1
 
     try:
+        ensure_schema_updates()
         created, failed_rows = importar_socios_desde_excel(
             args.path,
             on_progress=on_progress,

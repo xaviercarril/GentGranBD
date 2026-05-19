@@ -8,3 +8,6 @@ venv
 dist
 build
 src/gentgran.db
+.env
+postgres-data/
+logs/

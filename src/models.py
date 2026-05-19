@@ -46,6 +46,7 @@ class Socio(Base):
     telefonoMovil = Column(String(20))
     email = Column(String(100))
     grupoDifusion = Column(String(50))
+    fechaNacimiento = Column(Date)
     fechaAlta = Column(Date, nullable=False)
     fechaBaja = Column(Date)
     observaciones = Column(Text)

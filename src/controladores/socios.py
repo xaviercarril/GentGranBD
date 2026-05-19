@@ -49,6 +49,7 @@ def registrar_socio(datos: dict) -> int:
         telefonoMovil=dto.telefonoMovil,
         email=dto.email,
         grupoDifusion=dto.grupoDifusion,
+        fechaNacimiento=dto.fechaNacimiento,
         fechaAlta=dto.fechaAlta or date.today(),
         fechaBaja=dto.fechaBaja,
         observaciones=dto.observaciones,
@@ -94,6 +95,7 @@ def construir_socio_modelo(datos: dict) -> Socio:
             "telefonoMovil": "Mòbil",
             "email": "E-mail",
             "grupoDifusion": "Grup difusió",
+            "fechaNacimiento": "Data naixement",
             "fechaAlta": "Data d'alta",
             "fechaBaja": "Data de baixa",
             "observaciones": "Observacions",
@@ -129,6 +131,7 @@ def construir_socio_modelo(datos: dict) -> Socio:
         telefonoMovil=dto.telefonoMovil,
         email=dto.email,
         grupoDifusion=dto.grupoDifusion,
+        fechaNacimiento=dto.fechaNacimiento,
         fechaAlta=dto.fechaAlta or date.today(),
         fechaBaja=dto.fechaBaja,
         observaciones=dto.observaciones,
@@ -239,7 +242,7 @@ def listar_socios() -> list[dict]:
     """Retorna una llista de dicts amb tots els socis."""
     try:
         with SessionLocal() as db:
-            socios = db.query(Socio).all()
+            socios = db.query(Socio).order_by(Socio.id).all()
             if not socios:
                 return None
             result = []
@@ -256,7 +259,7 @@ def listar_socios_activos() -> list[dict]:
     """Retorna una llista de dicts amb els socis actius."""
     try:
         with SessionLocal() as db:
-            socios = db.query(Socio).filter(Socio.fechaBaja.is_(None)).all()
+            socios = db.query(Socio).filter(Socio.fechaBaja.is_(None)).order_by(Socio.id).all()
             return [socio_to_dto(s).model_dump() for s in socios]
     except Exception as e:
         raise ValueError(f"Error al llistar socis actius: {e}")
@@ -355,20 +358,32 @@ def eliminar_documento_firma_LOPD(socioID: int) -> None:
     
 # ────────────────── Exportación ──────────────────
 
+def _resolve_logo_path() -> str | None:
+    for path in (Path("extra/logo.png"), Path("src/extra/logo.png")):
+        if path.exists():
+            return str(path)
+    return None
+
+
 def generar_carnet_pdf(socioID: int, ruta_pdf: str) -> None:
     """
     Genera un carnet de soci en format PDF.
     Implementació simplificada, no inclou logo ni foto.
     """
     from exportador.pdf_carnet import generar_carnet_socio
-    import os
 
-    logo_path = "./extra/logo.png"  # Ruta del logo opcional
-    if not os.path.exists(logo_path):
-        # No bloquear la generación si falta el logo; es opcional
-        logo_path = None
+    logo_path = _resolve_logo_path()
     with SessionLocal() as db:
         generar_carnet_socio(db, socioID, ruta_pdf, logo_path=logo_path)
+
+
+def generar_ficha_socio_pdf(socioID: int, ruta_pdf: str) -> None:
+    """Genera una ficha de socio de 10 x 15 cm en format PDF."""
+    from exportador.pdf_ficha_socio import generar_ficha_socio
+
+    logo_path = _resolve_logo_path()
+    with SessionLocal() as db:
+        generar_ficha_socio(db, socioID, ruta_pdf, logo_path=logo_path)
 
 # Añadido: generar_pdf_LOPD para exportar consentimiento de protección de datos
 def generar_pdf_LOPD(

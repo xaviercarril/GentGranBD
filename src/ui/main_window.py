@@ -67,6 +67,9 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(ActividadesTab(), "Activitats")
         _startup_log("Creating PersonalTab")
         self.tabs.addTab(PersonalTab(), "Personal")
+        self._current_tab_index = self.tabs.currentIndex()
+        self._changing_tab_programmatically = False
+        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         # ── Menú superior ───────────────────────────────────────
         _startup_log("Creating menu")
@@ -92,6 +95,23 @@ class MainWindow(QMainWindow):
         action_restore_db.triggered.connect(self._restore_database)
         menu_arxiu.addAction(action_restore_db)
         _startup_log("MainWindow init finished")
+
+    def _on_tab_changed(self, index: int):
+        if self._changing_tab_programmatically:
+            return
+
+        previous_index = getattr(self, "_current_tab_index", index)
+        previous_widget = self.tabs.widget(previous_index)
+        if hasattr(previous_widget, "confirm_pending_changes"):
+            if not previous_widget.confirm_pending_changes():
+                self._changing_tab_programmatically = True
+                try:
+                    self.tabs.setCurrentIndex(previous_index)
+                finally:
+                    self._changing_tab_programmatically = False
+                return
+
+        self._current_tab_index = index
 
     def _mostrar_dialog_nou_curs(self):
         from ui.tab_cursoAcademico import CursoAcademicoDialog
@@ -426,24 +446,9 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
-        try:
-            prompt_needed = self._should_prompt_backup()
-        except Exception:
-            prompt_needed = False
-
-        if prompt_needed:
-            box = QMessageBox(self)
-            box.setWindowTitle("Còpia de seguretat recomanada")
-            box.setText(
-                "Fa més d'una setmana que no es fa cap còpia de seguretat.\n"
-                "Vols fer-ne una ara?"
-            )
-            box.setIcon(QMessageBox.Question)
-            box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
-            box.button(QMessageBox.Yes).setText("Sí")
-            box.button(QMessageBox.No).setText("No")
-            reply = box.exec()
-            if reply == QMessageBox.Yes:
-                self._backup_database()
+        if hasattr(self.socios_tab, "confirm_pending_changes"):
+            if not self.socios_tab.confirm_pending_changes():
+                event.ignore()
+                return
 
         super().closeEvent(event)

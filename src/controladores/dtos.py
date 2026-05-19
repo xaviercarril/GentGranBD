@@ -71,6 +71,7 @@ def socio_to_dto(socio: Socio) -> SocioDTO:
         telefonoMovil=normalize_phone(socio.telefonoMovil),
         email=socio.email,
         grupoDifusion=socio.grupoDifusion,
+        fechaNacimiento=socio.fechaNacimiento,
         fechaAlta=socio.fechaAlta,
         fechaBaja=socio.fechaBaja,
         observaciones=socio.observaciones,

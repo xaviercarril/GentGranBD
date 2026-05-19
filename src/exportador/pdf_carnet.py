@@ -42,18 +42,18 @@ def _fons(c: canvas.Canvas, logo_path: str | None):
     # Franja inferior gris
     c.setFillColor(colors.lightgrey)
     c.rect(0, 0, CARD_W, 8 * mm, fill=1, stroke=0)
-    c.setFont("Helvetica", 6)
+    c.setFont("Helvetica", 6.5)
     c.setFillColor(colors.black)
     c.drawCentredString(
         CARD_W / 2,
-        2.5 * mm,
+        2.4 * mm,
         "Associació Gent Gran · www.gentgrancastelldefels.com · Telf: 644 042 557"
     )
 
     # Logo opcional a dalt dreta
     if logo_path:
         try:
-            logo_w, logo_h = 18 * mm, 10 * mm
+            logo_w, logo_h = 24 * mm, 13 * mm
             x_logo = CARD_W - logo_w - 2 * mm        # 2 mm marge dret
             y_logo = CARD_H - logo_h - 2 * mm        # 2 mm marge top
             c.drawImage(
@@ -110,13 +110,12 @@ def generar_carnet_socio(
         foto_buf = _resize_photo(soci.foto)
         foto_flow = Image(foto_buf, width=FOTO_W, height=FOTO_H)
 
-    # ─── Bloc de text (nom, núm, alta) ────────────────────────────
+    # ─── Bloc de text (nom, núm) ──────────────────────────────────
     nom_complet = f"{soci.nombre} {soci.apellido1 or ''} {soci.apellido2 or ''}".strip()
     text_flow = [
         Paragraph(nom_complet, styles["NomSoci"]),
         Spacer(1, 1 * mm),
         Paragraph(f"Núm. Soci: <b>{soci.id:06d}</b>", styles["Normal"]),
-        Paragraph(f"Alta: {soci.fechaAlta:%d/%m/%Y}", styles["Normal"]),
     ]
 
     # ─── Taula 2 columnes: [FOTO | TEXT] ───────────────────────────

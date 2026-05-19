@@ -122,6 +122,7 @@ class SocioDTO(BaseModel):
     telefonoMovil: str | None = None
     email: str | None = None
     grupoDifusion: str | None = None
+    fechaNacimiento: date | None = None
     fechaAlta: date
     fechaBaja: date | None = None
     observaciones: str | None = None
@@ -139,6 +140,7 @@ class SocioUpdateDTO(BaseModel):
     telefonoMovil: str | None = None
     email: str | None = None
     grupoDifusion: str | None = None
+    fechaNacimiento: date | None = None
     fechaAlta: date | None = None
     fechaBaja: date | None = None
     observaciones: str | None = None
