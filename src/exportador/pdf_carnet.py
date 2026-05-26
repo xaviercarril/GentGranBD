@@ -2,6 +2,7 @@ from reportlab.platypus import (
     SimpleDocTemplate, Image, Paragraph, Spacer,
     Table, TableStyle
 )
+from reportlab.platypus.frames import Frame
 from reportlab.lib.units import mm
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib import colors
@@ -64,6 +65,76 @@ def _fons(c: canvas.Canvas, logo_path: str | None):
             pass  # si hi ha error en el logo, el carnet igualment es genera
 
 
+def _styles():
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        "NomSoci",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=9
+    ))
+    return styles
+
+
+def _story(soci, styles):
+    foto_flow = Spacer(0, 0)  # placeholder
+    if soci.foto:
+        foto_buf = _resize_photo(soci.foto)
+        foto_flow = Image(foto_buf, width=FOTO_W, height=FOTO_H)
+
+    nom_complet = f"{soci.nombre} {soci.apellido1 or ''} {soci.apellido2 or ''}".strip()
+    text_flow = [
+        Paragraph(nom_complet, styles["NomSoci"]),
+        Spacer(1, 1 * mm),
+        Paragraph(f"Núm. Soci: <b>{soci.id:06d}</b>", styles["Normal"]),
+    ]
+
+    table = Table(
+        [[foto_flow, text_flow]],
+        colWidths=[FOTO_W + 2 * mm, CARD_W - FOTO_W - 3 * MARGE],
+        hAlign="LEFT"
+    )
+    table.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (0, 0), 'TOP'),
+        ('VALIGN', (1, 0), (1, 0), 'MIDDLE'),
+        ('LEFTPADDING',  (0, 0), (-1, -1), 0),
+        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+        ('TOPPADDING',   (0, 0), (-1, -1), 0),
+        ('BOTTOMPADDING',(0, 0), (-1, -1), 0),
+    ]))
+
+    return [
+        Spacer(1, 6 * mm),
+        table
+    ]
+
+
+def dibujar_carnet_socio(
+    c: canvas.Canvas,
+    soci,
+    x: float,
+    y: float,
+    logo_path: str | None = None,
+):
+    """Dibuixa el carnet en un canvas existent a la posició indicada."""
+    c.saveState()
+    c.translate(x, y)
+    _fons(c, logo_path)
+    frame = Frame(
+        MARGE,
+        MARGE,
+        CARD_W - 2 * MARGE,
+        CARD_H - 2 * MARGE,
+        leftPadding=0,
+        rightPadding=0,
+        topPadding=0,
+        bottomPadding=0,
+        showBoundary=0,
+    )
+    frame.addFromList(_story(soci, _styles()), c)
+    c.restoreState()
+
+
 # ──────────────────────────────────────────────────────
 #   FUNCIÓ PRINCIPAL
 # ──────────────────────────────────────────────────────
@@ -85,14 +156,7 @@ def generar_carnet_socio(
     if not soci:
         raise ValueError("Soci no trobat")
 
-    # ─── Estils de text ─────────────────────────────────────────────
-    styles = getSampleStyleSheet()
-    styles.add(ParagraphStyle(
-        "NomSoci",
-        parent=styles["Normal"],
-        fontName="Helvetica-Bold",
-        fontSize=9
-    ))
+    styles = _styles()
 
     # ─── DocTemplate: marges reduïts ────────────────────────────────
     doc = SimpleDocTemplate(
@@ -104,40 +168,7 @@ def generar_carnet_socio(
         bottomMargin=MARGE,
     )
 
-    # ─── Foto (si existeix) ────────────────────────────────────────
-    foto_flow = Spacer(0, 0)  # placeholder
-    if soci.foto:
-        foto_buf = _resize_photo(soci.foto)
-        foto_flow = Image(foto_buf, width=FOTO_W, height=FOTO_H)
-
-    # ─── Bloc de text (nom, núm) ──────────────────────────────────
-    nom_complet = f"{soci.nombre} {soci.apellido1 or ''} {soci.apellido2 or ''}".strip()
-    text_flow = [
-        Paragraph(nom_complet, styles["NomSoci"]),
-        Spacer(1, 1 * mm),
-        Paragraph(f"Núm. Soci: <b>{soci.id:06d}</b>", styles["Normal"]),
-    ]
-
-    # ─── Taula 2 columnes: [FOTO | TEXT] ───────────────────────────
-    table = Table(
-        [[foto_flow, text_flow]],
-        colWidths=[FOTO_W + 2 * mm, CARD_W - FOTO_W - 3 * MARGE],
-        hAlign="LEFT"
-    )
-    table.setStyle(TableStyle([
-        ('VALIGN', (0, 0), (0, 0), 'TOP'),     # Foto a dalt
-        ('VALIGN', (1, 0), (1, 0), 'MIDDLE'),  # Text centrat verticalment
-        ('LEFTPADDING',  (0, 0), (-1, -1), 0),
-        ('RIGHTPADDING', (0, 0), (-1, -1), 0),
-        ('TOPPADDING',   (0, 0), (-1, -1), 0),
-        ('BOTTOMPADDING',(0, 0), (-1, -1), 0),
-    ]))
-
-    # ─── Story: Spacer per baixar lleugerament + taula ─────────────
-    story = [
-        Spacer(1, 6 * mm),   # baixa tot el bloc 6 mm
-        table
-    ]
+    story = _story(soci, styles)
 
     # ─── Construir PDF ─────────────────────────────────────────────
     doc.build(

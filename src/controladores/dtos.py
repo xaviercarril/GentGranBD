@@ -98,7 +98,6 @@ def personal_to_dto(p: Personal) -> PersonalDTO:
         nombre=p.nombre,
         apellido1=p.apellido1,
         apellido2=p.apellido2,
-        dniNie=p.dniNie,
         email=p.email,
         telfMovil=p.telfMovil,
         observaciones=p.observaciones

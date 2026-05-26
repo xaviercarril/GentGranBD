@@ -12,7 +12,7 @@ import os
 class ProfeDialog(QDialog):
     """Diàleg de “Nou / Editar” professor amb tots els camps i gestió de foto."""
 
-    _REQUERITS = ("dniNie", "nombre")
+    _REQUERITS = ("nombre", "apellido1")
 
     def __init__(self, parent=None, personal: dict | None = None):
         super().__init__(parent)
@@ -21,7 +21,6 @@ class ProfeDialog(QDialog):
         self.setWindowTitle("Editar professor" if personal else "Nou professor")
 
         # ── Widgets ──────────────────────────────────────────
-        self.dni = QLineEdit()
         self.nom = QLineEdit()
         self.c1 = QLineEdit()
         self.c2 = QLineEdit()
@@ -34,7 +33,6 @@ class ProfeDialog(QDialog):
 
         # ── Disseny ──────────────────────────────────────────
         form = QFormLayout(self)
-        form.addRow("DNI/NIE *:", self.dni)
         form.addRow("Nom *:", self.nom)
         form.addRow("1r Cognom *:", self.c1)
         form.addRow("2n Cognom:", self.c2)
@@ -51,7 +49,7 @@ class ProfeDialog(QDialog):
     # Guardar
     # ─────────────────────────────────────────────────────────
     def _validar(self) -> bool:
-        if not self.dni.text().strip() or not self.nom.text().strip() or not self.c1.text().strip():
+        if not self.nom.text().strip() or not self.c1.text().strip():
             QMessageBox.warning(self, "Error",
                                 "Els camps marcats amb * són obligatoris.")
             return False
@@ -59,7 +57,6 @@ class ProfeDialog(QDialog):
 
     def _build_data(self) -> dict:
         data = {
-            "dniNie": self.dni.text().strip(),
             "nombre": self.nom.text().strip(),
             "apellido1": self.c1.text().strip(),
             "apellido2": self.c2.text().strip() or None,

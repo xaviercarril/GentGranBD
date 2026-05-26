@@ -77,20 +77,73 @@ SessionLocal = sessionmaker(
 )
 
 
+def _drop_personal_dni_sqlite() -> None:
+    """Rebuild legacy SQLite personal table without the obsolete dniNie field."""
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text("DROP TABLE IF EXISTS personal_new"))
+        conn.execute(
+            text(
+                """
+                CREATE TABLE personal_new (
+                    id INTEGER NOT NULL,
+                    nombre VARCHAR(50) NOT NULL,
+                    apellido1 VARCHAR(50),
+                    apellido2 VARCHAR(50),
+                    email VARCHAR(100),
+                    "telfMovil" VARCHAR(20),
+                    observaciones TEXT,
+                    tipo VARCHAR(50),
+                    PRIMARY KEY (id)
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO personal_new (
+                    id, nombre, apellido1, apellido2, email,
+                    "telfMovil", observaciones, tipo
+                )
+                SELECT
+                    id, nombre, apellido1, apellido2, email,
+                    "telfMovil", observaciones, tipo
+                FROM personal
+                """
+            )
+        )
+        conn.execute(text("DROP TABLE personal"))
+        conn.execute(text("ALTER TABLE personal_new RENAME TO personal"))
+        conn.execute(text("PRAGMA foreign_keys=ON"))
+
+
 def ensure_schema_updates() -> None:
-    """Apply small additive schema updates for existing installations."""
+    """Apply schema updates for existing installations."""
     inspector = inspect(engine)
-    if "socios" not in inspector.get_table_names():
+    table_names = inspector.get_table_names()
+    if "socios" not in table_names:
         return
 
     socio_columns = {column["name"] for column in inspector.get_columns("socios")}
+    personal_columns = (
+        {column["name"] for column in inspector.get_columns("personal")}
+        if "personal" in table_names
+        else set()
+    )
     statements: list[str] = []
     if "fechaNacimiento" not in socio_columns:
         statements.append('ALTER TABLE socios ADD COLUMN "fechaNacimiento" DATE')
+    if "dniNie" in personal_columns and engine.url.get_backend_name() != "sqlite":
+        statements.append('ALTER TABLE personal DROP COLUMN "dniNie"')
 
-    if not statements:
+    if statements:
+        with engine.begin() as conn:
+            for statement in statements:
+                conn.execute(text(statement))
+
+    if "dniNie" in personal_columns and engine.url.get_backend_name() == "sqlite":
+        _drop_personal_dni_sqlite()
+
+    if not statements and "dniNie" not in personal_columns:
         return
-
-    with engine.begin() as conn:
-        for statement in statements:
-            conn.execute(text(statement))

@@ -11,7 +11,7 @@ from ui.table_models import DictTableModel
 from ui.socio_detail import SocioDetailWidget
 from controladores.socios import (
     listar_socios, eliminar_socio, consultar_socio, generar_carnet_pdf,
-    generar_ficha_socio_pdf
+    generar_ficha_socio_pdf, generar_hoja_ficha_carnet_pdf
 )
 from ui.socio_dialog import SocioDialog
 from ui.lopd_dialog import LOPDFirmaDialog
@@ -247,6 +247,12 @@ class SociosTab(QWidget):
     ficha_action.triggered.connect(self._generar_ficha_socio)
     menu.addAction(ficha_action)
 
+    hoja_action = QAction("Imprimir Fitxa i Carnet", self)
+    hoja_action.triggered.connect(self._generar_hoja_ficha_carnet_socio)
+    menu.addAction(hoja_action)
+
+    menu.addSeparator()
+    
     lopd_action = QAction(QIcon("ui/assets/signature.svg"), "LOPD - Signatura", self)
     lopd_action.triggered.connect(self._abrir_lopd_dialog)
     menu.addAction(lopd_action)
@@ -434,6 +440,31 @@ class SociosTab(QWidget):
         self,
         "Fitxa generada",
         f"La fitxa s'ha generat correctament:\n{pdf_path}",
+      )
+
+  def _generar_hoja_ficha_carnet_socio(self):
+    sel = self.table_socis.selectionModel().selectedRows()
+    if not sel:
+      QMessageBox.warning(self, "Error", "No s'ha seleccionat cap soci.")
+      return
+
+    row = sel[0].row()
+    socio = self.table_socis.model().rows[row]
+
+    pdf_path = self._temporary_pdf_path(f"fitxa_carnet_socio_{socio['id']:06d}_")
+    try:
+      generar_hoja_ficha_carnet_pdf(socio["id"], pdf_path)
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"No s'ha pogut generar la fulla imprimible:\n{e}")
+      return
+
+    try:
+      self._open_file(pdf_path)
+    except Exception:
+      QMessageBox.information(
+        self,
+        "Fulla generada",
+        f"La fulla imprimible s'ha generat correctament:\n{pdf_path}",
       )
 
   def _temporary_pdf_path(self, prefix: str) -> str:

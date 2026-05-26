@@ -385,6 +385,15 @@ def generar_ficha_socio_pdf(socioID: int, ruta_pdf: str) -> None:
     with SessionLocal() as db:
         generar_ficha_socio(db, socioID, ruta_pdf, logo_path=logo_path)
 
+
+def generar_hoja_ficha_carnet_pdf(socioID: int, ruta_pdf: str) -> None:
+    """Genera un A4 imprimible amb la fitxa i el carnet del soci."""
+    from exportador.pdf_ficha_carnet import generar_hoja_ficha_carnet_socio
+
+    logo_path = _resolve_logo_path()
+    with SessionLocal() as db:
+        generar_hoja_ficha_carnet_socio(db, socioID, ruta_pdf, logo_path=logo_path)
+
 # Añadido: generar_pdf_LOPD para exportar consentimiento de protección de datos
 def generar_pdf_LOPD(
     socioID: int,

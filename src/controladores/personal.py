@@ -21,14 +21,18 @@ def registrar_personal(data: dict, tipo: str) -> int:
             nombre=dto.nombre,
             apellido1=dto.apellido1,
             apellido2=dto.apellido2,
-            dniNie=dto.dniNie
+            email=dto.email,
+            telfMovil=dto.telfMovil,
+            observaciones=dto.observaciones,
         )
     elif tipo == 'voluntario':
         nuevo_personal = Voluntario(
             nombre=dto.nombre,
             apellido1=dto.apellido1,
             apellido2=dto.apellido2,
-            dniNie=dto.dniNie
+            email=dto.email,
+            telfMovil=dto.telfMovil,
+            observaciones=dto.observaciones,
         )
     else:
         raise ValueError("Tipo de personal no válido")

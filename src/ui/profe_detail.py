@@ -21,8 +21,6 @@ class ProfeDetailWidget(QWidget):
         self.cognom1.setFixedWidth(300)
         self.cognom2 = QLineEdit()
         self.cognom2.setFixedWidth(300)
-        self.dni = QLineEdit()
-        self.dni.setFixedWidth(300)
         self.email = QLineEdit()
         self.email.setFixedWidth(300)
         self.tel_mob = QLineEdit()
@@ -36,7 +34,6 @@ class ProfeDetailWidget(QWidget):
         form.addRow("Nom*:", self.nom)
         form.addRow("1r Cognom*:", self.cognom1)
         form.addRow("2n Cognom:", self.cognom2)
-        form.addRow("DNI:", self.dni)
         form.addRow("Email:", self.email)
         form.addRow("Tel. mòbil:", self.tel_mob)
         form.addRow("Observacions:", self.obs)
@@ -53,7 +50,7 @@ class ProfeDetailWidget(QWidget):
         layout.addWidget(self.imparteix_table)
         layout.addStretch()
 
-        for widget in [self.nom, self.cognom1, self.cognom2, self.dni, self.email, self.tel_mob]:
+        for widget in [self.nom, self.cognom1, self.cognom2, self.email, self.tel_mob]:
             widget.editingFinished.connect(self._guardar)
         self.obs.textChanged.connect(self._guardar)
 
@@ -74,7 +71,6 @@ class ProfeDetailWidget(QWidget):
         self.nom.setText(profe.get("nombre", ""))
         self.cognom1.setText(profe.get("apellido1", ""))
         self.cognom2.setText(profe.get("apellido2", ""))
-        self.dni.setText(profe.get("dniNie", ""))
         self.email.setText(profe.get("email", ""))
         self.tel_mob.setText(profe.get("telfMovil", ""))
         self.obs.setText(profe.get("observaciones", ""))
@@ -89,7 +85,6 @@ class ProfeDetailWidget(QWidget):
         self.nom.clear()
         self.cognom1.clear()
         self.cognom2.clear()
-        self.dni.clear()
         self.email.clear()
         self.tel_mob.clear()
         self.obs.clear()
@@ -111,7 +106,6 @@ class ProfeDetailWidget(QWidget):
             "nombre": self.nom.text().strip(),
             "apellido1": self.cognom1.text().strip(),
             "apellido2": self.cognom2.text().strip() or None,
-            "dni_nie": self.dni.text().strip() or None,
             "email": self.email.text().strip() or None,
             "telfMovil": self.tel_mob.text().strip() or None,
             "observaciones": self.obs.toPlainText().strip() or None,
@@ -136,7 +130,7 @@ class ProfeDetailWidget(QWidget):
     def _load_imparteix_table(self):
         """Load activities taught by this professor."""
         try:
-            
+
             actividades = listar_actividades_por_Personal(self._id)
             headers = [
                 ("Nom", "nombre"),
@@ -151,4 +145,3 @@ class ProfeDetailWidget(QWidget):
             self.imparteix_table.resizeColumnsToContents()
         except Exception as e:
             QMessageBox.warning(self, "Error", f"No s'han pogut carregar les activitats: {e}")
-            

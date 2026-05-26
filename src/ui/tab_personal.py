@@ -160,7 +160,6 @@ class PersonalTab(QWidget):
             ("Nom", "nombre"),
             ("1r Cognom", "apellido1"),
             ("2n Cognom", "apellido2"),
-            ("DNI", "dniNie"),
             ("Email", "email"),
             ("Telèfon", "telfMovil"),
             ("Observacions", "observaciones")
@@ -258,7 +257,6 @@ class PersonalTab(QWidget):
             ("Nom", "nombre"),
             ("1r Cognom", "apellido1"),
             ("2n Cognom", "apellido2"),
-            ("DNI", "dniNie"),
             ("Email", "email"),
             ("Telèfon", "telfMovil"),
             ("Observacions", "observaciones")

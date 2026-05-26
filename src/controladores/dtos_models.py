@@ -1,5 +1,5 @@
 # Nuevo módulo para convertir instancias de SQLAlchemy a DTOs
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date, datetime, time, timedelta
 from models import AsistenciaSocio, Clase, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Pago, Socio, Actividad, Personal, Trimestre, EstadoInscripcion, EstadoPago, TrimestreEnum
 
@@ -148,20 +148,22 @@ class SocioUpdateDTO(BaseModel):
 
 
 class PersonalDTO(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: int | None = None
     nombre: str
     apellido1: str
     apellido2: str | None = None
-    dniNie: str | None = None
     email: str | None = None
     telfMovil: str | None = None
     observaciones: str | None = None
 
 class PersonalUpdateDTO(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     nombre: str | None = None
     apellido1: str | None = None
     apellido2: str | None = None
-    dniNie: str | None = None
     email: str | None = None
     telfMovil: str | None = None
     observaciones: str | None = None

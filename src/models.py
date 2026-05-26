@@ -78,7 +78,6 @@ class Personal(Base):
     nombre = Column(String(50), nullable=False)
     apellido1 = Column(String(50))
     apellido2 = Column(String(50))
-    dniNie = Column(String(15), unique=True, nullable=False)
     email = Column(String(100))
     telfMovil = Column(String(20))
     observaciones = Column(Text)
