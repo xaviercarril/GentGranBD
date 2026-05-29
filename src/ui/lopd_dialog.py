@@ -13,7 +13,6 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QPixmap
 from PySide6.QtWidgets import (
     QDialog,
-    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -41,7 +40,12 @@ except ImportError:  # pragma: no cover - fallback visual si falta la dependenci
 
 def _build_qr_pixmap(text: str, size_px: int) -> QPixmap:
     if qrcode is not None:
-        qr = qrcode.QRCode(version=None, box_size=8, border=2)
+        qr = qrcode.QRCode(
+            version=None,
+            error_correction=qrcode.constants.ERROR_CORRECT_M,
+            box_size=8,
+            border=4,
+        )
         qr.add_data(text)
         qr.make(fit=True)
         image = qr.make_image(fill_color="black", back_color="white")
@@ -258,8 +262,8 @@ def _draw_format_bits(modules: list[list[bool | None]], bits: int) -> None:
         (0, 8),
     ]
     coords_2 = (
-        [(size - 1 - i, 8) for i in range(7)]
-        + [(8, size - 8 + i) for i in range(8)]
+        [(size - 1 - i, 8) for i in range(8)]
+        + [(8, size - 15 + i) for i in range(8, 15)]
     )
     for i, (row, col) in enumerate(coords_1):
         modules[row][col] = bool((bits >> i) & 1)
@@ -276,6 +280,7 @@ class LOPDFirmaDialog(QDialog):
         self._server = SignatureServer()
         self._server_pdf: Optional[Path] = None
         self._active_token: str | None = None
+        self._tablet_config_visible = False
         self._temp_view_files: list[Path] = []
         self._timer = QTimer(self)
         self._timer.setInterval(500)
@@ -301,18 +306,12 @@ class LOPDFirmaDialog(QDialog):
 
         self._btn_view = QPushButton("Obrir document signat")
         self._btn_delete = QPushButton("Eliminar document")
-        self._btn_export = QPushButton("Desar PDF en…")
-        self._btn_generate_qr = QPushButton("Generar URL + QR")
-        self._btn_start = QPushButton("Enviar a tablet")
-        self._btn_cancel = QPushButton("Cancel·lar firma pendent")
+        self._btn_config_tablet = QPushButton("Configurar connexió tablet")
         self._btn_copy_link = QPushButton("Copiar enllaç")
 
         self._btn_view.clicked.connect(self._abrir_documento_guardado)
         self._btn_delete.clicked.connect(self._eliminar_documento)
-        self._btn_export.clicked.connect(self._exportar_pdf)
-        self._btn_generate_qr.clicked.connect(self._generar_url_qr)
-        self._btn_start.clicked.connect(self._iniciar_firma)
-        self._btn_cancel.clicked.connect(self._cancelar_firma_pendiente)
+        self._btn_config_tablet.clicked.connect(self._configurar_conexion_tablet)
         self._btn_copy_link.clicked.connect(self._copiar_enlace)
 
         layout = QVBoxLayout(self)
@@ -321,11 +320,13 @@ class LOPDFirmaDialog(QDialog):
         layout.addWidget(self._build_signature_box())
         layout.addStretch(1)
 
-        self._btn_cancel.hide()
+        self._server_url.hide()
+        self._btn_copy_link.hide()
         self._btn_copy_link.setEnabled(False)
 
         self._load_socio_info()
         self._load_signature_status()
+        QTimer.singleShot(0, self._iniciar_firma)
 
     # ------------------------------------------------------------------
     def _build_header_box(self) -> QGroupBox:
@@ -352,26 +353,15 @@ class LOPDFirmaDialog(QDialog):
         return box
 
     def _build_signature_box(self) -> QGroupBox:
-        box = QGroupBox("Generar i firmar")
+        box = QGroupBox("Firma amb tablet")
         ly = QVBoxLayout(box)
-        ly.addWidget(QLabel("1. Pots desar una còpia del document en blanc per revisar-lo."))
-        ly.addWidget(self._btn_export, alignment=Qt.AlignLeft)
-
-        ly.addSpacing(8)
-        ly.addWidget(QLabel("2. Mantingues aquesta URL oberta a la tablet i envia-hi el soci."))
-        ly.addWidget(self._btn_generate_qr, alignment=Qt.AlignLeft)
+        ly.addWidget(self._btn_config_tablet, alignment=Qt.AlignLeft)
 
         link_row = QHBoxLayout()
         link_row.addWidget(self._server_url, stretch=1)
         link_row.addWidget(self._btn_copy_link)
         ly.addLayout(link_row)
         ly.addWidget(self._qr_label, alignment=Qt.AlignLeft)
-
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self._btn_start)
-        btn_row.addWidget(self._btn_cancel)
-        btn_row.addStretch(1)
-        ly.addLayout(btn_row)
 
         ly.addWidget(self._progress_label)
         return box
@@ -399,16 +389,6 @@ class LOPDFirmaDialog(QDialog):
             self._btn_delete.setEnabled(False)
 
     # ------------------------------------------------------------------
-    def _exportar_pdf(self) -> None:
-        suggested = f"lopd_{self._socio_id:06d}.pdf"
-        path, _ = QFileDialog.getSaveFileName(self, "Desar PDF LOPD", suggested, "PDF (*.pdf)")
-        if not path:
-            return
-        try:
-            generar_pdf_LOPD(self._socio_id, path, abrir=True)
-        except Exception as exc:
-            QMessageBox.critical(self, "Error", f"No s'ha pogut generar el PDF:\n{exc}")
-
     def _abrir_documento_guardado(self) -> None:
         try:
             data, _fecha = obtener_documento_firma_LOPD(self._socio_id)
@@ -418,6 +398,9 @@ class LOPDFirmaDialog(QDialog):
             return
 
         if self._ensure_tablet_server():
+            self._server.clear_active_signature()
+            self._cleanup_temp_pdf()
+            self._active_token = None
             self._server.set_completed_document(
                 data,
                 socio_id=self._socio_id,
@@ -454,6 +437,9 @@ class LOPDFirmaDialog(QDialog):
 
     # ------------------------------------------------------------------
     def _iniciar_firma(self) -> None:
+        if self._active_token:
+            return
+
         self._cleanup_temp_pdf()
         try:
             base_path = self._generar_pdf_temporal()
@@ -465,29 +451,23 @@ class LOPDFirmaDialog(QDialog):
         try:
             if not self._ensure_tablet_server():
                 raise RuntimeError("El servidor de la tablet no està disponible")
-            socio = consultar_socio(self._socio_id) or {}
-            self._active_token = self._server.set_active_signature(
-                pdf_path=base_path,
-                socio_id=self._socio_id,
-                nombre=self._nombre_socio_actual(socio),
-                dni=socio.get("dniNie", "") or "",
-            )
         except Exception as exc:
-            QMessageBox.critical(self, "Error", f"No s'ha pogut enviar el soci a la tablet:\n{exc}")
+            QMessageBox.critical(self, "Error", f"No s'ha pogut preparar la firma amb tablet:\n{exc}")
             self._cleanup_temp_pdf()
             return
 
-        self._progress_label.setText("Soci enviat a la tablet. Esperant la signatura.")
-        self._btn_start.setEnabled(False)
-        self._btn_cancel.show()
-        self._btn_cancel.setEnabled(True)
+        if not self._enviar_firma_si_tablet_conectada():
+            self._progress_label.setText("Firma preparada. Esperant que la tablet es connecti.")
         self._timer.start()
 
-    def _generar_url_qr(self) -> None:
+    def _configurar_conexion_tablet(self) -> None:
+        self._tablet_config_visible = True
+        self._server_url.show()
+        self._btn_copy_link.show()
         if not self._ensure_tablet_server():
             QMessageBox.critical(self, "Error", "No s'ha pogut generar la URL i el QR de la tablet.")
             return
-        self._progress_label.setText("URL i QR generats. Escaneja el QR amb la tablet.")
+        self._progress_label.setText("Connexió de tablet preparada. Escaneja el QR o copia l'enllaç.")
 
     def _ensure_tablet_server(self) -> bool:
         try:
@@ -502,7 +482,8 @@ class LOPDFirmaDialog(QDialog):
         if url:
             self._server_url.setText(url)
             self._btn_copy_link.setEnabled(True)
-            self._update_qr_url(url)
+            if self._tablet_config_visible:
+                self._update_qr_url(url)
             self._timer.start()
         else:
             self._server_url.setText("http://localhost")
@@ -518,18 +499,7 @@ class LOPDFirmaDialog(QDialog):
         self._server_url.clear()
         self._btn_copy_link.setEnabled(False)
         self._clear_qr()
-        self._btn_start.setEnabled(True)
-        self._btn_cancel.hide()
         self._progress_label.clear()
-
-    def _cancelar_firma_pendiente(self) -> None:
-        self._server.clear_active_signature()
-        self._server.clear_completed_document()
-        self._cleanup_temp_pdf()
-        self._active_token = None
-        self._btn_start.setEnabled(True)
-        self._btn_cancel.hide()
-        self._progress_label.setText("Firma pendent cancel·lada. La tablet queda en espera.")
 
     def _copiar_enlace(self) -> None:
         if not self._server_url.text():
@@ -553,6 +523,22 @@ class LOPDFirmaDialog(QDialog):
         self._qr_label.clear()
         self._qr_label.hide()
 
+    def _enviar_firma_si_tablet_conectada(self) -> bool:
+        if self._active_token or self._server_pdf is None:
+            return self._active_token is not None
+        if not self._server.tablet_connected():
+            return False
+
+        socio = consultar_socio(self._socio_id) or {}
+        self._active_token = self._server.set_active_signature(
+            pdf_path=self._server_pdf,
+            socio_id=self._socio_id,
+            nombre=self._nombre_socio_actual(socio),
+            dni=socio.get("dniNie", "") or "",
+        )
+        self._progress_label.setText("Soci enviat a la tablet. Esperant la signatura.")
+        return True
+
     # ------------------------------------------------------------------
     def _generar_pdf_temporal(self) -> str:
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -563,6 +549,9 @@ class LOPDFirmaDialog(QDialog):
     def _poll_signature_queue(self) -> None:
         if not self._server.running:
             return
+
+        self._enviar_firma_si_tablet_conectada()
+
         q = self._server.queue
         try:
             payload = q.get_nowait()
@@ -593,8 +582,6 @@ class LOPDFirmaDialog(QDialog):
         finally:
             self._cleanup_temp_pdf()
             self._active_token = None
-            self._btn_start.setEnabled(True)
-            self._btn_cancel.hide()
             self._progress_label.setText("Signatura rebuda i guardada. La tablet queda en espera.")
             if self._server.running:
                 self._timer.start()

@@ -6,6 +6,7 @@ import queue
 import secrets
 import socket
 import threading
+import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -35,6 +36,7 @@ class SignatureServer:
         self._lock = threading.Lock()
         self._active_signature: dict[str, Any] | None = None
         self._completed_document: dict[str, Any] | None = None
+        self._tablet_last_seen: float | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -67,6 +69,7 @@ class SignatureServer:
         self._server = None
         self._thread = None
         self._address = None
+        self._tablet_last_seen = None
         self.clear_active_signature()
         self.clear_completed_document()
         while not self._queue.empty():
@@ -131,6 +134,11 @@ class SignatureServer:
     def running(self) -> bool:
         return self._server is not None
 
+    def tablet_connected(self, *, max_age_seconds: float = 10.0) -> bool:
+        with self._lock:
+            last_seen = self._tablet_last_seen
+        return last_seen is not None and (time.monotonic() - last_seen) <= max_age_seconds
+
     def connection_url(self) -> str | None:
         if not self._server or not self._address:
             return None
@@ -182,6 +190,10 @@ class SignatureServer:
             "pdfUrl": "/documento.pdf",
         }
 
+    def _mark_tablet_seen(self) -> None:
+        with self._lock:
+            self._tablet_last_seen = time.monotonic()
+
     def _build_handler(self) -> type[BaseHTTPRequestHandler]:
         server = self
 
@@ -207,6 +219,7 @@ class SignatureServer:
                     self.send_error(HTTPStatus.NOT_FOUND)
 
             def _serve_index(self) -> None:
+                server._mark_tablet_seen()
                 self._set_headers(HTTPStatus.OK, "text/html; charset=utf-8")
                 self.wfile.write(_SIGNATURE_HTML.encode("utf-8"))
 
@@ -240,6 +253,7 @@ class SignatureServer:
                 self.wfile.write(bytes(data))
 
             def _serve_status(self) -> None:
+                server._mark_tablet_seen()
                 data = json.dumps(server._status_payload()).encode("utf-8")
                 self._set_headers(HTTPStatus.OK, "application/json")
                 self.wfile.write(data)
@@ -325,7 +339,7 @@ _SIGNATURE_HTML = """<!DOCTYPE html>
     .actions { margin-top: 1rem; }
     .preview { margin-top: 1rem; border-top: 1px solid #d7d7d2; padding-top: 1rem; }
     .preview iframe { width: 100%; height: 560px; border: 1px solid #d7d7d2; border-radius: 6px; background: white; }
-    #status { margin-top: 0.8rem; font-weight: bold; min-height: 1.4rem; }
+    #status { display: none; }
     #signing[hidden], #waiting[hidden], #preview[hidden] { display: none; }
   </style>
 </head>
@@ -333,9 +347,7 @@ _SIGNATURE_HTML = """<!DOCTYPE html>
   <main>
     <div class="card">
       <h1>Consentiment LOPD</h1>
-      <section id="waiting">
-        <p class="muted">Tablet preparada. Esperant que s'enviï un soci des de l'ordinador.</p>
-      </section>
+      <section id="waiting"></section>
       <section id="signing" hidden>
         <div class="person">
           <strong id="person-name"></strong>
@@ -350,7 +362,6 @@ _SIGNATURE_HTML = """<!DOCTYPE html>
         </div>
       </section>
       <section id="preview" class="preview" hidden>
-        <p><a id="preview-link" href="/firmado.pdf" target="_blank">Obrir document signat</a></p>
         <iframe id="preview-frame" title="Document LOPD signat"></iframe>
       </section>
       <div id="status"></div>
@@ -363,7 +374,6 @@ _SIGNATURE_HTML = """<!DOCTYPE html>
     const personDni = document.getElementById('person-dni');
     const pdfLink = document.getElementById('pdf-link');
     const preview = document.getElementById('preview');
-    const previewLink = document.getElementById('preview-link');
     const previewFrame = document.getElementById('preview-frame');
     const canvas = document.getElementById('pad');
     const ctx = canvas.getContext('2d');
@@ -401,7 +411,6 @@ _SIGNATURE_HTML = """<!DOCTYPE html>
       }
       const url = payload.previewUrl || '/firmado.pdf';
       currentPreviewID = payload.previewID || String(Date.now());
-      previewLink.href = url;
       previewFrame.src = `${url}?t=${encodeURIComponent(currentPreviewID)}`;
       preview.hidden = false;
     };
@@ -436,7 +445,8 @@ _SIGNATURE_HTML = """<!DOCTYPE html>
           }
         })
         .catch(() => {
-          statusLabel.textContent = 'No es pot contactar amb el servidor de firma.';
+          setWaiting('No es pot contactar amb el servidor de firma.');
+          hidePreview();
         });
     };
 

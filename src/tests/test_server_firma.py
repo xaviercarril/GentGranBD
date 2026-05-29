@@ -29,9 +29,8 @@ def _post_json(url: str, payload: dict) -> int:
 
 
 def _local_url(server: SignatureServer) -> str:
-    url = server.connection_url()
-    assert url is not None
-    return url.replace("0.0.0.0", "127.0.0.1")
+    assert server._address is not None
+    return f"http://127.0.0.1:{server._address[1]}"
 
 
 def test_servidor_tablet_espera_y_publica_socio(tmp_path: Path) -> None:
@@ -61,6 +60,21 @@ def test_servidor_tablet_espera_y_publica_socio(tmp_path: Path) -> None:
 
         with urllib.request.urlopen(f"{base_url}/documento.pdf", timeout=2) as response:
             assert response.read() == b"%PDF-1.4 test"
+    finally:
+        server.stop()
+
+
+def test_servidor_detecta_tablet_conectada_solo_tras_peticion() -> None:
+    server = SignatureServer(preferred_port=0)
+
+    try:
+        server.start()
+        base_url = _local_url(server)
+
+        assert server.tablet_connected() is False
+        waiting = _json_get(f"{base_url}/status")
+        assert waiting["active"] is False
+        assert server.tablet_connected() is True
     finally:
         server.stop()
 
