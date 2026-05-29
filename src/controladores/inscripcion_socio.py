@@ -4,6 +4,7 @@ from controladores.dtos_models import InscripcionSocioDTO, InscripcionSocioUpdat
 from database import SessionLocal
 from models import InscripcionSocio, Pago
 from controladores.dtos import inscripcion_to_dto, pago_to_dto
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
 # ───────────────── CRUD ─────────────────
@@ -17,6 +18,13 @@ def registrar_inscripcion(data: dict) -> int:
     nueva_inscripcion = InscripcionSocio(
         socioID=dto.socioID,
         actividadID=dto.actividadID,
+        noSocioNombre=dto.noSocioNombre,
+        noSocioApellido1=dto.noSocioApellido1,
+        noSocioApellido2=dto.noSocioApellido2,
+        noSocioDni=dto.noSocioDni,
+        noSocioTelefono=dto.noSocioTelefono,
+        noSocioEmail=dto.noSocioEmail,
+        noSocioObservaciones=dto.noSocioObservaciones,
         fechaInscripcion=dto.fechaInscripcion,
         estado=dto.estado,
         observaciones=dto.observaciones,
@@ -110,17 +118,14 @@ def consultar_socioID_InscripcionSocio(inscripcion_id: int) -> int | None:
 def listar_pagos_por_InscripcionSocio(inscripcion_id: int) -> list[dict]:
     """Lista los pagos asociados a una inscripción de socio."""
     try:
-        socioID = consultar_socioID_InscripcionSocio(inscripcion_id)
-        actividadID = consultar_actividadID_InscripcionSocio(inscripcion_id)
-        if not socioID:
-            raise ValueError("Inscripción no encontrada o socio no asociado")
-        if not actividadID:
-            raise ValueError("Inscripción no encontrada o actividad no asociada")
         with SessionLocal() as db:
-            pagos = db.query(Pago).filter(
-                Pago.socioID == socioID,
-                Pago.actividadID == actividadID
-            ).all()
+            ins = db.get(InscripcionSocio, inscripcion_id)
+            if not ins:
+                raise ValueError("Inscripción no encontrada")
+            filtros = [Pago.inscripcionID == inscripcion_id]
+            if ins.socioID:
+                filtros.append((Pago.socioID == ins.socioID) & (Pago.actividadID == ins.actividadID))
+            pagos = db.query(Pago).filter(or_(*filtros)).all()
             return [pago_to_dto(pago).model_dump() for pago in pagos]
     except Exception as e:
         raise ValueError(f"Error al listar pagos: {e}")

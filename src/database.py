@@ -118,6 +118,63 @@ def _drop_personal_dni_sqlite() -> None:
         conn.execute(text("PRAGMA foreign_keys=ON"))
 
 
+def _rebuild_matricula_pagos_sqlite_for_inscripcion_id() -> None:
+    """Rebuild legacy SQLite payment table with nullable socioID and inscripcionID."""
+    with engine.begin() as conn:
+        conn.execute(text("PRAGMA foreign_keys=OFF"))
+        conn.execute(text("DROP TABLE IF EXISTS matricula_pagos_new"))
+        conn.execute(
+            text(
+                """
+                CREATE TABLE matricula_pagos_new (
+                    id INTEGER NOT NULL,
+                    "socioID" INTEGER,
+                    "actividadID" INTEGER NOT NULL,
+                    "inscripcionID" INTEGER,
+                    fecha DATE NOT NULL,
+                    importe DECIMAL(10, 2) NOT NULL,
+                    estado VARCHAR(7) NOT NULL,
+                    observaciones TEXT,
+                    PRIMARY KEY (id),
+                    CONSTRAINT fk_matricula_inscripcion
+                        FOREIGN KEY("socioID", "actividadID")
+                        REFERENCES inscripciones ("socioID", "actividadID")
+                        ON DELETE CASCADE
+                )
+                """
+            )
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO matricula_pagos_new (
+                    id, "socioID", "actividadID", "inscripcionID",
+                    fecha, importe, estado, observaciones
+                )
+                SELECT
+                    p.id,
+                    p."socioID",
+                    p."actividadID",
+                    (
+                        SELECT i.id
+                        FROM inscripciones i
+                        WHERE i."socioID" = p."socioID"
+                          AND i."actividadID" = p."actividadID"
+                        LIMIT 1
+                    ),
+                    p.fecha,
+                    p.importe,
+                    p.estado,
+                    p.observaciones
+                FROM matricula_pagos p
+                """
+            )
+        )
+        conn.execute(text("DROP TABLE matricula_pagos"))
+        conn.execute(text("ALTER TABLE matricula_pagos_new RENAME TO matricula_pagos"))
+        conn.execute(text("PRAGMA foreign_keys=ON"))
+
+
 def ensure_schema_updates() -> None:
     """Apply schema updates for existing installations."""
     inspector = inspect(engine)
@@ -131,9 +188,55 @@ def ensure_schema_updates() -> None:
         if "personal" in table_names
         else set()
     )
+    inscripcion_columns = (
+        {column["name"] for column in inspector.get_columns("inscripciones")}
+        if "inscripciones" in table_names
+        else set()
+    )
+    actividad_columns = (
+        {column["name"] for column in inspector.get_columns("actividades")}
+        if "actividades" in table_names
+        else set()
+    )
+    pago_columns_info = (
+        inspector.get_columns("matricula_pagos")
+        if "matricula_pagos" in table_names
+        else []
+    )
+    pago_columns = {column["name"] for column in pago_columns_info}
+    pago_socio_not_null = any(
+        column["name"] == "socioID" and not column.get("nullable", True)
+        for column in pago_columns_info
+    )
     statements: list[str] = []
     if "fechaNacimiento" not in socio_columns:
         statements.append('ALTER TABLE socios ADD COLUMN "fechaNacimiento" DATE')
+    if "inscripciones" in table_names and "noSocioNombre" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioNombre" VARCHAR(100)')
+    if "inscripciones" in table_names and "noSocioApellido1" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioApellido1" VARCHAR(100)')
+    if "inscripciones" in table_names and "noSocioApellido2" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioApellido2" VARCHAR(100)')
+    if "inscripciones" in table_names and "noSocioDni" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioDni" VARCHAR(20)')
+    if "inscripciones" in table_names and "noSocioTelefono" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioTelefono" VARCHAR(20)')
+    if "inscripciones" in table_names and "noSocioEmail" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioEmail" VARCHAR(100)')
+    if "inscripciones" in table_names and "noSocioObservaciones" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioObservaciones" TEXT')
+    if "actividades" in table_names and "tipo" not in actividad_columns:
+        statements.append("ALTER TABLE actividades ADD COLUMN tipo VARCHAR(6) NOT NULL DEFAULT 'CURS'")
+    rebuild_pagos_sqlite = (
+        "matricula_pagos" in table_names
+        and engine.url.get_backend_name() == "sqlite"
+        and ("inscripcionID" not in pago_columns or pago_socio_not_null)
+    )
+    if "matricula_pagos" in table_names and engine.url.get_backend_name() != "sqlite":
+        if "inscripcionID" not in pago_columns:
+            statements.append('ALTER TABLE matricula_pagos ADD COLUMN "inscripcionID" INTEGER')
+        if pago_socio_not_null:
+            statements.append('ALTER TABLE matricula_pagos ALTER COLUMN "socioID" DROP NOT NULL')
     if "dniNie" in personal_columns and engine.url.get_backend_name() != "sqlite":
         statements.append('ALTER TABLE personal DROP COLUMN "dniNie"')
 
@@ -141,9 +244,34 @@ def ensure_schema_updates() -> None:
         with engine.begin() as conn:
             for statement in statements:
                 conn.execute(text(statement))
+            if "actividades" in table_names:
+                conn.execute(text("UPDATE actividades SET tipo = 'CURS' WHERE tipo IS NULL OR tipo = ''"))
+            if (
+                "matricula_pagos" in table_names
+                and "inscripcionID" not in pago_columns
+                and engine.url.get_backend_name() != "sqlite"
+            ):
+                conn.execute(
+                    text(
+                        """
+                        UPDATE matricula_pagos
+                        SET "inscripcionID" = (
+                            SELECT i.id
+                            FROM inscripciones i
+                            WHERE i."socioID" = matricula_pagos."socioID"
+                              AND i."actividadID" = matricula_pagos."actividadID"
+                            LIMIT 1
+                        )
+                        WHERE "inscripcionID" IS NULL
+                        """
+                    )
+                )
 
     if "dniNie" in personal_columns and engine.url.get_backend_name() == "sqlite":
         _drop_personal_dni_sqlite()
+
+    if rebuild_pagos_sqlite:
+        _rebuild_matricula_pagos_sqlite_for_inscripcion_id()
 
     if not statements and "dniNie" not in personal_columns:
         return

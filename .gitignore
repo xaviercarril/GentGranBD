@@ -11,3 +11,4 @@ src/gentgran.db
 .env
 postgres-data/
 logs/
+tmp

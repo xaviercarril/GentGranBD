@@ -5,7 +5,7 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QProcess
+from PySide6.QtCore import QProcess, QSize
 from PySide6.QtWidgets import (
     QMainWindow, QTabWidget, QApplication, QMenuBar, QMenu
 )
@@ -41,7 +41,12 @@ class MainWindow(QMainWindow):
         _startup_log("MainWindow init started")
         self._sel_model = None  # Model de selecció per a la taula de socis
         self.setWindowTitle("Associació Gent Gran de Castelldefels – Gestió")
-        self.resize(900, 600)
+        self._tab_window_sizes = {
+            "Socis": QSize(1120, 720),
+            "Activitats": QSize(1350, 780),
+            "Personal": QSize(1050, 680),
+        }
+        self.resize(self._bounded_window_size(self._tab_window_sizes["Socis"]))
 
         app = QApplication.instance()
         screen = app.primaryScreen() if app else None
@@ -112,6 +117,24 @@ class MainWindow(QMainWindow):
                 return
 
         self._current_tab_index = index
+        self._resize_for_current_tab()
+
+    def _resize_for_current_tab(self):
+        label = self.tabs.tabText(self.tabs.currentIndex())
+        target = self._tab_window_sizes.get(label)
+        if target:
+            self.resize(self._bounded_window_size(target))
+
+    def _bounded_window_size(self, target: QSize) -> QSize:
+        app = QApplication.instance()
+        screen = app.primaryScreen() if app else None
+        if not screen:
+            return target
+        available = screen.availableGeometry()
+        return QSize(
+            min(target.width(), max(900, available.width() - 80)),
+            min(target.height(), max(600, available.height() - 80)),
+        )
 
     def _mostrar_dialog_nou_curs(self):
         from ui.tab_cursoAcademico import CursoAcademicoDialog

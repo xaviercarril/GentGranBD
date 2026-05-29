@@ -1,15 +1,131 @@
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QLabel, QListWidget, QPushButton, QHBoxLayout, QMessageBox, QComboBox, QTableView, QHeaderView
+    QDialog, QVBoxLayout, QLabel, QListWidget, QPushButton, QHBoxLayout,
+    QMessageBox, QComboBox, QTableView, QHeaderView, QStyledItemDelegate
 )
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from controladores.inscripcion_socio import (
     consultar_actividadID_InscripcionSocio, consultar_socioID_InscripcionSocio, registrar_inscripcion, eliminar_inscripcion
 )
 from controladores.actividades import consultar_actividad, listar_actividades, listar_inscripciones_por_Actividad
 from controladores.socios import consultar_socio, listar_inscripciones_por_socio
-from datetime import date
+from datetime import date, datetime
 from controladores.inscripcion_socio import modificar_inscripcion, listar_pagos_por_InscripcionSocio
+from controladores.pagos import modificar_pago
 from ui.table_models import DictTableModel
+
+
+def _actividad_tipo_label(tipo) -> str:
+    value = getattr(tipo, "value", tipo)
+    return "Viatge" if value == "VIATGE" else "Curs"
+
+
+class PagosTableModel(QAbstractTableModel):
+    EDITABLE_KEYS = {"fecha_pago", "importe", "estado", "observaciones"}
+
+    def __init__(self, rows, headers, payment_changed_callback, parent=None):
+        super().__init__(parent)
+        self.rows = rows or []
+        self.labels, self.keys = zip(*headers)
+        self._payment_changed_callback = payment_changed_callback
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self.rows)
+
+    def columnCount(self, parent=QModelIndex()):
+        return len(self.keys)
+
+    def data(self, index, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+
+        key = self.keys[index.column()]
+        value = self.rows[index.row()].get(key, "")
+
+        if role in (Qt.DisplayRole, Qt.EditRole):
+            if value is None:
+                return "" if role == Qt.EditRole else "----"
+            if key == "fecha_pago":
+                return value.strftime("%d-%m-%Y") if isinstance(value, date) else str(value)
+            if key == "importe":
+                try:
+                    return f"{float(value):.2f} €" if role == Qt.DisplayRole else f"{float(value):.2f}"
+                except (TypeError, ValueError):
+                    return str(value)
+            return str(getattr(value, "value", value))
+
+        return None
+
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.labels[section]
+        return super().headerData(section, orientation, role)
+
+    def flags(self, index):
+        flags = super().flags(index)
+        if index.isValid() and self.keys[index.column()] in self.EDITABLE_KEYS:
+            return flags | Qt.ItemIsEditable
+        return flags
+
+    def setData(self, index, value, role=Qt.EditRole):
+        if role != Qt.EditRole or not index.isValid():
+            return False
+
+        key = self.keys[index.column()]
+        if key not in self.EDITABLE_KEYS:
+            return False
+
+        try:
+            pago = self.rows[index.row()]
+            new_value = self._parse_value(key, value)
+            self._payment_changed_callback(pago["id"], key, new_value)
+            pago[key] = new_value
+            self.dataChanged.emit(index, index, [Qt.DisplayRole, Qt.EditRole])
+            return True
+        except ValueError as e:
+            QMessageBox.warning(None, "Error", str(e))
+            return False
+
+    def _parse_value(self, key, value):
+        text = str(value).strip()
+        if key == "fecha_pago":
+            for fmt in ("%d/%m/%Y", "%d-%m-%Y", "%Y-%m-%d"):
+                try:
+                    return datetime.strptime(text, fmt).date()
+                except ValueError:
+                    pass
+            raise ValueError("La data ha de tenir format dd/mm/aaaa.")
+        if key == "importe":
+            text = text.replace("€", "").replace(",", ".").strip()
+            try:
+                parsed = float(text)
+            except ValueError:
+                raise ValueError("L'import ha de ser un número.")
+            if parsed < 0:
+                raise ValueError("L'import no pot ser negatiu.")
+            return parsed
+        if key == "estado":
+            normalized = text.upper().replace("ANULAT", "ANUL·LAT")
+            if normalized not in {"PENDENT", "PAGAT", "ANUL·LAT"}:
+                raise ValueError("L'estat ha de ser PENDENT, PAGAT o ANUL·LAT.")
+            return normalized
+        return text or None
+
+
+class EstadoPagoDelegate(QStyledItemDelegate):
+    ESTADOS = ["PENDENT", "PAGAT", "ANUL·LAT"]
+
+    def createEditor(self, parent, option, index):
+        combo = QComboBox(parent)
+        combo.addItems(self.ESTADOS)
+        return combo
+
+    def setEditorData(self, editor, index):
+        value = str(index.model().data(index, Qt.EditRole) or "")
+        pos = editor.findText(value)
+        editor.setCurrentIndex(pos if pos >= 0 else 0)
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.currentText(), Qt.EditRole)
 
 class InscripcionesDialog(QDialog):
     def __init__(self, socio_id: int, parent=None):
@@ -42,6 +158,8 @@ class InscripcionesDialog(QDialog):
         self.pagos_table.setMinimumHeight(200)
         self.pagos_table.verticalHeader().setVisible(False)
         self.pagos_table.setSelectionBehavior(QTableView.SelectRows)
+        self.pagos_table.setSelectionMode(QTableView.SingleSelection)
+        self.pagos_table.setEditTriggers(QTableView.DoubleClicked | QTableView.EditKeyPressed)
         self.pagos_table.setAlternatingRowColors(True)
         self.pagos_table.horizontalHeader().setVisible(True)
         self.pagos_table.horizontalHeader().setStretchLastSection(True)
@@ -102,18 +220,31 @@ class InscripcionesDialog(QDialog):
             actividadID = consultar_actividadID_InscripcionSocio(ins["id"])
             act = consultar_actividad(actividadID) if actividadID else None
             if act and (curso_id is None or act["cursoAcademico_id"] == curso_id):
-                self.lista_inscripciones.addItem(f"{act['nombre']} - {ins['estado'].value} - {ins['fechaInscripcion'].strftime('%d-%m-%Y')}")
+                tipo = _actividad_tipo_label(act.get("tipo"))
+                self.lista_inscripciones.addItem(
+                    f"{act['nombre']} ({tipo}) - {ins['estado'].value} - {ins['fechaInscripcion'].strftime('%d-%m-%Y')}"
+                )
         self._carregar_pagos(self.lista_inscripciones.currentRow())
 
     def _afegir_inscripcio(self):
         curso_id = self.combo_cursos.currentData()
         activitats = [a for a in listar_actividades() if curso_id is None or a["cursoAcademico_id"] == curso_id]
-        noms = [a["nombre"] for a in activitats]
+        opcions = {
+            f"{a['nombre']} ({_actividad_tipo_label(a.get('tipo'))}, ID {a['id']})": a
+            for a in activitats
+        }
 
         from PySide6.QtWidgets import QInputDialog
-        item, ok = QInputDialog.getItem(self, "Selecciona una activitat", "Activitat:", noms, 0, False)
+        item, ok = QInputDialog.getItem(
+            self,
+            "Selecciona una activitat",
+            "Activitat:",
+            list(opcions.keys()),
+            0,
+            False,
+        )
         if ok and item:
-            act = next((a for a in activitats if a["nombre"] == item), None)
+            act = opcions.get(item)
             if act:
                 ya_inscrito = any(
                     ins["actividadID"] == act["id"] for ins in self._inscripcions
@@ -190,13 +321,14 @@ class InscripcionesDialog(QDialog):
                 ("Estat", "estado"),
                 ("Observacions", "observaciones")
             ]
-            for pago in pagos:
-                pago["fecha_pago"] = pago["fecha_pago"].strftime("%d-%m-%Y") if pago["fecha_pago"] else "Desconeguda"
-                pago["importe"] = f"{pago['importe']:.2f} €"
-            self.pagos_table.setModel(DictTableModel(pagos, headers))
+            self.pagos_table.setModel(PagosTableModel(pagos, headers, self._actualitzar_pagament, self))
+            self.pagos_table.setItemDelegateForColumn(2, EstadoPagoDelegate(self.pagos_table))
             self.pagos_table.resizeColumnsToContents()
         except Exception as e:
             QMessageBox.warning(self, "Error", f"No s'han pogut carregar els pagaments: {e}")
+
+    def _actualitzar_pagament(self, pago_id: int, field: str, value):
+        modificar_pago(pago_id, {field: value})
 
 
     def _afegir_pagament(self):
@@ -215,6 +347,7 @@ class InscripcionesDialog(QDialog):
             data = dialog.get_data()
             data["socioID"] = inscripcio["socioID"]
             data["actividadID"] = inscripcio["actividadID"]
+            data["inscripcionID"] = inscripcio["id"]
 
             from controladores.pagos import registrar_pago
             try:

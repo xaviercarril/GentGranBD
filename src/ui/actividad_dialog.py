@@ -7,10 +7,11 @@ from controladores.personal import listar_personal
 from PySide6.QtWidgets import QDoubleSpinBox
 
 class ActividadDialog(QDialog):
-    def __init__(self, parent=None, cursoAcademico_id=None):
+    def __init__(self, parent=None, cursoAcademico_id=None, tipo="CURS"):
         super().__init__(parent)
         self._cursoAcademico_id = cursoAcademico_id
-        self.setWindowTitle("Nova activitat")
+        self._tipo = tipo
+        self.setWindowTitle("Nou viatge" if tipo == "VIATGE" else "Nou curs")
 
         self.nombre = QLineEdit()
         self.descripcion = QLineEdit()
@@ -30,11 +31,18 @@ class ActividadDialog(QDialog):
         self.precioMatricula.setMaximum(999.99)
 
         form = QFormLayout()
-        form.addRow("Nom:", self.nombre)
-        form.addRow("Descripció:", self.descripcion)
-        form.addRow("Professor/Voluntari:", self.personal)
-        form.addRow("Preu matrícula:", self.precioMatricula)
-        form.addRow("Màxim alumnes:", self.numMaxAlumnos)
+        if tipo == "CURS":
+            form.addRow("Nom:", self.nombre)
+            form.addRow("Descripció:", self.descripcion)
+            form.addRow("Professor/Voluntari:", self.personal)
+            form.addRow("Preu matrícula:", self.precioMatricula)
+            form.addRow("Màxim alumnes:", self.numMaxAlumnos)
+        else:
+            form.addRow("Nom del viatge:", self.nombre)
+            form.addRow("Descripció / itinerari:", self.descripcion)
+            form.addRow("Responsable:", self.personal)
+            form.addRow("Preu viatge:", self.precioMatricula)
+            form.addRow("Places:", self.numMaxAlumnos)
 
         btn_guardar = QPushButton("Guardar")
         btn_cancelar = QPushButton("Cancel·lar")
@@ -56,6 +64,7 @@ class ActividadDialog(QDialog):
             "cursoAcademico_id": self._cursoAcademico_id,
             "personalID": self.personal.currentData(),
             "precio_matricula": self.precioMatricula.value(),
+            "tipo": self._tipo,
         }
 
         if not data["nombre"]:

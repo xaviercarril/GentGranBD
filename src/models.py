@@ -30,6 +30,11 @@ class EstadoPago(enum.Enum):
     PAGAT = "PAGAT"
     ANULAT = "ANUL·LAT"
 
+
+class TipoActividadEnum(enum.Enum):
+    CURS = "CURS"
+    VIATGE = "VIATGE"
+
 # ---------------------------------------------
 # SOCIO + GDPR CONSENT
 # ---------------------------------------------
@@ -148,6 +153,7 @@ class Actividad(Base):
 
     id = Column(Integer, primary_key=True)
     nombre = Column(String(100), nullable=False)
+    tipo = Column(Enum(TipoActividadEnum), nullable=False, default=TipoActividadEnum.CURS)
     numMaxAlumnos = Column(Integer)
     precio_matricula = Column(DECIMAL(10, 2), default=0.0)
     descripcion = Column(Text)
@@ -193,6 +199,13 @@ class InscripcionSocio(Base):
     id = Column(Integer, primary_key=True)
     socioID = Column(Integer, ForeignKey("socios.id"))
     actividadID = Column(Integer, ForeignKey("actividades.id"))
+    noSocioNombre = Column(String(100))
+    noSocioApellido1 = Column(String(100))
+    noSocioApellido2 = Column(String(100))
+    noSocioDni = Column(String(20))
+    noSocioTelefono = Column(String(20))
+    noSocioEmail = Column(String(100))
+    noSocioObservaciones = Column(Text)
 
     fechaInscripcion = Column(Date, nullable=False)
     fechaBaja = Column(Date)
@@ -234,8 +247,9 @@ class Pago(Base):
     __tablename__ = "matricula_pagos"
 
     id = Column(Integer, primary_key=True)
-    socioID = Column(Integer, nullable=False)
+    socioID = Column(Integer)
     actividadID = Column(Integer, nullable=False)
+    inscripcionID = Column(Integer)
     fecha = Column(Date, nullable=False)
     importe = Column(DECIMAL(10, 2), nullable=False)
     estado = Column(Enum(EstadoPago), nullable=False)

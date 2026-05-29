@@ -13,19 +13,42 @@ from controladores.inscripcion_socio import consultar_socioID_InscripcionSocio, 
 from controladores.socios import consultar_socio
 from database import SessionLocal
 from models import (
-    Actividad, Clase, InscripcionSocio
+    Actividad, Clase, InscripcionSocio, TipoActividadEnum
 )
+
+def _normalizar_tipo_actividad(tipo) -> TipoActividadEnum | None:
+    if tipo is None:
+        return None
+    if isinstance(tipo, TipoActividadEnum):
+        return tipo
+    text = str(tipo).strip().upper()
+    aliases = {
+        "CURSO": "CURS",
+        "CURSOS": "CURS",
+        "CURS": "CURS",
+        "TALLER": "CURS",
+        "TALLERS": "CURS",
+        "TALLERES": "CURS",
+        "VIAJE": "VIATGE",
+        "VIAJES": "VIATGE",
+        "VIATGE": "VIATGE",
+        "VIATGES": "VIATGE",
+    }
+    return TipoActividadEnum(aliases.get(text, text))
+
 
 # ───────────────── CRUD ─────────────────
 def registrar_actividad(data: dict) -> int:
     """Crea actividad; recibe dict, valida con DTO y devuelve ID."""
     try:
+        data = {**data, "tipo": _normalizar_tipo_actividad(data.get("tipo")) or TipoActividadEnum.CURS}
         dto = ActividadDTO(**data)
     except ValidationError as e:
         raise ValueError(f"Datos de entrada inválidos: {e}")
     try:
         nueva = Actividad(
             nombre=dto.nombre,
+            tipo=dto.tipo,
             descripcion=dto.descripcion,
             numMaxAlumnos=dto.numMaxAlumnos,
             cursoAcademicoID=dto.cursoAcademico_id,
@@ -43,6 +66,8 @@ def registrar_actividad(data: dict) -> int:
 
 def modificar_actividad(actividadID: int, newData: dict) -> None:
     try:
+        if "tipo" in newData:
+            newData = {**newData, "tipo": _normalizar_tipo_actividad(newData.get("tipo"))}
         dto = ActividadUpdateDTO(**newData)
     except ValidationError as e:
         raise ValueError(f"Datos inválidos al modificar clase: {e}")
@@ -89,14 +114,31 @@ def eliminar_actividad(actividadID: int) -> None:
 
 # ────────────────── Consultas ────────────
 
-def listar_actividades() -> list[dict]:
+def listar_actividades(tipo=None) -> list[dict]:
     """Devuelve todas las actividades como lista de dicts."""
     try:
+        tipo_enum = _normalizar_tipo_actividad(tipo)
         with SessionLocal() as db:
-            acts = db.query(Actividad).order_by(Actividad.nombre).all()
+            query = db.query(Actividad)
+            if tipo_enum is not None:
+                query = query.filter(Actividad.tipo == tipo_enum)
+            acts = query.order_by(Actividad.nombre).all()
             return [actividad_to_dto(a).model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades: {e}")
+
+def listar_actividades_por_tipo(tipo) -> list[dict]:
+    """Devuelve actividades filtradas por tipo."""
+    try:
+        tipo_enum = _normalizar_tipo_actividad(tipo)
+        with SessionLocal() as db:
+            query = db.query(Actividad)
+            if tipo_enum is not None:
+                query = query.filter(Actividad.tipo == tipo_enum)
+            acts = query.order_by(Actividad.nombre).all()
+            return [actividad_to_dto(a).model_dump() for a in acts]
+    except Exception as e:
+        raise ValueError(f"Error al listar actividades por tipo: {e}")
 
 def listar_inscripciones_por_Actividad(actividadID: int) -> list[dict]:
     """Devuelve inscripciones de una actividad."""
