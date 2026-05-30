@@ -35,18 +35,16 @@ def _startup_log(message: str) -> None:
 
 class MainWindow(QMainWindow):
     """Finestra principal amb pestanyes (Socis, Activitats, …)."""
+    LOGOUT_EXIT_CODE = 42
 
-    def __init__(self):
+    def __init__(self, current_user: dict | None = None):
         super().__init__()
         _startup_log("MainWindow init started")
+        self.current_user = current_user or {}
+        self._logging_out = False
         self._sel_model = None  # Model de selecció per a la taula de socis
         self.setWindowTitle("Associació Gent Gran de Castelldefels – Gestió")
-        self._tab_window_sizes = {
-            "Socis": QSize(1120, 720),
-            "Activitats": QSize(1350, 780),
-            "Personal": QSize(1050, 680),
-        }
-        self.resize(self._bounded_window_size(self._tab_window_sizes["Socis"]))
+        self._initial_window_size = QSize(1350, 780)
 
         app = QApplication.instance()
         screen = app.primaryScreen() if app else None
@@ -75,6 +73,7 @@ class MainWindow(QMainWindow):
         self._current_tab_index = self.tabs.currentIndex()
         self._changing_tab_programmatically = False
         self.tabs.currentChanged.connect(self._on_tab_changed)
+        self.resize(self._bounded_window_size(self._initial_window_size))
 
         # ── Menú superior ───────────────────────────────────────
         _startup_log("Creating menu")
@@ -99,7 +98,53 @@ class MainWindow(QMainWindow):
         action_restore_db = QAction("Restaurar BD des d'una còpia…", self)
         action_restore_db.triggered.connect(self._restore_database)
         menu_arxiu.addAction(action_restore_db)
+        menu_arxiu.addSeparator()
+
+        action_logout = QAction("Tancar sessió", self)
+        action_logout.triggered.connect(self._logout)
+        menu_arxiu.addAction(action_logout)
+
+        if self.current_user.get("rol") == "ADMIN":
+            menu_admin = menu_bar.addMenu("Administració")
+            action_usuaris = QAction("Usuaris", self)
+            action_usuaris.triggered.connect(self._mostrar_usuaris)
+            menu_admin.addAction(action_usuaris)
+
+        self._update_session_status()
         _startup_log("MainWindow init finished")
+
+    def _update_session_status(self):
+        from database import engine
+
+        username = self.current_user.get("username", "")
+        safe_url = engine.url.render_as_string(hide_password=True)
+        if username:
+            self.setWindowTitle(f"Associació Gent Gran de Castelldefels – Gestió ({username})")
+        self.statusBar().showMessage(f"Usuari: {username} | BD: {safe_url}")
+
+    def _mostrar_usuaris(self):
+        if self.current_user.get("rol") != "ADMIN":
+            QMessageBox.warning(self, "Accés denegat", "Només els administradors poden gestionar usuaris.")
+            return
+        from ui.usuarios_dialog import UsuariosDialog
+
+        dlg = UsuariosDialog(self)
+        dlg.exec()
+
+    def _logout(self):
+        if not self._confirm_all_pending_changes():
+            return
+        self._logging_out = True
+        self.close()
+        QApplication.exit(self.LOGOUT_EXIT_CODE)
+
+    def _confirm_all_pending_changes(self) -> bool:
+        for index in range(self.tabs.count()):
+            widget = self.tabs.widget(index)
+            if hasattr(widget, "confirm_pending_changes"):
+                if not widget.confirm_pending_changes():
+                    return False
+        return True
 
     def _on_tab_changed(self, index: int):
         if self._changing_tab_programmatically:
@@ -117,13 +162,6 @@ class MainWindow(QMainWindow):
                 return
 
         self._current_tab_index = index
-        self._resize_for_current_tab()
-
-    def _resize_for_current_tab(self):
-        label = self.tabs.tabText(self.tabs.currentIndex())
-        target = self._tab_window_sizes.get(label)
-        if target:
-            self.resize(self._bounded_window_size(target))
 
     def _bounded_window_size(self, target: QSize) -> QSize:
         app = QApplication.instance()
@@ -469,9 +507,8 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
-        if hasattr(self.socios_tab, "confirm_pending_changes"):
-            if not self.socios_tab.confirm_pending_changes():
-                event.ignore()
-                return
+        if not self._logging_out and not self._confirm_all_pending_changes():
+            event.ignore()
+            return
 
         super().closeEvent(event)

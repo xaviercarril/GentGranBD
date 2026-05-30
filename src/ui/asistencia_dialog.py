@@ -13,6 +13,7 @@ from controladores.curso_academico import listar_trimestres_por_cursoA
 from controladores.actividades import consultar_actividad, listar_inscripciones_por_Actividad
 from controladores.asistencia_socio import registrar_asistenciaSocio, eliminar_asistenciaSocio, consultar_asistenciaSocio, generar_pdf_asistencias
 from controladores.clase import generar_clases_semana, registrar_clase
+from ui.theme import Palette, set_button_variant
 
 
 MESOS_CAT = {
@@ -45,6 +46,9 @@ class AsistenciaDialog(QDialog):
         self.btn_exportar = QPushButton("Exportar a PDF")
         self.btn_generar_dialog = QPushButton("Generar classes auto.")
         self.btn_añadir_manual = QPushButton("Afegir una classe")
+        set_button_variant(self.btn_exportar, "secondary")
+        set_button_variant(self.btn_generar_dialog, "primary")
+        set_button_variant(self.btn_añadir_manual, "primary")
         self.btn_generar_dialog.clicked.connect(self._abrir_dialog_generar)
         self.btn_añadir_manual.clicked.connect(self._abrir_dialog_afegir)
         self.btn_exportar.clicked.connect(self._exportar_asistencia_pdf)
@@ -97,14 +101,15 @@ class AsistenciaDialog(QDialog):
 
         self._syncing_table = True
         try:
-            self.table.setStyleSheet("""
+            self.table.setStyleSheet(f"""
                 QTableWidget::item {
                     padding: 10px;
-                    border: 1px solid #cccccc;
-                    background-color: #fdfdfd;
+                    border: 1px solid {Palette.BORDER};
+                    background-color: {Palette.SURFACE};
                 }
                 QTableWidget::item:selected {
-                    background-color: #d0e8ff;
+                    background-color: {Palette.SELECTION};
+                    color: {Palette.TEXT};
                 }
             """)
             self.table.clear()
@@ -149,7 +154,7 @@ class AsistenciaDialog(QDialog):
                 day_item = QTableWidgetItem(str(fecha.day))
                 day_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 day_item.setTextAlignment(Qt.AlignCenter)
-                day_item.setBackground(QColor("#f3f3f3"))
+                day_item.setBackground(QColor(Palette.SURFACE_ALT))
                 day_item.setFont(header_font)
                 self.table.setItem(1, col, day_item)
 
@@ -161,7 +166,7 @@ class AsistenciaDialog(QDialog):
                 month_item = QTableWidgetItem(MESOS_CAT[fecha.month])
                 month_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
                 month_item.setTextAlignment(Qt.AlignCenter)
-                month_item.setBackground(QColor("#e7e7e7"))
+                month_item.setBackground(QColor(Palette.PRIMARY_SOFT))
                 month_item.setFont(header_font)
                 self.table.setItem(0, first_col, month_item)
                 if len(columnas) > 1:
@@ -171,7 +176,7 @@ class AsistenciaDialog(QDialog):
 
             colores_por_columna = {}
             for i, (_, columnas) in enumerate(meses.items()):
-                color = QColor("#e6f2ff") if i % 2 == 0 else QColor("#ffffff")
+                color = QColor("#eef5e8") if i % 2 == 0 else QColor(Palette.SURFACE)
                 for col in columnas:
                     colores_por_columna[col] = color
 
@@ -418,6 +423,7 @@ class GenerarClasesDialog(QDialog):
         self.intervalo_semanas.setValue(1)
 
         btn_ok = QPushButton("Generar")
+        set_button_variant(btn_ok, "primary")
         btn_ok.clicked.connect(self._generar_clases)
 
         layout = QVBoxLayout(self)
@@ -536,6 +542,7 @@ class AñadirClaseDialog(QDialog):
         form.addWidget(self.hora_fin)
 
         btn_ok = QPushButton("Afegir")
+        set_button_variant(btn_ok, "primary")
         btn_ok.clicked.connect(self._afegir)
 
         layout = QVBoxLayout(self)

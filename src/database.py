@@ -77,6 +77,37 @@ SessionLocal = sessionmaker(
 )
 
 
+def default_database_url() -> str:
+    return _database_url()
+
+
+def set_database_url(database_url: str | None) -> None:
+    """Configure the process-wide SQLAlchemy engine and existing SessionLocal.
+
+    Controllers import SessionLocal directly, so keep the same sessionmaker
+    object and rebind it instead of replacing it.
+    """
+    global DATABASE_URL, engine
+
+    new_url = (database_url or "").strip() or default_database_url()
+    if new_url == DATABASE_URL:
+        return
+
+    try:
+        engine.dispose()
+    except Exception:
+        pass
+
+    DATABASE_URL = new_url
+    engine = create_engine(
+        DATABASE_URL,
+        echo=os.getenv("SQLALCHEMY_ECHO", "").lower() in {"1", "true", "yes"},
+        future=True,
+        connect_args=_connect_args(DATABASE_URL),
+    )
+    SessionLocal.configure(bind=engine)
+
+
 def _drop_personal_dni_sqlite() -> None:
     """Rebuild legacy SQLite personal table without the obsolete dniNie field."""
     with engine.begin() as conn:
@@ -179,6 +210,12 @@ def ensure_schema_updates() -> None:
     """Apply schema updates for existing installations."""
     inspector = inspect(engine)
     table_names = inspector.get_table_names()
+    if "usuarios" not in table_names:
+        from models import Usuario
+
+        Usuario.__table__.create(bind=engine, checkfirst=True)
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
     if "socios" not in table_names:
         return
 

@@ -3,7 +3,7 @@ import sys
 import tempfile
 
 # src/ui/tab_socios.py
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox, QMenu
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox, QMenu, QSplitter, QScrollArea
 from PySide6.QtGui import QIcon, QPixmap, QAction
 from PySide6.QtCore import QSize, QItemSelectionModel
 from PySide6.QtCore import QEvent, Qt
@@ -15,6 +15,7 @@ from controladores.socios import (
 )
 from ui.socio_dialog import SocioDialog
 from ui.lopd_dialog import LOPDFirmaDialog
+from ui.theme import set_button_icon, set_button_variant
 
 class SociosTab(QWidget):
   # ==========================================================
@@ -45,15 +46,6 @@ class SociosTab(QWidget):
     header = self.table_socis.horizontalHeader()
     header.setSectionsClickable(True)
     header.sectionClicked.connect(self._sort_by_header)
-    self.table_socis.setStyleSheet("""
-      QTableView::item:selected {
-        background: #c5d6a1;
-        color: black;
-      }
-      QTableView::item:selected:active {
-        background: #a8bd88;
-      }
-    """)
     self._refresh_socios()
 
     # Panell de detall dreta
@@ -64,16 +56,30 @@ class SociosTab(QWidget):
     self.table_socis.selectionModel().currentRowChanged.connect(self._row_changed)
     self.table_socis.doubleClicked.connect(self._abrir_inscripciones_socio)
 
-    # Layout horitzontal amb taula (flexible) and detall (ample fix, no movable)
-    hlayout = QHBoxLayout()
-    hlayout.addWidget(self.table_socis, stretch=3)
-    self.detail.setFixedWidth(300)
-    hlayout.addWidget(self.detail, stretch=0)
+    # Splitter horitzontal perquè la taula i el detall s'adaptin al resize.
+    self.splitter = QSplitter(Qt.Horizontal)
+    self.splitter.addWidget(self.table_socis)
+
+    self.detail_scroll = QScrollArea()
+    self.detail_scroll.setWidgetResizable(True)
+    self.detail_scroll.setFrameShape(QScrollArea.NoFrame)
+    self.detail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    self.detail.setMinimumWidth(430)
+    self.detail.setMaximumWidth(480)
+    self.detail_scroll.setMinimumWidth(450)
+    self.detail_scroll.setMaximumWidth(510)
+    self.detail_scroll.setWidget(self.detail)
+    self.splitter.addWidget(self.detail_scroll)
+    self.splitter.setStretchFactor(0, 1)
+    self.splitter.setStretchFactor(1, 0)
+    self.splitter.setCollapsible(0, False)
+    self.splitter.setCollapsible(1, False)
+    self.splitter.setSizes([850, 450])
 
     # Botons alta / baixa
     btn_nou = QPushButton("Nou soci")
-    btn_nou.setIcon(QIcon("ui/assets/plus.svg"))
-    btn_nou.setIconSize(QSize(16, 16))
+    set_button_icon(btn_nou, "ui/assets/plus.svg")
+    set_button_variant(btn_nou, "primary")
     btn_nou.clicked.connect(self._dialog_nou_socio)
 
     top_buttons = QHBoxLayout()
@@ -84,7 +90,7 @@ class SociosTab(QWidget):
     ly = QVBoxLayout(page)
     ly.addLayout(top_buttons)
     ly.addWidget(self._search_box)
-    ly.addLayout(hlayout, 1)
+    ly.addWidget(self.splitter, 1)
     self.setLayout(ly)
     self.table_socis.installEventFilter(self)
 

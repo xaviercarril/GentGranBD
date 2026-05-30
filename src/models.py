@@ -3,6 +3,7 @@ from sqlalchemy import (
     ForeignKey, ForeignKeyConstraint, LargeBinary, Enum, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
+from datetime import datetime
 import enum
 
 # ---------------------------------------------
@@ -34,6 +35,24 @@ class EstadoPago(enum.Enum):
 class TipoActividadEnum(enum.Enum):
     CURS = "CURS"
     VIATGE = "VIATGE"
+
+
+class UsuarioRol(enum.Enum):
+    ADMIN = "ADMIN"
+    USER = "USER"
+
+
+class Usuario(Base):
+    __tablename__ = "usuarios"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String(50), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    rol = Column(Enum(UsuarioRol), nullable=False, default=UsuarioRol.USER)
+    activo = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login = Column(DateTime)
 
 # ---------------------------------------------
 # SOCIO + GDPR CONSENT

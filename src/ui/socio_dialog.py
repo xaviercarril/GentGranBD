@@ -6,6 +6,7 @@ from PySide6.QtGui import QPixmap, QIntValidator
 from PySide6.QtCore import Qt, QDate
 from datetime import date
 from controladores.socios import registrar_socio, modificar_socio
+from ui.theme import Palette, set_button_variant
 
 
 EMPTY_DATE = QDate(1900, 1, 1)
@@ -41,7 +42,7 @@ class SocioDialog(QDialog):
         self.obs = QTextEdit()
         self.preview = QLabel();     self.preview.setFixedSize(100, 120)
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setStyleSheet("border:1px solid #aaa;")
+        self.preview.setStyleSheet(f"border:1px solid {Palette.BORDER_STRONG}; border-radius: 5px; background: {Palette.SURFACE_ALT};")
 
 
         self.data_alta.setDate(QDate.currentDate())
@@ -64,12 +65,14 @@ class SocioDialog(QDialog):
 
         # Foto
         btn_foto = QPushButton("Carregar foto")
+        set_button_variant(btn_foto, "secondary")
         btn_foto.clicked.connect(self._seleccionar_foto)
         foto_box = QHBoxLayout(); foto_box.addWidget(btn_foto); foto_box.addWidget(self.preview)
         form.addRow("Foto:", foto_box)
 
         # Botó guardar
         btn_save = QPushButton("Desar")
+        set_button_variant(btn_save, "primary")
         btn_save.clicked.connect(self._guardar)
         form.addRow(btn_save)
 

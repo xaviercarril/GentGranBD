@@ -22,6 +22,7 @@ TABLES = [
     "clases",
     "inscripciones",
     "matricula_pagos",
+    "usuarios",
 ]
 
 

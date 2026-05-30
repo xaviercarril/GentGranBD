@@ -31,6 +31,7 @@ from controladores.socios import (
     obtener_documento_firma_LOPD,
 )
 from server_firma import SignatureServer
+from ui.theme import Palette, set_button_variant
 
 try:
     import qrcode
@@ -302,12 +303,17 @@ class LOPDFirmaDialog(QDialog):
         self._qr_label = QLabel("")
         self._qr_label.setAlignment(Qt.AlignCenter)
         self._qr_label.setFixedSize(180, 180)
+        self._qr_label.setStyleSheet(f"border: 1px solid {Palette.BORDER}; border-radius: 6px; background: {Palette.SURFACE_ALT};")
         self._qr_label.hide()
 
         self._btn_view = QPushButton("Obrir document signat")
         self._btn_delete = QPushButton("Eliminar document")
         self._btn_config_tablet = QPushButton("Configurar connexió tablet")
         self._btn_copy_link = QPushButton("Copiar enllaç")
+        set_button_variant(self._btn_view, "primary")
+        set_button_variant(self._btn_delete, "danger")
+        set_button_variant(self._btn_config_tablet, "secondary")
+        set_button_variant(self._btn_copy_link, "secondary")
 
         self._btn_view.clicked.connect(self._abrir_documento_guardado)
         self._btn_delete.clicked.connect(self._eliminar_documento)

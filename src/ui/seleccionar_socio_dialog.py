@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from controladores.socios import listar_socios_activos
 from ui.table_models import DictTableModel
+from ui.theme import set_button_variant
 
 
 class SeleccionarSocioDialog(QDialog):
@@ -41,7 +42,10 @@ class SeleccionarSocioDialog(QDialog):
         self.btn_no_soci = QPushButton("Afegir no soci")
         self.btn_no_soci.setIcon(QIcon("ui/assets/plus.svg"))
         self.btn_no_soci.setIconSize(QSize(16, 16))
+        set_button_variant(self.btn_no_soci, "primary")
         self.buttons.addButton(self.btn_no_soci, QDialogButtonBox.ActionRole)
+        set_button_variant(self.buttons.button(QDialogButtonBox.Ok), "primary")
+        set_button_variant(self.buttons.button(QDialogButtonBox.Cancel), "secondary")
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         self.btn_no_soci.clicked.connect(self._afegir_no_soci)
@@ -138,6 +142,8 @@ class NoSocioDialog(QDialog):
         form.addRow("Observacions:", self.observaciones)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        set_button_variant(self.buttons.button(QDialogButtonBox.Ok), "primary")
+        set_button_variant(self.buttons.button(QDialogButtonBox.Cancel), "secondary")
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
 

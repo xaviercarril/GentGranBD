@@ -45,14 +45,9 @@ def main():
     _log(f"cwd={Path.cwd()}")
     _log(f"sys.path[0:3]={sys.path[:3]}")
 
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtWidgets import QApplication, QDialog
     from PySide6.QtGui import QIcon
     from ui.main_window import MainWindow
-    from database import engine, ensure_schema_updates
-    from models import Base
-
-    safe_url = engine.url.render_as_string(hide_password=True)
-    _log(f"Database backend={engine.url.get_backend_name()} url={safe_url}")
 
     # 1) Pick a sensible working directory that contains our resources
     resource_candidates: list[Path] = []
@@ -129,23 +124,39 @@ def main():
     except Exception as exc:
         _log(f"Resource preparation failed: {exc}")
 
-    _log("Creating database schema if needed")
-    Base.metadata.create_all(bind=engine)
-    ensure_schema_updates()
     _log("Creating QApplication")
     app = QApplication(sys.argv)
+    from ui.theme import apply_app_theme
+    apply_app_theme(app)
     try:
         app.setWindowIcon(QIcon(str(Path("extra") / "icon.png")))
     except Exception as exc:
         _log(f"Could not set app icon: {exc}")
-    _log("Creating MainWindow")
-    win = MainWindow()
-    _log("Showing MainWindow")
-    win.show()
-    win.raise_()
-    win.activateWindow()
-    _log("Entering Qt event loop")
-    sys.exit(app.exec())
+
+    from ui.login_dialog import LoginDialog
+    import database
+
+    while True:
+        login = LoginDialog()
+        if login.exec() != QDialog.Accepted:
+            _log("Login cancelled")
+            sys.exit(0)
+
+        safe_url = database.engine.url.render_as_string(hide_password=True)
+        _log(f"Database backend={database.engine.url.get_backend_name()} url={safe_url}")
+        _log(f"Authenticated user={login.current_user.get('username') if login.current_user else ''}")
+
+        _log("Creating MainWindow")
+        win = MainWindow(current_user=login.current_user)
+        _log("Showing MainWindow")
+        win.show()
+        win.raise_()
+        win.activateWindow()
+        _log("Entering Qt event loop")
+        exit_code = app.exec()
+        if exit_code != MainWindow.LOGOUT_EXIT_CODE:
+            sys.exit(exit_code)
+        _log("Logout requested; returning to login")
 
 if __name__ == "__main__":
     main()

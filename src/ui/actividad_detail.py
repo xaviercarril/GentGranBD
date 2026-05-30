@@ -19,6 +19,7 @@ from exportador.pdf_inscripciones import generar_pdf_matriculados_actividad
 from models import EstadoInscripcion
 from ui.seleccionar_socio_dialog import SeleccionarSocioDialog
 from ui.table_models import DictTableModel
+from ui.theme import Palette, fit_combo_popup_to_contents, set_button_variant
 
 
 class InscripcionesActividadTableModel(QAbstractTableModel):
@@ -150,6 +151,7 @@ class ActividadDetailWidget(QWidget):
 
         self.nombre = QLineEdit()
         self.personal = QComboBox()
+        self.personal.setMinimumWidth(180)
         self._refresh_personal()
         self.numMaxAlumnos = QSpinBox()
         self.numMaxAlumnos.setMinimum(0)
@@ -161,16 +163,7 @@ class ActividadDetailWidget(QWidget):
         self.socio_preview = QLabel("Sense foto")
         self.socio_preview.setFixedSize(115, 135)
         self.socio_preview.setAlignment(Qt.AlignCenter)
-        self.socio_preview.setStyleSheet("border: 1px solid #888; color: #777; font-size: 12px;")
-        detail_field_style = "font-size: 14px;"
-        for widget in (
-            self.nombre,
-            self.personal,
-            self.numMaxAlumnos,
-            self.preuMatricula,
-            self.descripcion,
-        ):
-            widget.setStyleSheet(detail_field_style)
+        self.socio_preview.setStyleSheet(f"border: 1px solid {Palette.BORDER_STRONG}; border-radius: 5px; color: {Palette.TEXT_MUTED}; background: {Palette.SURFACE_ALT};")
         self.nombre.setAlignment(Qt.AlignLeft)
         self.numMaxAlumnos.setAlignment(Qt.AlignLeft)
         self.preuMatricula.setAlignment(Qt.AlignLeft)
@@ -204,7 +197,7 @@ class ActividadDetailWidget(QWidget):
         layout.addWidget(self.details_panel)
 
         self.label_inscrits = QLabel("INSCRITS: 0/0")
-        self.label_inscrits.setStyleSheet("font-weight: 600;")
+        self.label_inscrits.setProperty("role", "sectionTitle")
 
         btn_layout = QHBoxLayout()
         self.btn_afegir_soci = QPushButton("Afegir soci")
@@ -217,6 +210,11 @@ class ActividadDetailWidget(QWidget):
         self.btn_refrescar.setIcon(QIcon("ui/assets/refresh.svg"))
         self.btn_exportar_pdf.setIcon(QIcon("ui/assets/pdf.svg"))
         self.btn_exportar_excel.setIcon(QIcon("ui/assets/excel.svg"))
+        set_button_variant(self.btn_afegir_soci, "primary")
+        set_button_variant(self.btn_eliminar_inscripcio, "danger")
+        set_button_variant(self.btn_refrescar, "secondary")
+        set_button_variant(self.btn_exportar_pdf, "secondary")
+        set_button_variant(self.btn_exportar_excel, "secondary")
         btn_layout.addWidget(self.btn_afegir_soci)
         btn_layout.addWidget(self.btn_eliminar_inscripcio)
         btn_layout.addWidget(self.btn_refrescar)
@@ -675,6 +673,7 @@ class ActividadDetailWidget(QWidget):
             else:
                 nombre = f"{persona['apellido1']} {persona['apellido2']}, {persona['nombre']}".strip()
             self.personal.addItem(nombre, userData=persona["id"])
+        fit_combo_popup_to_contents(self.personal)
 
     def _wrap_focus_out(self, original_focus_out):
         def new_focus_out(event):

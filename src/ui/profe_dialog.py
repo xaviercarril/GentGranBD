@@ -6,6 +6,7 @@ from PySide6.QtGui import QPixmap
 from PySide6.QtCore import Qt, QDate
 from datetime import date
 from controladores.personal import registrar_personal, modificar_personal
+from ui.theme import Palette, set_button_variant
 import os
 
 
@@ -29,7 +30,7 @@ class ProfeDialog(QDialog):
         self.obs = QTextEdit()
         self.preview = QLabel();     self.preview.setFixedSize(100, 120)
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setStyleSheet("border:1px solid #aaa;")
+        self.preview.setStyleSheet(f"border:1px solid {Palette.BORDER_STRONG}; border-radius: 5px; background: {Palette.SURFACE_ALT};")
 
         # ── Disseny ──────────────────────────────────────────
         form = QFormLayout(self)
@@ -42,6 +43,7 @@ class ProfeDialog(QDialog):
 
         # Botó guardar
         btn_save = QPushButton("Desar")
+        set_button_variant(btn_save, "primary")
         btn_save.clicked.connect(self._guardar)
         form.addRow(btn_save)
 

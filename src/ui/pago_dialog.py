@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QDate
 from datetime import date
+from ui.theme import set_button_variant
 
 class PagoDialog(QDialog):
     def __init__(self, importe_default: float = 0.0, parent=None):
@@ -49,6 +50,8 @@ class PagoDialog(QDialog):
         btn_layout = QHBoxLayout()
         self.btn_ok = QPushButton("Afegir")
         self.btn_cancel = QPushButton("Cancel·lar")
+        set_button_variant(self.btn_ok, "primary")
+        set_button_variant(self.btn_cancel, "secondary")
         self.btn_ok.clicked.connect(self.accept)
         self.btn_cancel.clicked.connect(self.reject)
         btn_layout.addWidget(self.btn_ok)

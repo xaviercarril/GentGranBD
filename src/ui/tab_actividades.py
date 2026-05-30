@@ -9,12 +9,13 @@ from PySide6.QtWidgets import (
   QPushButton, QMessageBox, QLineEdit, QComboBox, QSizePolicy, QTabWidget
 )
 from PySide6.QtGui import QDesktopServices, QIcon
-from PySide6.QtCore import QSize, QModelIndex, QItemSelectionModel, Qt, QUrl
+from PySide6.QtCore import QSize, QModelIndex, QItemSelectionModel, Qt, QUrl, QTimer
 from exportador.pdf_actividades import generar_pdf_actividades_curso
 from ui.actividad_dialog import ActividadDialog
 from ui.actividad_detail import ActividadDetailWidget
 from ui.table_models import DictTableModel
 from ui.asistencia_dialog import AsistenciaDialog
+from ui.theme import set_button_icon, set_button_variant
 from models import EstadoInscripcion
 
 class ActividadesTab(QWidget):
@@ -54,23 +55,6 @@ class ActividadesTab(QWidget):
     header = self.table_activitats.horizontalHeader()
     header.setSectionsClickable(True)
     header.sectionClicked.connect(self._sort_by_header)
-    self.table_activitats.setStyleSheet("""
-      QTableView {
-        font-size: 14px;
-      }
-      QHeaderView::section {
-        font-size: 14px;
-        font-weight: 600;
-      }
-      QTableView::item:selected {
-        background: #c5d6a1;
-        color: black;
-      } 
-      QTableView::item:selected:active {
-        background: #a8bd88;
-      }
-    """)
-
     self.table_activitats.doubleClicked.connect(self._abrir_asistencia)
 
     self.detail_actividad = ActividadDetailWidget()
@@ -82,14 +66,13 @@ class ActividadesTab(QWidget):
     self.inscrits_panel.setParent(self)
 
     self.btn_nova_actividad = QPushButton("Nou Curs")
-    self.btn_nova_actividad.setIcon(QIcon("ui/assets/plus.svg"))
-    self.btn_nova_actividad.setIconSize(QSize(16, 16))
+    set_button_icon(self.btn_nova_actividad, "ui/assets/plus.svg")
+    set_button_variant(self.btn_nova_actividad, "primary")
     self.btn_eliminar_actividad = QPushButton("Eliminar Curs")
-    self.btn_eliminar_actividad.setIcon(QIcon("ui/assets/minus.svg"))
-    self.btn_eliminar_actividad.setIconSize(QSize(16, 16))
+    set_button_icon(self.btn_eliminar_actividad, "ui/assets/minus.svg")
+    set_button_variant(self.btn_eliminar_actividad, "danger")
     self.btn_exportar_activitats = QPushButton("Exportar PDF")
-    self.btn_exportar_activitats.setIcon(QIcon("ui/assets/pdf.svg"))
-    self.btn_exportar_activitats.setIconSize(QSize(16, 16))
+    set_button_icon(self.btn_exportar_activitats, "ui/assets/pdf.svg")
 
     self.btn_nova_actividad.clicked.connect(self._dialog_nova_actividad)
     self.btn_eliminar_actividad.clicked.connect(self._eliminar_actividad)
@@ -355,6 +338,8 @@ class ActividadesTab(QWidget):
     self._refresh_activitats()
 
   def _on_subtab_changed(self, index):
+    window = self.window()
+    previous_size = window.size() if window else None
     self._tipo_actual = "VIATGE" if index == 1 else "CURS"
     is_viatge = self._tipo_actual == "VIATGE"
     target_tab = self.viatges_tab if is_viatge else self.cursos_tab
@@ -365,3 +350,5 @@ class ActividadesTab(QWidget):
     self.detail_actividad.set_tipo_actividad(self._tipo_actual)
     self.detail_actividad.load(None)
     self._refresh_activitats()
+    if window and previous_size:
+      QTimer.singleShot(0, lambda: window.resize(previous_size))

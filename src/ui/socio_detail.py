@@ -3,7 +3,8 @@ from datetime import date
 
 from PySide6.QtWidgets import (
     QWidget, QFormLayout, QLineEdit, QDateEdit, QTextEdit,
-    QPushButton, QLabel, QFileDialog, QHBoxLayout, QMessageBox, QCheckBox
+    QPushButton, QLabel, QFileDialog, QHBoxLayout, QMessageBox, QCheckBox,
+    QVBoxLayout
 )
 from PySide6.QtGui import QPixmap, QIntValidator
 from PySide6.QtCore import Qt, QDate, Signal
@@ -11,6 +12,7 @@ from PySide6.QtCore import Qt, QDate, Signal
 from controladores.socios import (
     consultar_socio, modificar_socio
 )
+from ui.theme import Palette, set_button_variant
 
 
 EMPTY_DATE = QDate(1900, 1, 1)
@@ -66,23 +68,34 @@ class SocioDetailWidget(QWidget):
             self.fe_baixa.setEnabled(True)               # si hi ha baixa, activat
         self.obs = QTextEdit()
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("color: #666;")
+        self.status_label.setProperty("role", "muted")
 
         self.preview = QLabel(); self.preview.setFixedSize(100, 120)
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setStyleSheet("border:1px solid #888;")
+        self.preview.setStyleSheet(f"border:1px solid {Palette.BORDER_STRONG}; border-radius: 5px; background: {Palette.SURFACE_ALT};")
         btn_foto = QPushButton("Canviar\nFoto")
+        set_button_variant(btn_foto, "secondary")
         btn_foto.clicked.connect(self._canviar_foto)
-        foto_box = QHBoxLayout()
+        foto_container = QWidget()
+        foto_box = QHBoxLayout(foto_container)
+        foto_box.setContentsMargins(0, 0, 0, 12)
         foto_box.addWidget(self.preview)
         foto_box.addSpacing(12)                 # espai entre la foto i el botó
         foto_box.addWidget(btn_foto)
+        foto_box.addStretch()
         foto_box.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         
 
         # ── layout ──
-        f = QFormLayout(self)
-        f.addRow("Foto:", foto_box)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(10, 10, 10, 10)
+        root.setSpacing(10)
+        root.addWidget(QLabel("Foto:"))
+        root.addWidget(foto_container)
+
+        f = QFormLayout()
+        f.setHorizontalSpacing(10)
+        f.setVerticalSpacing(6)
         f.addRow("ID soci:", self.id_field)
         f.addRow("DNI/NIE*:", self.dni)
         f.addRow("Nom*:", self.nom)
@@ -101,6 +114,8 @@ class SocioDetailWidget(QWidget):
 
         self.btn_guardar = QPushButton("Guardar")
         self.btn_descartar = QPushButton("Descartar")
+        set_button_variant(self.btn_guardar, "primary")
+        set_button_variant(self.btn_descartar, "secondary")
         self.btn_guardar.setEnabled(False)
         self.btn_descartar.setEnabled(False)
         self.btn_guardar.clicked.connect(lambda: self._guardar())
@@ -111,6 +126,8 @@ class SocioDetailWidget(QWidget):
         actions_box.addStretch()
         f.addRow("", actions_box)
         f.addRow("", self.status_label)
+        root.addLayout(f)
+        root.addStretch()
 
         # -- connexions per marcar canvis pendents --
         for w in (self.dni, self.nom, self.c1, self.c2, self.dir,

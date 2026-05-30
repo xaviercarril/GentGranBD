@@ -87,9 +87,17 @@ def expected_table_names() -> set[str]:
     return {table.name for table in Base.metadata.sorted_tables}
 
 
+def migratable_tables(actual_tables: set[str] | None = None):
+    tables = list(Base.metadata.sorted_tables)
+    if actual_tables is not None:
+        tables = [table for table in tables if table.name in actual_tables]
+    return tables
+
+
 def validate_sqlite_schema(source_engine) -> list[str]:
     actual_tables = set(inspect(source_engine).get_table_names())
-    missing = sorted(expected_table_names() - actual_tables)
+    optional_tables = {"usuarios"}
+    missing = sorted((expected_table_names() - optional_tables) - actual_tables)
     if not missing:
         return []
     return [
@@ -157,6 +165,8 @@ def main() -> int:
         return 2
 
     source_engine = create_engine(sqlite_url(sqlite_path), future=True)
+    source_table_names = set(inspect(source_engine).get_table_names())
+    source_tables = migratable_tables(source_table_names)
 
     schema_issues = validate_sqlite_schema(source_engine)
     if schema_issues:
@@ -169,7 +179,7 @@ def main() -> int:
         issues = validate_sqlite_data(source_conn)
         source_counts = {
             table.name: table_count(source_conn, table)
-            for table in Base.metadata.sorted_tables
+            for table in source_tables
         }
 
     print(f"Source SQLite: {sqlite_path.resolve()}")
@@ -195,7 +205,7 @@ def main() -> int:
         if args.truncate:
             truncate_target(target_conn)
 
-        for table in Base.metadata.sorted_tables:
+        for table in source_tables:
             rows = fetch_rows(source_conn, table)
             if rows:
                 target_conn.execute(table.insert(), rows)

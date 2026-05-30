@@ -16,21 +16,19 @@ class VolunDetailWidget(QWidget):
         self._id: int | None = None
 
         self.nom = QLineEdit()
-        self.nom.setFixedWidth(300)
         self.cognom1 = QLineEdit()
-        self.cognom1.setFixedWidth(300)
         self.cognom2 = QLineEdit()
-        self.cognom2.setFixedWidth(300)
         self.email = QLineEdit()
-        self.email.setFixedWidth(300)
         self.tel_mob = QLineEdit()
-        self.tel_mob.setFixedWidth(300)
         self.obs = QTextEdit()
 
         # ── Disseny ──────────────────────────────────────────
         layout = QVBoxLayout(self)
         
         form = QFormLayout()
+        form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(6)
         form.addRow("Nom*:", self.nom)
         form.addRow("1r Cognom*:", self.cognom1)
         form.addRow("2n Cognom:", self.cognom2)

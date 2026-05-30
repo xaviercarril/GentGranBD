@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
 from controladores.actividades import registrar_actividad
 from controladores.personal import listar_personal
 from PySide6.QtWidgets import QDoubleSpinBox
+from ui.theme import fit_combo_popup_to_contents, set_button_variant
 
 class ActividadDialog(QDialog):
     def __init__(self, parent=None, cursoAcademico_id=None, tipo="CURS"):
@@ -16,12 +17,14 @@ class ActividadDialog(QDialog):
         self.nombre = QLineEdit()
         self.descripcion = QLineEdit()
         self.personal = QComboBox()
+        self.personal.setMinimumWidth(220)
         for persona in listar_personal():
             if persona.get("apellido2") is None:
                 nombre = f"{persona['apellido1']}, {persona['nombre']}".strip()
             else:
                 nombre = f"{persona['apellido1']} {persona['apellido2']}, {persona['nombre']}".strip()
             self.personal.addItem(nombre, userData=persona["id"])
+        fit_combo_popup_to_contents(self.personal)
         self.numMaxAlumnos = QSpinBox()
         self.numMaxAlumnos.setMinimum(1)
         self.numMaxAlumnos.setMaximum(999)
@@ -46,6 +49,8 @@ class ActividadDialog(QDialog):
 
         btn_guardar = QPushButton("Guardar")
         btn_cancelar = QPushButton("Cancel·lar")
+        set_button_variant(btn_guardar, "primary")
+        set_button_variant(btn_cancelar, "secondary")
         btn_guardar.clicked.connect(self._save)
         btn_cancelar.clicked.connect(self.reject)
 
