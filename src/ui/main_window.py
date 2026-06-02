@@ -5,11 +5,11 @@ import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-from PySide6.QtCore import QProcess, QSize
+from PySide6.QtCore import QObject, QProcess, QSize, QThread, QTimer, Signal, QUrl
 from PySide6.QtWidgets import (
     QMainWindow, QTabWidget, QApplication, QMenuBar, QMenu
 )
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtWidgets import QMessageBox, QProgressBar
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPlainTextEdit, QDialogButtonBox
@@ -18,6 +18,38 @@ from ui.tab_socios import SociosTab
 from ui.tab_actividades import ActividadesTab
 from ui.tab_cursoAcademico import CursoAcademicoDialog
 from ui.tab_personal import PersonalTab
+
+
+class _UpdateCheckWorker(QObject):
+    finished = Signal(object, object)
+
+    def __init__(self, manual: bool):
+        super().__init__()
+        self.manual = manual
+
+    def run(self):
+        try:
+            import updater
+
+            self.finished.emit(updater.check_for_update(), None)
+        except Exception as exc:
+            self.finished.emit(None, exc)
+
+
+class _UpdateInstallWorker(QObject):
+    finished = Signal(object, object)
+
+    def __init__(self, update_info):
+        super().__init__()
+        self.update_info = update_info
+
+    def run(self):
+        try:
+            import updater
+
+            self.finished.emit(updater.install_update(self.update_info), None)
+        except Exception as exc:
+            self.finished.emit(None, exc)
 
 
 def _startup_log(message: str) -> None:
@@ -42,6 +74,10 @@ class MainWindow(QMainWindow):
         _startup_log("MainWindow init started")
         self.current_user = current_user or {}
         self._logging_out = False
+        self._installing_update = False
+        self._update_check_thread = None
+        self._update_install_thread = None
+        self._update_progress_dialog = None
         self._sel_model = None  # Model de selecció per a la taula de socis
         self.setWindowTitle("Associació Gent Gran de Castelldefels – Gestió")
         self._initial_window_size = QSize(1350, 780)
@@ -104,6 +140,14 @@ class MainWindow(QMainWindow):
         action_logout.triggered.connect(self._logout)
         menu_arxiu.addAction(action_logout)
 
+        menu_ajuda = menu_bar.addMenu("Ajuda")
+        action_updates = QAction("Comprovar actualitzacions manualment", self)
+        action_updates.triggered.connect(lambda: self._start_update_check(manual=True))
+        menu_ajuda.addAction(action_updates)
+        action_about = QAction("Informació de la versió", self)
+        action_about.triggered.connect(self._show_version_info)
+        menu_ajuda.addAction(action_about)
+
         if self.current_user.get("rol") == "ADMIN":
             menu_admin = menu_bar.addMenu("Administració")
             action_usuaris = QAction("Usuaris", self)
@@ -112,6 +156,7 @@ class MainWindow(QMainWindow):
 
         self._update_session_status()
         _startup_log("MainWindow init finished")
+        QTimer.singleShot(1200, lambda: self._start_update_check(manual=False))
 
     def _update_session_status(self):
         from database import engine
@@ -121,6 +166,137 @@ class MainWindow(QMainWindow):
         if username:
             self.setWindowTitle(f"Associació Gent Gran de Castelldefels – Gestió ({username})")
         self.statusBar().showMessage(f"Usuari: {username} | BD: {safe_url}")
+
+    def _show_version_info(self):
+        from version import APP_VERSION
+
+        frozen_text = "empaquetada" if getattr(sys, "frozen", False) else "desenvolupament"
+        QMessageBox.information(
+            self,
+            "Informació de la versió",
+            "GentGranBD\n\n"
+            f"Versió: {APP_VERSION}\n"
+            f"Mode: {frozen_text}\n"
+            f"Python: {sys.version.split()[0]}\n"
+            f"Executable: {sys.executable}",
+        )
+
+    def _start_update_check(self, manual: bool = False):
+        if self._update_check_thread is not None:
+            if manual:
+                QMessageBox.information(self, "Actualitzacions", "Utilitzant la versió més recent.")
+            return
+
+        thread = QThread(self)
+        worker = _UpdateCheckWorker(manual=manual)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(lambda info, error: self._on_update_check_finished(info, error, manual))
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: setattr(self, "_update_check_thread", None))
+        self._update_check_thread = thread
+        thread.start()
+
+    def _on_update_check_finished(self, update_info, error, manual: bool):
+        if error:
+            _startup_log(f"Update check failed: {error}")
+            if manual:
+                QMessageBox.warning(self, "Actualitzacions", f"No s'ha pogut comprovar actualitzacions:\n{error}")
+            return
+
+        if update_info is None:
+            if manual:
+                QMessageBox.information(self, "Actualitzacions", "Ja tens instal·lada l'última versió.")
+            return
+
+        self._show_update_available_dialog(update_info)
+
+    def _show_update_available_dialog(self, update_info):
+        body = (update_info.body or "").strip()
+        if len(body) > 1200:
+            body = body[:1200].rstrip() + "\n..."
+
+        box = QMessageBox(self)
+        box.setWindowTitle("Actualització disponible")
+        box.setIcon(QMessageBox.Information)
+        box.setText(
+            f"Hi ha una nova versió de GentGranBD.\n\n"
+            f"Versió actual: {update_info.current_version}\n"
+            f"Nova versió: {update_info.latest_version}"
+        )
+        if body:
+            box.setInformativeText(body)
+        install_button = box.addButton("Instal·lar ara", QMessageBox.AcceptRole)
+        later_button = box.addButton("Més tard", QMessageBox.RejectRole)
+        release_button = None
+        if update_info.release_url:
+            release_button = box.addButton("Veure release", QMessageBox.ActionRole)
+        box.setDefaultButton(install_button)
+        box.exec()
+
+        clicked = box.clickedButton()
+        if clicked == install_button:
+            self._start_update_install(update_info)
+        elif release_button is not None and clicked == release_button:
+            QDesktopServices.openUrl(QUrl(update_info.release_url))
+        else:
+            later_button.setEnabled(True)
+
+    def _start_update_install(self, update_info):
+        if self._update_install_thread is not None:
+            QMessageBox.information(self, "Actualitzacions", "Ja s'està preparant una actualització.")
+            return
+        if not self._confirm_all_pending_changes():
+            return
+
+        progress = QDialog(self)
+        progress.setWindowTitle("Instal·lant actualització")
+        progress.setModal(True)
+        layout = QVBoxLayout(progress)
+        layout.addWidget(QLabel("Descarregant i verificant l'actualització..."))
+        bar = QProgressBar(progress)
+        bar.setRange(0, 0)
+        layout.addWidget(bar)
+        progress.setMinimumWidth(420)
+        progress.show()
+        self._update_progress_dialog = progress
+
+        thread = QThread(self)
+        worker = _UpdateInstallWorker(update_info)
+        worker.moveToThread(thread)
+        thread.started.connect(worker.run)
+        worker.finished.connect(self._on_update_install_finished)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+        thread.finished.connect(lambda: setattr(self, "_update_install_thread", None))
+        self._update_install_thread = thread
+        thread.start()
+
+    def _on_update_install_finished(self, result, error):
+        if self._update_progress_dialog is not None:
+            self._update_progress_dialog.close()
+            self._update_progress_dialog.deleteLater()
+            self._update_progress_dialog = None
+
+        if error:
+            _startup_log(f"Update install failed: {error}")
+            QMessageBox.critical(self, "Actualització", f"No s'ha pogut instal·lar l'actualització:\n{error}")
+            return
+
+        backup_note = ""
+        if getattr(result, "backup_path", None):
+            backup_note = f"\n\nCòpia de seguretat creada:\n{result.backup_path}"
+        QMessageBox.information(
+            self,
+            "Actualització",
+            f"{result.message}\n\nL'aplicació es tancarà per completar la instal·lació.{backup_note}",
+        )
+        self._installing_update = True
+        self.close()
+        QApplication.quit()
 
     def _mostrar_usuaris(self):
         if self.current_user.get("rol") != "ADMIN":
@@ -507,7 +683,7 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
-        if not self._logging_out and not self._confirm_all_pending_changes():
+        if not self._logging_out and not self._installing_update and not self._confirm_all_pending_changes():
             event.ignore()
             return
 
