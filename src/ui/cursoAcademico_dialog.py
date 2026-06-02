@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QDialog, QVBoxLayout, QFormLayout, QLabel, QLineEdit, QDateEdit, QPushButton
 from PySide6.QtCore import QDate
 from controladores.curso_academico import registrar_cursoA
+from ui.theme import set_button_variant
 
 class CursoAcademicoFormDialog(QDialog):
     def __init__(self, parent=None):
@@ -26,6 +27,7 @@ class CursoAcademicoFormDialog(QDialog):
         form_layout.addRow("Fi:", self.fi)
 
         self.btn_crear = QPushButton("Crear")
+        set_button_variant(self.btn_crear, "primary")
         self.btn_crear.clicked.connect(self._guardar)
 
         layout.addLayout(form_layout)

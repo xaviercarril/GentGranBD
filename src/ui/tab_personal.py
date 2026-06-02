@@ -1,6 +1,6 @@
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox, QTabWidget
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox, QTabWidget, QSplitter
 from PySide6.QtGui import QIcon, QPixmap
-from PySide6.QtCore import QSize
+from PySide6.QtCore import QSize, Qt
 
 from controladores.personal import listar_profesores, eliminar_personal, listar_voluntarios
 from ui.profe_detail import ProfeDetailWidget
@@ -8,6 +8,7 @@ from ui.profe_dialog import ProfeDialog
 from ui.table_models import DictTableModel
 from ui.volun_detail import VolunDetailWidget
 from ui.volun_dialog import VolunDialog
+from ui.theme import set_button_icon, set_button_variant
 
 class PersonalTab(QWidget):
     def __init__(self):
@@ -42,15 +43,6 @@ class PersonalTab(QWidget):
         self.prof_table.setSelectionBehavior(QTableView.SelectRows)
         self.prof_table.setSelectionMode(QTableView.SingleSelection)
         self.prof_table.setAlternatingRowColors(True)
-        self.prof_table.setStyleSheet("""
-            QTableView::item:selected {
-                background: #c5d6a1;
-                color: black;
-            }
-            QTableView::item:selected:active {
-                background: #a8bd88;
-            }
-        """)
         self._refresh_profe()
 
         # Panell de detall dreta
@@ -60,18 +52,23 @@ class PersonalTab(QWidget):
         # Connect selection change to detail view
         self.prof_table.selectionModel().currentRowChanged.connect(self._row_changed_profe)
 
-        # Layout for buttons
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.prof_table, stretch=3)
-        self.detail_profe.setFixedWidth(300)
-        hlayout.addWidget(self.detail_profe, stretch=0)
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(self.prof_table)
+        self.detail_profe.setMinimumWidth(380)
+        self.detail_profe.setMaximumWidth(460)
+        splitter.addWidget(self.detail_profe)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 0)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+        splitter.setSizes([820, 420])
 
         btn_nou = QPushButton("Nou Professor")
-        btn_nou.setIcon(QIcon("ui/assets/plus.svg"))
-        btn_nou.setIconSize(QSize(16, 16))
+        set_button_icon(btn_nou, "ui/assets/plus.svg")
+        set_button_variant(btn_nou, "primary")
         btn_eliminar = QPushButton("Eliminar Professor")
-        btn_eliminar.setIcon(QIcon("ui/assets/minus.svg"))
-        btn_eliminar.setIconSize(QSize(16, 16))
+        set_button_icon(btn_eliminar, "ui/assets/minus.svg")
+        set_button_variant(btn_eliminar, "danger")
         btn_nou.clicked.connect(self._dialog_nou_profe)
         btn_eliminar.clicked.connect(self._eliminar_profe)
 
@@ -84,7 +81,7 @@ class PersonalTab(QWidget):
         ly = QVBoxLayout(page)
         ly.addLayout(top_buttons)
         ly.addWidget(self.search_box_profe)
-        ly.addLayout(hlayout, 1)
+        ly.addWidget(splitter, 1)
         self.profe_tab.setLayout(ly)
 
     def _init_volun_tab(self):
@@ -103,15 +100,6 @@ class PersonalTab(QWidget):
         self.volun_table.setSelectionBehavior(QTableView.SelectRows)
         self.volun_table.setSelectionMode(QTableView.SingleSelection)
         self.volun_table.setAlternatingRowColors(True)
-        self.volun_table.setStyleSheet("""
-            QTableView::item:selected {
-                background: #c5d6a1;
-                color: black;
-            }
-            QTableView::item:selected:active {
-                background: #a8bd88;
-            }
-        """)
         self._refresh_volun()
 
         # Panell de detall dreta
@@ -121,18 +109,23 @@ class PersonalTab(QWidget):
         # Connect selection change to detail view
         # signal will be connected in _refresh_volun after setting the model
 
-        # Layout for buttons
-        hlayout = QHBoxLayout()
-        hlayout.addWidget(self.volun_table, stretch=3)
-        self.detail_volun.setFixedWidth(300)
-        hlayout.addWidget(self.detail_volun, stretch=0)
+        splitter = QSplitter(Qt.Horizontal)
+        splitter.addWidget(self.volun_table)
+        self.detail_volun.setMinimumWidth(380)
+        self.detail_volun.setMaximumWidth(460)
+        splitter.addWidget(self.detail_volun)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 0)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+        splitter.setSizes([820, 420])
 
         btn_nou = QPushButton("Nou Voluntari")
-        btn_nou.setIcon(QIcon("ui/assets/plus.svg"))
-        btn_nou.setIconSize(QSize(16, 16))
+        set_button_icon(btn_nou, "ui/assets/plus.svg")
+        set_button_variant(btn_nou, "primary")
         btn_eliminar = QPushButton("Eliminar Voluntari")
-        btn_eliminar.setIcon(QIcon("ui/assets/minus.svg"))
-        btn_eliminar.setIconSize(QSize(16, 16))
+        set_button_icon(btn_eliminar, "ui/assets/minus.svg")
+        set_button_variant(btn_eliminar, "danger")
         btn_nou.clicked.connect(self._dialog_nou_volun)
         btn_eliminar.clicked.connect(self._eliminar_volun)
 
@@ -145,7 +138,7 @@ class PersonalTab(QWidget):
         ly = QVBoxLayout(page)
         ly.addLayout(top_buttons)
         ly.addWidget(self.search_box_volun)
-        ly.addLayout(hlayout, 1)
+        ly.addWidget(splitter, 1)
         self.volun_tab.setLayout(ly)
     
     ########################
@@ -160,7 +153,6 @@ class PersonalTab(QWidget):
             ("Nom", "nombre"),
             ("1r Cognom", "apellido1"),
             ("2n Cognom", "apellido2"),
-            ("DNI", "dniNie"),
             ("Email", "email"),
             ("Telèfon", "telfMovil"),
             ("Observacions", "observaciones")
@@ -258,7 +250,6 @@ class PersonalTab(QWidget):
             ("Nom", "nombre"),
             ("1r Cognom", "apellido1"),
             ("2n Cognom", "apellido2"),
-            ("DNI", "dniNie"),
             ("Email", "email"),
             ("Telèfon", "telfMovil"),
             ("Observacions", "observaciones")

@@ -1,19 +1,40 @@
+import re
+import tempfile
+
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QTimeEdit, QSpinBox, QGroupBox, QGridLayout
 )
-from PySide6.QtCore import Qt, QTime
-from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QFileDialog
+from PySide6.QtCore import Qt, QTime, QUrl
+from PySide6.QtGui import QColor, QDesktopServices, QFont
 from controladores.socios import consultar_socio
 from controladores.trimestre import listar_clases_por_trimestre
 from controladores.curso_academico import listar_trimestres_por_cursoA
 from controladores.actividades import consultar_actividad, listar_inscripciones_por_Actividad
 from controladores.asistencia_socio import registrar_asistenciaSocio, eliminar_asistenciaSocio, consultar_asistenciaSocio, generar_pdf_asistencias
 from controladores.clase import generar_clases_semana, registrar_clase
+from ui.theme import Palette, set_button_variant
+
+
+MESOS_CAT = {
+    1: "GENER",
+    2: "FEBRER",
+    3: "MARÇ",
+    4: "ABRIL",
+    5: "MAIG",
+    6: "JUNY",
+    7: "JULIOL",
+    8: "AGOST",
+    9: "SETEMBRE",
+    10: "OCTUBRE",
+    11: "NOVEMBRE",
+    12: "DESEMBRE",
+}
 
 
 class AsistenciaDialog(QDialog):
+    HEADER_ROWS = 2
+
     def __init__(self, actividadID, cursoAcademicoID, parent=None):
         super().__init__(parent)
         self.resize(1200, 700)
@@ -25,6 +46,9 @@ class AsistenciaDialog(QDialog):
         self.btn_exportar = QPushButton("Exportar a PDF")
         self.btn_generar_dialog = QPushButton("Generar classes auto.")
         self.btn_añadir_manual = QPushButton("Afegir una classe")
+        set_button_variant(self.btn_exportar, "secondary")
+        set_button_variant(self.btn_generar_dialog, "primary")
+        set_button_variant(self.btn_añadir_manual, "primary")
         self.btn_generar_dialog.clicked.connect(self._abrir_dialog_generar)
         self.btn_añadir_manual.clicked.connect(self._abrir_dialog_afegir)
         self.btn_exportar.clicked.connect(self._exportar_asistencia_pdf)
@@ -38,6 +62,7 @@ class AsistenciaDialog(QDialog):
         self.table.verticalHeader().setSectionsClickable(True)
         self.table.verticalHeader().sectionClicked.connect(self._seleccionar_fila)
         self.table.horizontalHeader().sectionClicked.connect(self._seleccionar_columna)
+        self.table.cellClicked.connect(self._on_cell_clicked)
 
         top_layout = QHBoxLayout()
         label_trimestre = QLabel("Trimestre:")
@@ -69,29 +94,33 @@ class AsistenciaDialog(QDialog):
         clases = [c for c in listar_clases_por_trimestre(trimestre_id) if c["actividadID"] == self.actividadID]
         clases.sort(key=lambda c: (c["fecha"], c.get("horaInicio")))
         inscripciones = listar_inscripciones_por_Actividad(self.actividadID)
-        inscripciones = [i for i in inscripciones if i.get("estado").value == "INSCRIT"]
+        inscripciones = [i for i in inscripciones if i.get("socioID") and i.get("estado").value == "INSCRIT"]
         row_count = len(inscripciones)
         col_count = len(clases)
+        data_row_count = row_count + self.HEADER_ROWS
 
         self._syncing_table = True
         try:
-            self.table.setStyleSheet("""
+            self.table.setStyleSheet(f"""
                 QTableWidget::item {
                     padding: 10px;
-                    border: 1px solid #cccccc;
-                    background-color: #fdfdfd;
+                    border: 1px solid {Palette.BORDER};
+                    background-color: {Palette.SURFACE};
                 }
                 QTableWidget::item:selected {
-                    background-color: #d0e8ff;
+                    background-color: {Palette.SELECTION};
+                    color: {Palette.TEXT};
                 }
             """)
             self.table.clear()
+            self.table.clearSpans()
             self.table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
+            self.table.horizontalHeader().setVisible(False)
             self.table.verticalHeader().setDefaultAlignment(Qt.AlignVCenter | Qt.AlignLeft)
             self.table.setAlternatingRowColors(True)
             self.table.setShowGrid(True)
             self.table.setWordWrap(True)
-            self.table.setRowCount(row_count)
+            self.table.setRowCount(data_row_count)
             self.table.setColumnCount(col_count)
             self.table.setHorizontalScrollMode(QTableWidget.ScrollPerPixel)
             self.table.setVerticalScrollMode(QTableWidget.ScrollPerPixel)
@@ -108,33 +137,56 @@ class AsistenciaDialog(QDialog):
 
             self.cell_items = [[None for _ in range(col_count)] for _ in range(row_count)]
             self.default_cell_colors = [[None for _ in range(col_count)] for _ in range(row_count)]
+            self._month_column_ranges = {}
+
+            self.table.setVerticalHeaderItem(0, QTableWidgetItem("Mes"))
+            self.table.setVerticalHeaderItem(1, QTableWidgetItem("Dia"))
+            header_font = QFont()
+            header_font.setBold(True)
 
             from collections import defaultdict
 
             meses = defaultdict(list)
             for col, clase in enumerate(clases):
                 fecha = clase["fecha"]
-                texto = fecha.strftime("%d/%m")
-                if clase.get("horaInicio") and clase.get("horaFin"):
-                    texto += f"\n{clase['horaInicio'].strftime('%H:%M')}–{clase['horaFin'].strftime('%H:%M')}"
-                header_item = QTableWidgetItem(texto)
-                header_item.setFlags(Qt.ItemIsEnabled)
-                header_item.setTextAlignment(Qt.AlignCenter)
-                self.table.setHorizontalHeaderItem(col, header_item)
-                meses[fecha.strftime("%B %Y")].append(col)
+                meses[(fecha.year, fecha.month)].append(col)
+
+                day_item = QTableWidgetItem(str(fecha.day))
+                day_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                day_item.setTextAlignment(Qt.AlignCenter)
+                day_item.setBackground(QColor(Palette.SURFACE_ALT))
+                day_item.setFont(header_font)
+                self.table.setItem(1, col, day_item)
+
+            for _, columnas in meses.items():
+                if not columnas:
+                    continue
+                first_col = columnas[0]
+                fecha = clases[first_col]["fecha"]
+                month_item = QTableWidgetItem(MESOS_CAT[fecha.month])
+                month_item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                month_item.setTextAlignment(Qt.AlignCenter)
+                month_item.setBackground(QColor(Palette.PRIMARY_SOFT))
+                month_item.setFont(header_font)
+                self.table.setItem(0, first_col, month_item)
+                if len(columnas) > 1:
+                    self.table.setSpan(0, first_col, 1, len(columnas))
+                for col in columnas:
+                    self._month_column_ranges[col] = columnas
 
             colores_por_columna = {}
             for i, (_, columnas) in enumerate(meses.items()):
-                color = QColor("#e6f2ff") if i % 2 == 0 else QColor("#ffffff")
+                color = QColor("#eef5e8") if i % 2 == 0 else QColor(Palette.SURFACE)
                 for col in columnas:
                     colores_por_columna[col] = color
 
             for row, insc in enumerate(inscripciones):
+                table_row = row + self.HEADER_ROWS
                 socio = consultar_socio(insc["socioID"])
                 header_item = QTableWidgetItem(f"{socio['nombre']} {socio['apellido1']}")
                 header_item.setFlags(Qt.ItemIsEnabled)
                 header_item.setTextAlignment(Qt.AlignCenter)
-                self.table.setVerticalHeaderItem(row, header_item)
+                self.table.setVerticalHeaderItem(table_row, header_item)
 
                 for col, clase in enumerate(clases):
                     asistencia = consultar_asistenciaSocio(insc["socioID"], clase["id"])
@@ -150,12 +202,14 @@ class AsistenciaDialog(QDialog):
                     else:
                         item.setData(Qt.BackgroundRole, None)
 
-                    self.table.setItem(row, col, item)
+                    self.table.setItem(table_row, col, item)
                     self.cell_items[row][col] = item
                     self.default_cell_colors[row][col] = default_color
 
             self.table.resizeColumnsToContents()
             self.table.resizeRowsToContents()
+            self.table.setRowHeight(0, 28)
+            self.table.setRowHeight(1, 28)
         finally:
             self._syncing_table = False
 
@@ -176,30 +230,31 @@ class AsistenciaDialog(QDialog):
                     item.setData(Qt.BackgroundRole, None)
 
     def _seleccionar_columna(self, columna):
+        self._seleccionar_columnas([columna])
+
+    def _seleccionar_columnas(self, columnas):
         # Permitir aplicar cambios a todas las columnas seleccionadas si hay más de una
-        columnas = sorted(set(index.column() for index in self.table.selectedIndexes()))
-        if len(columnas) > 1:
-            for col in columnas:
-                self._seleccionar_columna(col)
-            return
+        columnas = sorted(set(columnas))
         cell_items = getattr(self, "cell_items", [])
         if not cell_items:
             return
         col_count = len(cell_items[0]) if cell_items else 0
-        if columna < 0 or columna >= col_count:
+        columnas = [col for col in columnas if 0 <= col < col_count]
+        if not columnas:
             return
 
         self._reset_colores()
         self.table.clearSelection()
-        self.table.selectColumn(columna)
 
         columna_items = []
-        for fila in range(len(cell_items)):
-            item = cell_items[fila][columna]
-            if not item:
-                continue
-            item.setBackground(QColor("#d0e8ff"))
-            columna_items.append(item)
+        for columna in columnas:
+            for fila in range(len(cell_items)):
+                item = cell_items[fila][columna]
+                if not item:
+                    continue
+                item.setSelected(True)
+                item.setBackground(QColor("#d0e8ff"))
+                columna_items.append(item)
 
         if not columna_items:
             return
@@ -212,11 +267,17 @@ class AsistenciaDialog(QDialog):
                 item.setCheckState(nuevo_estado)
 
     def _seleccionar_fila(self, fila):
+        fila -= self.HEADER_ROWS
+        if fila < 0:
+            return
         # Permitir aplicar cambios a todas las filas seleccionadas si hay más de una
-        filas = sorted(set(index.row() for index in self.table.selectedIndexes()))
+        filas = sorted(
+            set(index.row() - self.HEADER_ROWS for index in self.table.selectedIndexes())
+        )
+        filas = [f for f in filas if f >= 0]
         if len(filas) > 1:
             for f in filas:
-                self._seleccionar_fila(f)
+                self._seleccionar_fila(f + self.HEADER_ROWS)
             return
         cell_items = getattr(self, "cell_items", [])
         if not cell_items:
@@ -226,13 +287,13 @@ class AsistenciaDialog(QDialog):
 
         self._reset_colores()
         self.table.clearSelection()
-        self.table.selectRow(fila)
 
         fila_items = []
         for col in range(len(cell_items[fila])):
             item = cell_items[fila][col]
             if not item:
                 continue
+            item.setSelected(True)
             item.setBackground(QColor("#d0e8ff"))
             fila_items.append(item)
 
@@ -255,6 +316,7 @@ class AsistenciaDialog(QDialog):
                 return
             trimestre_id = self.trimestre_selector.currentData()
             clases = [c for c in listar_clases_por_trimestre(trimestre_id) if c["actividadID"] == self.actividadID]
+            clases.sort(key=lambda c: (c["fecha"], c.get("horaInicio")))
             clases_a_eliminar = [clases[col] for col in columnas if col < len(clases)]
             if not clases_a_eliminar:
                 return
@@ -286,6 +348,13 @@ class AsistenciaDialog(QDialog):
         checked = item.checkState() == Qt.Checked
         self._guardar_asistencia(socio_id, clase_id, checked)
 
+    def _on_cell_clicked(self, row, column):
+        if row == 0:
+            columnas = getattr(self, "_month_column_ranges", {}).get(column, [column])
+            self._seleccionar_columnas(columnas)
+        elif row == 1:
+            self._seleccionar_columna(column)
+
     def _abrir_dialog_generar(self):
         dlg = GenerarClasesDialog(self.actividadID, self.cursoAcademicoID, self)
         if dlg.exec():
@@ -301,15 +370,24 @@ class AsistenciaDialog(QDialog):
             self._cargar_parrilla()
 
     def _exportar_asistencia_pdf(self):
-        ruta, _ = QFileDialog.getSaveFileName(self, f"Desar PDF", f"assistencia-{consultar_actividad(self.actividadID)['nombre']}.pdf", "PDF Files (*.pdf)")
-        if not ruta:
-            return
-        
         trimestre_id = self.trimestre_selector.currentData()
+        actividad = consultar_actividad(self.actividadID)
+        nombre = re.sub(r"[^A-Za-z0-9._-]+", "_", actividad["nombre"]).strip("_") or "activitat"
 
         try:
+            with tempfile.NamedTemporaryFile(
+                prefix=f"assistencia-{nombre}-",
+                suffix=".pdf",
+                delete=False,
+            ) as tmp:
+                ruta = tmp.name
             generar_pdf_asistencias(self.actividadID, trimestre_id, ruta)
-            QMessageBox.information(self, "Èxit", "El PDF s'ha generat correctament.")
+            if not QDesktopServices.openUrl(QUrl.fromLocalFile(ruta)):
+                QMessageBox.warning(
+                    self,
+                    "Avís",
+                    f"No s'ha pogut obrir el visor PDF del sistema.\nPDF temporal: {ruta}",
+                )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No s'ha pogut generar el PDF:\n{e}")
             
@@ -345,6 +423,7 @@ class GenerarClasesDialog(QDialog):
         self.intervalo_semanas.setValue(1)
 
         btn_ok = QPushButton("Generar")
+        set_button_variant(btn_ok, "primary")
         btn_ok.clicked.connect(self._generar_clases)
 
         layout = QVBoxLayout(self)
@@ -463,6 +542,7 @@ class AñadirClaseDialog(QDialog):
         form.addWidget(self.hora_fin)
 
         btn_ok = QPushButton("Afegir")
+        set_button_variant(btn_ok, "primary")
         btn_ok.clicked.connect(self._afegir)
 
         layout = QVBoxLayout(self)

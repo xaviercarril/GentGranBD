@@ -6,6 +6,10 @@ from PySide6.QtGui import QPixmap, QIntValidator
 from PySide6.QtCore import Qt, QDate
 from datetime import date
 from controladores.socios import registrar_socio, modificar_socio
+from ui.theme import Palette, set_button_variant
+
+
+EMPTY_DATE = QDate(1900, 1, 1)
 
 
 class SocioDialog(QDialog):
@@ -29,11 +33,16 @@ class SocioDialog(QDialog):
         self.dir = QLineEdit()
         self.tel_fix = QLineEdit();  self.tel_mob = QLineEdit()
         self.email = QLineEdit();    self.grup = QLineEdit()
+        self.data_naixement = QDateEdit(); self.data_naixement.setCalendarPopup(True)
+        self.data_naixement.setDisplayFormat("dd/MM/yyyy")
+        self.data_naixement.setMinimumDate(EMPTY_DATE)
+        self.data_naixement.setSpecialValueText("")
+        self.data_naixement.setDate(EMPTY_DATE)
         self.data_alta = QDateEdit();  self.data_alta.setCalendarPopup(True)
         self.obs = QTextEdit()
         self.preview = QLabel();     self.preview.setFixedSize(100, 120)
         self.preview.setAlignment(Qt.AlignCenter)
-        self.preview.setStyleSheet("border:1px solid #aaa;")
+        self.preview.setStyleSheet(f"border:1px solid {Palette.BORDER_STRONG}; border-radius: 5px; background: {Palette.SURFACE_ALT};")
 
 
         self.data_alta.setDate(QDate.currentDate())
@@ -50,17 +59,20 @@ class SocioDialog(QDialog):
         form.addRow("Tel. mòbil:", self.tel_mob)
         form.addRow("Email:", self.email)
         form.addRow("Grup difusió:", self.grup)
+        form.addRow("Data naixement:", self.data_naixement)
         form.addRow("Data alta:", self.data_alta)
         form.addRow("Observacions:", self.obs)
 
         # Foto
         btn_foto = QPushButton("Carregar foto")
+        set_button_variant(btn_foto, "secondary")
         btn_foto.clicked.connect(self._seleccionar_foto)
         foto_box = QHBoxLayout(); foto_box.addWidget(btn_foto); foto_box.addWidget(self.preview)
         form.addRow("Foto:", foto_box)
 
         # Botó guardar
         btn_save = QPushButton("Desar")
+        set_button_variant(btn_save, "primary")
         btn_save.clicked.connect(self._guardar)
         form.addRow(btn_save)
 
@@ -113,6 +125,11 @@ class SocioDialog(QDialog):
             "telefonoMovil": self.tel_mob.text().strip() or None,
             "email": self.email.text().strip() or None,
             "grupoDifusion": self.grup.text().strip() or None,
+            "fechaNacimiento": (
+                self.data_naixement.date().toPython()
+                if self.data_naixement.date() != EMPTY_DATE
+                else None
+            ),
             "fechaAlta": self.data_alta.date().toPython() or date.today(),
             "fechaBaja": None,
             "observaciones": self.obs.toPlainText() or None,
@@ -164,6 +181,14 @@ class SocioDialog(QDialog):
         self.tel_mob.setText(socio.get("telefonoMovil", "") or "")
         self.email.setText(socio.get("email", "") or "")
         self.grup.setText(socio.get("grupoDifusion", "") or "")
+        fecha_naixement = socio.get("fechaNacimiento")
+        if fecha_naixement:
+            if isinstance(fecha_naixement, date):
+                self.data_naixement.setDate(QDate(fecha_naixement.year, fecha_naixement.month, fecha_naixement.day))
+            else:
+                self.data_naixement.setDate(QDate.fromString(str(fecha_naixement)))
+        else:
+            self.data_naixement.setDate(EMPTY_DATE)
         fecha_alta = socio.get("fechaAlta")
         if fecha_alta:
             if isinstance(fecha_alta, date):

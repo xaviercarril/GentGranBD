@@ -5,6 +5,7 @@ from datetime import date
 from controladores.curso_academico import eliminar_cursoA, listar_trimestres_por_cursoA, listar_cursosA, generar_T1, generar_T2, generar_T3, generar_T4
 from controladores.trimestre import modificar_trimestre
 from ui.table_models import DictTableModel
+from ui.theme import set_button_icon, set_button_variant
 
 class CursoAcademicoDialog(QDialog):
     def __init__(self, parent=None):
@@ -13,12 +14,12 @@ class CursoAcademicoDialog(QDialog):
 
         main_layout = QVBoxLayout()
         btn_nou = QPushButton("Nou Curs Acadèmic")
-        btn_nou.setIcon(QIcon("ui/assets/plus.svg"))
-        btn_nou.setIconSize(QSize(16, 16))
+        set_button_icon(btn_nou, "ui/assets/plus.svg")
+        set_button_variant(btn_nou, "primary")
         btn_nou.clicked.connect(self._mostrar_dialog_crear)
         btn_borrar = QPushButton("Eliminar Curs Acadèmic")
-        btn_borrar.setIcon(QIcon("ui/assets/minus.svg"))
-        btn_borrar.setIconSize(QSize(16, 16))
+        set_button_icon(btn_borrar, "ui/assets/minus.svg")
+        set_button_variant(btn_borrar, "danger")
         btn_borrar.clicked.connect(self._eliminar_curso)
         
         top_buttons_layout = QHBoxLayout()
@@ -33,15 +34,6 @@ class CursoAcademicoDialog(QDialog):
         self.tabla.setSelectionBehavior(QTableView.SelectRows)
         self.tabla.setSelectionMode(QTableView.SingleSelection)
         self.tabla.setAlternatingRowColors(True)
-        self.tabla.setStyleSheet("""
-            QTableView::item:selected {
-                background: #c5d6a1;
-                color: black;
-            }
-            QTableView::item:selected:active {
-                background: #a8bd88;
-            }
-        """)
         self._refresh_table()
 
         # --- Trimestre group box ---

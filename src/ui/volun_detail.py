@@ -16,27 +16,22 @@ class VolunDetailWidget(QWidget):
         self._id: int | None = None
 
         self.nom = QLineEdit()
-        self.nom.setFixedWidth(300)
         self.cognom1 = QLineEdit()
-        self.cognom1.setFixedWidth(300)
         self.cognom2 = QLineEdit()
-        self.cognom2.setFixedWidth(300)
-        self.dni = QLineEdit()
-        self.dni.setFixedWidth(300)
         self.email = QLineEdit()
-        self.email.setFixedWidth(300)
         self.tel_mob = QLineEdit()
-        self.tel_mob.setFixedWidth(300)
         self.obs = QTextEdit()
 
         # ── Disseny ──────────────────────────────────────────
         layout = QVBoxLayout(self)
         
         form = QFormLayout()
+        form.setFieldGrowthPolicy(QFormLayout.ExpandingFieldsGrow)
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(6)
         form.addRow("Nom*:", self.nom)
         form.addRow("1r Cognom*:", self.cognom1)
         form.addRow("2n Cognom:", self.cognom2)
-        form.addRow("DNI:", self.dni)
         form.addRow("Email:", self.email)
         form.addRow("Tel. mòbil:", self.tel_mob)
         form.addRow("Observacions:", self.obs)
@@ -53,7 +48,7 @@ class VolunDetailWidget(QWidget):
         layout.addWidget(self.imparteix_table)
         layout.addStretch()
 
-        for widget in [self.nom, self.cognom1, self.cognom2, self.dni, self.email, self.tel_mob]:
+        for widget in [self.nom, self.cognom1, self.cognom2, self.email, self.tel_mob]:
             widget.editingFinished.connect(self._guardar)
         self.obs.textChanged.connect(self._guardar)
 
@@ -74,7 +69,6 @@ class VolunDetailWidget(QWidget):
         self.nom.setText(volun.get("nombre") or "")
         self.cognom1.setText(volun.get("apellido1") or "")
         self.cognom2.setText(volun.get("apellido2") or "")
-        self.dni.setText(volun.get("dniNie") or "")
         self.email.setText(volun.get("email") or "")
         self.tel_mob.setText(volun.get("telfMovil") or "")
         self.obs.setText(volun.get("observaciones") or "")
@@ -89,7 +83,6 @@ class VolunDetailWidget(QWidget):
         self.nom.clear()
         self.cognom1.clear()
         self.cognom2.clear()
-        self.dni.clear()
         self.email.clear()
         self.tel_mob.clear()
         self.obs.clear()
@@ -111,7 +104,6 @@ class VolunDetailWidget(QWidget):
             "nombre": self.nom.text().strip(),
             "apellido1": self.cognom1.text().strip(),
             "apellido2": self.cognom2.text().strip() or None,
-            "dni_nie": self.dni.text().strip() or None,
             "email": self.email.text().strip() or None,
             "telfMovil": self.tel_mob.text().strip() or None,
             "observaciones": self.obs.toPlainText().strip() or None,
@@ -137,7 +129,7 @@ class VolunDetailWidget(QWidget):
     def _load_imparteix_table(self):
         """Load activities taught by this professor."""
         try:
-            
+
             actividades = listar_actividades_por_Personal(self._id)
             headers = [
                 ("Nom", "nombre"),
@@ -152,4 +144,3 @@ class VolunDetailWidget(QWidget):
             self.imparteix_table.resizeColumnsToContents()
         except Exception as e:
             QMessageBox.warning(self, "Error", f"No s'han pogut carregar les activitats: {e}")
-            

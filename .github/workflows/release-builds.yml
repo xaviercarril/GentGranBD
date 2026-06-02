@@ -28,6 +28,12 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
+      - name: Set app version from tag
+        shell: pwsh
+        run: |
+          $version = "${env:RELEASE_TAG}" -replace '^[vV]', ''
+          Set-Content -Path src\version.py -Value "APP_VERSION = `"$version`"" -Encoding UTF8
+
       - name: Build Windows app (one-file)
         run: pyinstaller pyinstaller-win.spec --noconfirm
 
@@ -51,19 +57,25 @@ jobs:
           Copy-Item $exe.FullName $dest -Force
 
           # Build NSIS installer from the found EXE
-          makensis -DAPP_EXE="$($exe.FullName)" installer\installer.nsi
+          makensis -DVERSION="${env:RELEASE_TAG}" -DAPP_EXE="$($exe.FullName)" installer\installer.nsi
 
           $setup = Get-ChildItem -Path installer -Filter 'GentGranBD-Setup-*.exe' -File | Select-Object -First 1
+          if (-not $setup) { $setup = Get-ChildItem -Path . -Filter 'GentGranBD-Setup-*.exe' -File | Select-Object -First 1 }
           if (-not $setup) { Write-Error 'Installer not found after NSIS'; exit 1 }
           $setupDest = Join-Path $PWD ("GentGranBD-Setup-Windows-${env:RELEASE_TAG}.exe")
           Move-Item $setup.FullName $setupDest -Force
+
+          Get-FileHash -Algorithm SHA256 $dest | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $dest -Leaf)" } | Set-Content "$dest.sha256"
+          Get-FileHash -Algorithm SHA256 $setupDest | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $setupDest -Leaf)" } | Set-Content "$setupDest.sha256"
 
       - name: Upload assets to Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             GentGranBD-Windows-${{ env.RELEASE_TAG }}.exe
+            GentGranBD-Windows-${{ env.RELEASE_TAG }}.exe.sha256
             GentGranBD-Setup-Windows-${{ env.RELEASE_TAG }}.exe
+            GentGranBD-Setup-Windows-${{ env.RELEASE_TAG }}.exe.sha256
 
   build-macos:
     if: github.event.release.target_commitish == 'main'
@@ -85,6 +97,12 @@ jobs:
           python3 -m pip install -r requirements.txt
           python3 -m pip install pyinstaller
 
+      - name: Set app version from tag
+        run: |
+          VERSION="${RELEASE_TAG#v}"
+          VERSION="${VERSION#V}"
+          printf 'APP_VERSION = "%s"\n' "$VERSION" > src/version.py
+
       - name: Build macOS .app
         run: |
           pyinstaller pyinstaller-mac.spec --noconfirm
@@ -96,8 +114,11 @@ jobs:
           ZIP_NAME="GentGranBD-macOS-${RELEASE_TAG}.zip"
           # Preserve bundle structure and metadata
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "$ZIP_NAME"
+          shasum -a 256 "$ZIP_NAME" | awk '{print $1 "  " $2}' > "$ZIP_NAME.sha256"
 
       - name: Upload asset to Release
         uses: softprops/action-gh-release@v1
         with:
-          files: GentGranBD-macOS-${{ env.RELEASE_TAG }}.zip
+          files: |
+            GentGranBD-macOS-${{ env.RELEASE_TAG }}.zip
+            GentGranBD-macOS-${{ env.RELEASE_TAG }}.zip.sha256

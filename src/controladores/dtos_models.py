@@ -1,22 +1,24 @@
 # Nuevo módulo para convertir instancias de SQLAlchemy a DTOs
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import date, datetime, time, timedelta
-from models import AsistenciaSocio, Clase, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Pago, Socio, Actividad, Personal, Trimestre, EstadoInscripcion, EstadoPago, TrimestreEnum
+from models import AsistenciaSocio, Clase, CursoAcademico, FirmaLOPD, InscripcionSocio, Lugar, Pago, Socio, Actividad, Personal, Trimestre, EstadoInscripcion, EstadoPago, TrimestreEnum, TipoActividadEnum
 
 # ─────────────────────────────── DTOs ───────────────────────────────
 
 class ActividadDTO(BaseModel):
     id: int | None = None
     nombre: str
+    tipo: TipoActividadEnum = TipoActividadEnum.CURS
     descripcion: str | None = None
     numMaxAlumnos: int | None = 0
-    cursoAcademico_id: int
+    cursoAcademico_id: int | None = None
     lugarID: int | None = None
     personalID: int | None = None   
     precio_matricula: float = 0.0
 
 class ActividadUpdateDTO(BaseModel):
     nombre: str | None = None
+    tipo: TipoActividadEnum | None = None
     descripcion: str | None = None
     numMaxAlumnos: int | None = None
     cursoAcademico_id: int | None = None
@@ -74,8 +76,15 @@ class FirmaLOPDUpdateDTO(BaseModel):
 
 class InscripcionSocioDTO(BaseModel):
     id: int | None = None
-    socioID: int
+    socioID: int | None = None
     actividadID: int
+    noSocioNombre: str | None = None
+    noSocioApellido1: str | None = None
+    noSocioApellido2: str | None = None
+    noSocioDni: str | None = None
+    noSocioTelefono: str | None = None
+    noSocioEmail: str | None = None
+    noSocioObservaciones: str | None = None
     fechaInscripcion: date
     estado: EstadoInscripcion = EstadoInscripcion.RESERVA
     observaciones: str | None = None
@@ -84,6 +93,13 @@ class InscripcionSocioDTO(BaseModel):
 class InscripcionSocioUpdateDTO(BaseModel):
     socioID: int | None = None
     actividadID: int | None = None
+    noSocioNombre: str | None = None
+    noSocioApellido1: str | None = None
+    noSocioApellido2: str | None = None
+    noSocioDni: str | None = None
+    noSocioTelefono: str | None = None
+    noSocioEmail: str | None = None
+    noSocioObservaciones: str | None = None
     fechaInscripcion: date | None = None
     estado: EstadoInscripcion | None = None
     observaciones: str | None = None
@@ -100,16 +116,19 @@ class LugarUpdateDTO(BaseModel):
 
 class PagoDTO(BaseModel):
     id: int | None = None
-    socioID: int
+    socioID: int | None = None
     actividadID: int
+    inscripcionID: int | None = None
     fecha_pago: date
     importe: float = 0.0
     estado: str = "PENDENT"  # Estado por defecto
+    observaciones: str | None = None
 
 class PagoUpdateDTO(BaseModel):
     fecha_pago: date | None = None
     estado: str | None = None
     importe: float | None = None
+    observaciones: str | None = None
 
 class SocioDTO(BaseModel):
     id: int | None = None
@@ -122,6 +141,7 @@ class SocioDTO(BaseModel):
     telefonoMovil: str | None = None
     email: str | None = None
     grupoDifusion: str | None = None
+    fechaNacimiento: date | None = None
     fechaAlta: date
     fechaBaja: date | None = None
     observaciones: str | None = None
@@ -139,6 +159,7 @@ class SocioUpdateDTO(BaseModel):
     telefonoMovil: str | None = None
     email: str | None = None
     grupoDifusion: str | None = None
+    fechaNacimiento: date | None = None
     fechaAlta: date | None = None
     fechaBaja: date | None = None
     observaciones: str | None = None
@@ -146,20 +167,22 @@ class SocioUpdateDTO(BaseModel):
 
 
 class PersonalDTO(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     id: int | None = None
     nombre: str
     apellido1: str
     apellido2: str | None = None
-    dniNie: str | None = None
     email: str | None = None
     telfMovil: str | None = None
     observaciones: str | None = None
 
 class PersonalUpdateDTO(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     nombre: str | None = None
     apellido1: str | None = None
     apellido2: str | None = None
-    dniNie: str | None = None
     email: str | None = None
     telfMovil: str | None = None
     observaciones: str | None = None

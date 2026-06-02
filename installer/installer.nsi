@@ -1,6 +1,8 @@
 ; NSIS installer script for GentGranBD (Windows)
 ; Build with: makensis installer.nsi (after building pyinstaller-win.spec)
 
+!include "FileFunc.nsh"
+
 !define APPNAME "GentGranBD"
 !ifndef VERSION
 !define VERSION "1.0.0"
@@ -27,6 +29,13 @@ Section "Install"
     File /r "${DISTDIR}\*.*"
   !endif
   CreateShortCut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\GentGranBD.exe"
+
+  ${GetParameters} $R0
+  ClearErrors
+  ${GetOptions} "$R0" "/LAUNCH" $R1
+  IfErrors done
+  Exec "$INSTDIR\GentGranBD.exe"
+done:
 SectionEnd
 
 Section "Uninstall"

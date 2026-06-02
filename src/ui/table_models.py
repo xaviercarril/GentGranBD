@@ -1,4 +1,5 @@
 from decimal import Decimal
+from datetime import date, datetime
 
 from PySide6.QtCore import Qt, QAbstractTableModel, QModelIndex
 
@@ -53,6 +54,12 @@ class DictTableModel(QAbstractTableModel):
                 return str(int(value))
             text = f"{value}"
             return text.rstrip("0").rstrip(".") or "0"
+
+        if isinstance(value, datetime):
+            return value.strftime("%d/%m/%Y")
+
+        if isinstance(value, date):
+            return value.strftime("%d/%m/%Y")
 
         return str(value)
 

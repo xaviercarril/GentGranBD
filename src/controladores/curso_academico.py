@@ -7,7 +7,7 @@ from controladores.dtos_models import CursoAcademicoDTO, CursoAcademicoUpdateDTO
 from controladores.trimestre import registrar_trimestre
 from controladores.dtos import actividad_to_dto, cursoA_to_dto, trimestre_to_dto
 from database import SessionLocal
-from models import Actividad, CursoAcademico, Trimestre, TrimestreEnum
+from models import Actividad, CursoAcademico, Trimestre, TrimestreEnum, TipoActividadEnum
 
 # ───────────────── CRUD ─────────────────
 def registrar_cursoA(datos: dict) -> int:
@@ -113,11 +113,36 @@ def listar_trimestres_por_cursoA(cursoAcademicoID: int) -> list[dict]:
     trimestres = db.query(Trimestre).filter(Trimestre.cursoAcademicoID == cursoAcademicoID).all()
     return [trimestre_to_dto(t).model_dump() for t in trimestres]
   
-def listar_actividades_por_CursoAcademico(cursoAcademicoID: int) -> list[dict]:
+def _normalizar_tipo_actividad(tipo) -> TipoActividadEnum | None:
+    if tipo is None:
+        return None
+    if isinstance(tipo, TipoActividadEnum):
+        return tipo
+    text = str(tipo).strip().upper()
+    aliases = {
+        "CURSO": "CURS",
+        "CURSOS": "CURS",
+        "CURS": "CURS",
+        "TALLER": "CURS",
+        "TALLERS": "CURS",
+        "TALLERES": "CURS",
+        "VIAJE": "VIATGE",
+        "VIAJES": "VIATGE",
+        "VIATGE": "VIATGE",
+        "VIATGES": "VIATGE",
+    }
+    return TipoActividadEnum(aliases.get(text, text))
+
+
+def listar_actividades_por_CursoAcademico(cursoAcademicoID: int, tipo=None) -> list[dict]:
     """Devuelve actividades de un curso académico."""
     try:
+        tipo_enum = _normalizar_tipo_actividad(tipo)
         with SessionLocal() as db:
-            acts = db.query(Actividad).filter(Actividad.cursoAcademicoID == cursoAcademicoID).all()
+            query = db.query(Actividad).filter(Actividad.cursoAcademicoID == cursoAcademicoID)
+            if tipo_enum is not None:
+                query = query.filter(Actividad.tipo == tipo_enum)
+            acts = query.order_by(Actividad.nombre).all()
             return [actividad_to_dto(a).model_dump() for a in acts]
     except Exception as e:
         raise ValueError(f"Error al listar actividades por curso: {e}")

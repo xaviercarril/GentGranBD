@@ -2,22 +2,53 @@ import sys
 import os
 from pathlib import Path
 import shutil
+import traceback
+from datetime import datetime
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+STARTUP_LOG = PROJECT_ROOT / "logs" / "app-startup.log"
+RUN_ID = datetime.now().strftime("%Y%m%d-%H%M%S")
+
+
+def _log(message: str) -> None:
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"{timestamp} [{RUN_ID}] [app.py] {message}"
+    print(line, flush=True)
+    try:
+        STARTUP_LOG.parent.mkdir(parents=True, exist_ok=True)
+        with STARTUP_LOG.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except Exception:
+        pass
+
+
+def _log_exception(exc_type, exc, tb) -> None:
+    detail = "".join(traceback.format_exception(exc_type, exc, tb))
+    _log("Unhandled exception:\n" + detail)
+    sys.__excepthook__(exc_type, exc, tb)
+
+
+sys.excepthook = _log_exception
 
 # Ensure running as a script works (python src/ui/app.py)
 try:
     _src_dir = Path(__file__).resolve().parents[1]
     if str(_src_dir) not in sys.path:
         sys.path.insert(0, str(_src_dir))
-except Exception:
-    pass
-
-from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QIcon
-from ui.main_window import MainWindow
-from database import engine
-from models import Base
+except Exception as exc:
+    _log(f"Could not prepare sys.path: {exc}")
 
 def main():
+    _log("=" * 72)
+    _log(f"Starting app. executable={sys.executable}")
+    _log(f"cwd={Path.cwd()}")
+    _log(f"sys.path[0:3]={sys.path[:3]}")
+
+    from PySide6.QtWidgets import QApplication, QDialog
+    from PySide6.QtGui import QIcon
+    from ui.main_window import MainWindow
+
     # 1) Pick a sensible working directory that contains our resources
     resource_candidates: list[Path] = []
     try:
@@ -56,8 +87,9 @@ def main():
     try:
         if chosen_root:
             os.chdir(chosen_root)
-    except Exception:
-        pass
+            _log(f"Changed cwd to resource root={chosen_root}")
+    except Exception as exc:
+        _log(f"Could not change cwd to resource root: {exc}")
 
     # 2) Ensure resource dirs exist in the working directory (copy from available sources)
     try:
@@ -86,21 +118,45 @@ def main():
                         dest_rel.parent.mkdir(parents=True, exist_ok=True)
                         try:
                             shutil.copytree(candidate, dest_rel, dirs_exist_ok=True)
-                        except Exception:
-                            pass
+                        except Exception as exc:
+                            _log(f"Could not copy resources from {candidate} to {dest_rel}: {exc}")
                         break
-    except Exception:
-        pass
+    except Exception as exc:
+        _log(f"Resource preparation failed: {exc}")
 
-    Base.metadata.create_all(bind=engine)
+    _log("Creating QApplication")
     app = QApplication(sys.argv)
+    from ui.theme import apply_app_theme
+    apply_app_theme(app)
     try:
         app.setWindowIcon(QIcon(str(Path("extra") / "icon.png")))
-    except Exception:
-        pass
-    win = MainWindow()
-    win.show()
-    sys.exit(app.exec())
+    except Exception as exc:
+        _log(f"Could not set app icon: {exc}")
+
+    from ui.login_dialog import LoginDialog
+    import database
+
+    while True:
+        login = LoginDialog()
+        if login.exec() != QDialog.Accepted:
+            _log("Login cancelled")
+            sys.exit(0)
+
+        safe_url = database.engine.url.render_as_string(hide_password=True)
+        _log(f"Database backend={database.engine.url.get_backend_name()} url={safe_url}")
+        _log(f"Authenticated user={login.current_user.get('username') if login.current_user else ''}")
+
+        _log("Creating MainWindow")
+        win = MainWindow(current_user=login.current_user)
+        _log("Showing MainWindow")
+        win.show()
+        win.raise_()
+        win.activateWindow()
+        _log("Entering Qt event loop")
+        exit_code = app.exec()
+        if exit_code != MainWindow.LOGOUT_EXIT_CODE:
+            sys.exit(exit_code)
+        _log("Logout requested; returning to login")
 
 if __name__ == "__main__":
     main()
