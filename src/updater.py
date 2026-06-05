@@ -5,6 +5,7 @@ import json
 import os
 import platform
 import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
@@ -26,6 +27,15 @@ HTTP_TIMEOUT = 20
 
 class UpdateError(RuntimeError):
     pass
+
+
+def _ssl_context() -> ssl.SSLContext | None:
+    try:
+        import certifi
+
+        return ssl.create_default_context(cafile=certifi.where())
+    except Exception:
+        return None
 
 
 @dataclass(frozen=True)
@@ -79,7 +89,7 @@ def _request_json(url: str, token: str | None = None) -> dict:
         headers["Authorization"] = f"Bearer {token}"
     request = Request(url, headers=headers)
     try:
-        with urlopen(request, timeout=HTTP_TIMEOUT) as response:
+        with urlopen(request, timeout=HTTP_TIMEOUT, context=_ssl_context()) as response:
             return json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
         raise UpdateError(f"GitHub ha retornat HTTP {exc.code}") from exc
@@ -157,7 +167,7 @@ def download_file(url: str, destination: Path) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     request = Request(url, headers={"User-Agent": "GentGranBD-updater"})
     try:
-        with urlopen(request, timeout=HTTP_TIMEOUT) as response, destination.open("wb") as fh:
+        with urlopen(request, timeout=HTTP_TIMEOUT, context=_ssl_context()) as response, destination.open("wb") as fh:
             shutil.copyfileobj(response, fh)
     except HTTPError as exc:
         raise UpdateError(f"No s'ha pogut descarregar l'actualització: HTTP {exc.code}") from exc
@@ -207,6 +217,18 @@ def _user_data_dir() -> Path:
         return target
 
 
+def _update_log(message: str) -> None:
+    line = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} [updater.py] {message}"
+    print(line, flush=True)
+    try:
+        log_path = _user_data_dir() / "updates" / "updater.log"
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as fh:
+            fh.write(line + "\n")
+    except Exception:
+        pass
+
+
 def auto_backup_sqlite() -> Path | None:
     from database import engine
 
@@ -231,19 +253,28 @@ def _download_update_assets(update: UpdateInfo) -> tuple[Path, Path]:
     updates_dir = _user_data_dir() / "updates" / update.tag
     installer_path = updates_dir / update.asset.name
     sha_path = updates_dir / update.sha256_asset.name
+    _update_log(f"Descarregant actualització: {update.asset.name}")
     download_file(update.asset.download_url, installer_path)
+    _update_log(f"Actualització descarregada: {installer_path}")
+    _update_log(f"Descarregant SHA256: {update.sha256_asset.name}")
     download_file(update.sha256_asset.download_url, sha_path)
+    _update_log(f"SHA256 descarregat: {sha_path}")
     verify_sha256(installer_path, parse_sha256_file(sha_path))
+    _update_log("SHA256 verificat correctament")
     return installer_path, sha_path
 
 
 def install_update(update: UpdateInfo, app_path: Path | None = None) -> InstallResult:
+    _update_log(f"Iniciant instal·lació de {update.latest_version}")
     installer_path, _ = _download_update_assets(update)
+    _update_log("Creant còpia de seguretat de la base de dades")
     backup_path = auto_backup_sqlite()
     if sys.platform == "win32":
+        _update_log("Llançant helper de Windows")
         _launch_windows_helper(installer_path)
         return InstallResult(True, "S'ha preparat l'instal·lador de Windows.", backup_path)
     if sys.platform == "darwin":
+        _update_log("Llançant helper de macOS")
         _launch_macos_helper(installer_path, app_path=app_path)
         return InstallResult(True, "S'ha iniciat l'actualitzador de macOS.", backup_path)
     raise UpdateError("Plataforma no suportada per instal·lar automàticament.")
@@ -297,32 +328,89 @@ def _launch_macos_helper(zip_path: Path, app_path: Path | None = None) -> None:
         raise UpdateError("El paquet macOS no conté cap .app.")
     new_app = candidates[0]
 
-    helper_path = _user_data_dir() / "updates" / "install_macos_update.sh"
+    updates_dir = _user_data_dir() / "updates"
+    helper_path = updates_dir / "install_macos_update.sh"
+    helper_log = updates_dir / "install_macos_update.log"
+    current_pid = os.getpid()
     helper_path.write_text(
         f"""#!/bin/sh
 set -eu
+LOG={_sh_quote(str(helper_log))}
+APP_PID={current_pid}
 TARGET_APP={_sh_quote(str(target_app))}
 NEW_APP={_sh_quote(str(new_app))}
 PARENT_DIR=$(dirname "$TARGET_APP")
 APP_NAME=$(basename "$TARGET_APP")
-for i in $(seq 1 60); do
-  if ! pgrep -f "$TARGET_APP/Contents/MacOS" >/dev/null 2>&1; then
-    break
-  fi
+
+log() {{
+  printf '%s [install_macos_update.sh] %s\\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG"
+}}
+
+log "Helper iniciat. APP_PID=$APP_PID TARGET_APP=$TARGET_APP NEW_APP=$NEW_APP"
+while kill -0 "$APP_PID" >/dev/null 2>&1; do
+  log "Esperant que es tanqui GentGranBD..."
   sleep 1
 done
+log "GentGranBD tancat. Instal·lant actualització."
 rm -rf "$TARGET_APP.old"
 if [ -d "$TARGET_APP" ]; then
+  log "Movent app actual a $TARGET_APP.old"
   mv "$TARGET_APP" "$TARGET_APP.old"
 fi
+log "Copiant nova app"
 cp -R "$NEW_APP" "$PARENT_DIR/$APP_NAME"
+log "Eliminant quarantine"
 xattr -dr com.apple.quarantine "$PARENT_DIR/$APP_NAME" >/dev/null 2>&1 || true
-open "$PARENT_DIR/$APP_NAME"
-rm -rf "$TARGET_APP.old"
+
+BUNDLE_EXEC=$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$PARENT_DIR/$APP_NAME/Contents/Info.plist" 2>/dev/null || printf 'GentGranBD')
+APP_EXEC="$PARENT_DIR/$APP_NAME/Contents/MacOS/$BUNDLE_EXEC"
+log "Executable detectat: $APP_EXEC"
+ls -la "$PARENT_DIR/$APP_NAME/Contents/MacOS" >> "$LOG" 2>&1 || true
+chmod +x "$APP_EXEC" >/dev/null 2>&1 || true
+
+if [ -f "$APP_EXEC" ]; then
+  log "Executable preparat"
+else
+  log "No existeix l'executable esperat: $APP_EXEC"
+fi
+
+log "Obrint nova app amb open -n"
+if open -n "$PARENT_DIR/$APP_NAME" >> "$LOG" 2>&1; then
+  log "Nova app oberta correctament amb open -n"
+  log "Eliminant còpia antiga"
+  rm -rf "$TARGET_APP.old"
+  log "Actualització completada"
+  exit 0
+fi
+
+if [ -f "$APP_EXEC" ]; then
+  log "open -n ha fallat. Intentant arrencar l'executable directament amb nohup."
+  nohup "$APP_EXEC" >> "$LOG" 2>&1 &
+  NEW_PID=$!
+  sleep 2
+  if kill -0 "$NEW_PID" >/dev/null 2>&1; then
+    log "Executable arrencat directament amb PID=$NEW_PID"
+    log "Eliminant còpia antiga"
+    rm -rf "$TARGET_APP.old"
+    log "Actualització completada"
+    exit 0
+  fi
+  log "L'executable directe també ha sortit immediatament."
+fi
+
+log "No s'ha pogut obrir la nova app. Restaurant la versió anterior."
+rm -rf "$PARENT_DIR/$APP_NAME"
+if [ -d "$TARGET_APP.old" ]; then
+  mv "$TARGET_APP.old" "$PARENT_DIR/$APP_NAME"
+fi
+log "Actualització revertida perquè la nova app no s'ha pogut obrir"
+exit 1
 """,
         encoding="utf-8",
     )
     helper_path.chmod(0o755)
+    _update_log(f"Helper macOS escrit a {helper_path}")
+    _update_log(f"Log del helper macOS: {helper_log}")
     subprocess.Popen(["/bin/sh", str(helper_path)], start_new_session=True)
 
 

@@ -31,8 +31,19 @@ class _UpdateCheckWorker(QObject):
         try:
             import updater
 
-            self.finished.emit(updater.check_for_update(), None)
+            _startup_log(f"Checking updates with updater={updater.__file__} current={updater.APP_VERSION}")
+            update_info = updater.check_for_update()
+            if update_info is None:
+                _startup_log("Update check result: no update available")
+            else:
+                _startup_log(
+                    "Update check result: "
+                    f"current={update_info.current_version} latest={update_info.latest_version} "
+                    f"asset={update_info.asset.name}"
+                )
+            self.finished.emit(update_info, None)
         except Exception as exc:
+            _startup_log(f"Update check exception: {exc}")
             self.finished.emit(None, exc)
 
 
@@ -47,8 +58,15 @@ class _UpdateInstallWorker(QObject):
         try:
             import updater
 
-            self.finished.emit(updater.install_update(self.update_info), None)
+            _startup_log(
+                "Update install started: "
+                f"target={self.update_info.latest_version} asset={self.update_info.asset.name}"
+            )
+            result = updater.install_update(self.update_info)
+            _startup_log(f"Update install result: {result}")
+            self.finished.emit(result, None)
         except Exception as exc:
+            _startup_log(f"Update install exception: {exc}")
             self.finished.emit(None, exc)
 
 
@@ -67,6 +85,10 @@ def _startup_log(message: str) -> None:
 
 class MainWindow(QMainWindow):
     """Finestra principal amb pestanyes (Socis, Activitats, …)."""
+    update_check_finished_on_main = Signal(int, object, object, bool)
+    update_check_thread_finished_on_main = Signal(int)
+    update_install_finished_on_main = Signal(object, object)
+
     LOGOUT_EXIT_CODE = 42
 
     def __init__(self, current_user: dict | None = None):
@@ -77,11 +99,19 @@ class MainWindow(QMainWindow):
         self._installing_update = False
         self._closing = False
         self._update_check_thread = None
+        self._update_check_worker = None
+        self._update_check_id = 0
+        self._stale_update_check_threads = []
         self._update_install_thread = None
+        self._update_install_worker = None
         self._update_progress_dialog = None
+        self._base_status_message = ""
         self._sel_model = None  # Model de selecció per a la taula de socis
         self.setWindowTitle("Associació Gent Gran de Castelldefels – Gestió")
         self._initial_window_size = QSize(1350, 780)
+        self.update_check_finished_on_main.connect(self._on_update_check_finished)
+        self.update_check_thread_finished_on_main.connect(self._on_update_check_thread_finished)
+        self.update_install_finished_on_main.connect(self._on_update_install_finished)
 
         app = QApplication.instance()
         screen = app.primaryScreen() if app else None
@@ -167,10 +197,17 @@ class MainWindow(QMainWindow):
         safe_url = engine.url.render_as_string(hide_password=True)
         if username:
             self.setWindowTitle(f"Associació Gent Gran de Castelldefels – Gestió ({username})")
-        self.statusBar().showMessage(f"Usuari: {username} | BD: {safe_url}")
+        self._base_status_message = f"Usuari: {username} | BD: {safe_url}"
+        self.statusBar().showMessage(self._base_status_message)
+
+    def _show_base_status(self):
+        self.statusBar().showMessage(self._base_status_message)
 
     def _is_admin(self) -> bool:
         return self.current_user.get("rol") == "ADMIN"
+
+    def _is_packaged_app(self) -> bool:
+        return getattr(sys, "frozen", False)
 
     def _show_version_info(self):
         from version import APP_VERSION
@@ -189,24 +226,43 @@ class MainWindow(QMainWindow):
     def _start_update_check(self, manual: bool = False):
         if self._closing:
             return
+        if not self._is_packaged_app():
+            if manual:
+                QMessageBox.information(
+                    self,
+                    "Actualitzacions",
+                    "La comprovació d'actualitzacions només està disponible en l'aplicació empaquetada.",
+                )
+            return
         if self._update_check_thread is not None:
             if manual:
-                QMessageBox.information(self, "Actualitzacions", "Utilitzant la versió més recent.")
+                QMessageBox.information(self, "Actualitzacions", "Ja s'estan comprovant les actualitzacions.")
             return
 
+        self._update_check_id += 1
+        check_id = self._update_check_id
+        _startup_log(f"Update check started id={check_id} manual={manual}")
+        self.statusBar().showMessage("Comprovant actualitzacions...")
         thread = QThread(self)
         worker = _UpdateCheckWorker(manual=manual)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.finished.connect(lambda info, error: self._on_update_check_finished(info, error, manual))
         worker.finished.connect(thread.quit)
+        worker.finished.connect(
+            lambda info, error: self.update_check_finished_on_main.emit(check_id, info, error, manual)
+        )
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(lambda: setattr(self, "_update_check_thread", None))
+        thread.finished.connect(lambda: self.update_check_thread_finished_on_main.emit(check_id))
         self._update_check_thread = thread
+        self._update_check_worker = worker
         thread.start()
+        QTimer.singleShot(25000, lambda: self._on_update_check_timeout(check_id, manual))
 
-    def _on_update_check_finished(self, update_info, error, manual: bool):
+    def _on_update_check_finished(self, check_id: int, update_info, error, manual: bool):
+        if check_id != self._update_check_id:
+            return
+        self._show_base_status()
         if error:
             _startup_log(f"Update check failed: {error}")
             if manual:
@@ -219,6 +275,38 @@ class MainWindow(QMainWindow):
             return
 
         self._show_update_available_dialog(update_info)
+
+    def _on_update_check_thread_finished(self, check_id: int):
+        if check_id != self._update_check_id:
+            return
+        _startup_log(f"Update check thread finished id={check_id}")
+        self._update_check_thread = None
+        self._update_check_worker = None
+        self._show_base_status()
+
+    def _on_update_check_timeout(self, check_id: int, manual: bool):
+        if check_id != self._update_check_id or self._update_check_thread is None:
+            return
+        _startup_log(f"Update check timeout id={check_id}")
+        stale_thread = self._update_check_thread
+        self._stale_update_check_threads.append(stale_thread)
+        stale_thread.finished.connect(lambda: self._discard_stale_update_thread(stale_thread))
+        self._update_check_id += 1
+        self._update_check_thread = None
+        self._update_check_worker = None
+        self.statusBar().showMessage("No s'ha pogut comprovar actualitzacions: temps esgotat.", 6000)
+        if manual:
+            QMessageBox.warning(
+                self,
+                "Actualitzacions",
+                "La comprovació d'actualitzacions ha trigat massa. Torna-ho a provar més tard.",
+            )
+
+    def _discard_stale_update_thread(self, thread):
+        try:
+            self._stale_update_check_threads.remove(thread)
+        except ValueError:
+            pass
 
     def _show_update_available_dialog(self, update_info):
         body = (update_info.body or "").strip()
@@ -276,13 +364,19 @@ class MainWindow(QMainWindow):
         worker = _UpdateInstallWorker(update_info)
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
-        worker.finished.connect(self._on_update_install_finished)
+        worker.finished.connect(lambda result, error: self.update_install_finished_on_main.emit(result, error))
         worker.finished.connect(thread.quit)
         worker.finished.connect(worker.deleteLater)
         thread.finished.connect(thread.deleteLater)
-        thread.finished.connect(lambda: setattr(self, "_update_install_thread", None))
+        thread.finished.connect(self._on_update_install_thread_finished)
         self._update_install_thread = thread
+        self._update_install_worker = worker
         thread.start()
+
+    def _on_update_install_thread_finished(self):
+        _startup_log("Update install thread finished")
+        self._update_install_thread = None
+        self._update_install_worker = None
 
     def _on_update_install_finished(self, result, error):
         if self._update_progress_dialog is not None:
