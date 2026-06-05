@@ -12,3 +12,10 @@ src/gentgran.db
 postgres-data/
 logs/
 tmp
+doc/manual_usuario/manual_usuario.aux
+doc/manual_usuario/manual_usuario.fdb_latexmk
+doc/manual_usuario/manual_usuario.fls
+doc/manual_usuario/manual_usuario.log
+doc/manual_usuario/manual_usuario.out
+doc/manual_usuario/manual_usuario.synctex.gz
+doc/manual_usuario/manual_usuario.toc

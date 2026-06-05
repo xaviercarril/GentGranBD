@@ -1,4 +1,4 @@
-from PySide6.QtCore import QItemSelectionModel, QSize
+from PySide6.QtCore import QItemSelectionModel, QSize, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QDialog,
@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QMenu,
     QPushButton,
     QTableView,
     QVBoxLayout,
@@ -14,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from controladores.socios import listar_socios_activos
 from ui.table_models import DictTableModel
+from ui.table_utils import enable_table_copy
 from ui.theme import set_button_variant
 
 
@@ -35,8 +37,10 @@ class SeleccionarSocioDialog(QDialog):
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setSelectionMode(QTableView.SingleSelection)
+        enable_table_copy(self.table)
         self.table.setAlternatingRowColors(True)
-        self.table.doubleClicked.connect(self.accept)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_table_context_menu)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.btn_no_soci = QPushButton("Afegir no soci")
@@ -117,6 +121,20 @@ class SeleccionarSocioDialog(QDialog):
         if dialog.exec():
             self._selected_socio = dialog.get_data()
             super().accept()
+
+    def _show_table_context_menu(self, pos):
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        self.table.setCurrentIndex(index)
+        self.table.selectionModel().select(
+            index,
+            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
+        menu = QMenu(self)
+        action = menu.addAction("Seleccionar soci")
+        action.triggered.connect(self.accept)
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
 
 class NoSocioDialog(QDialog):

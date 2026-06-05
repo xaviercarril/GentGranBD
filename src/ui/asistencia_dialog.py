@@ -13,6 +13,7 @@ from controladores.curso_academico import listar_trimestres_por_cursoA
 from controladores.actividades import consultar_actividad, listar_inscripciones_por_Actividad
 from controladores.asistencia_socio import registrar_asistenciaSocio, eliminar_asistenciaSocio, consultar_asistenciaSocio, generar_pdf_asistencias
 from controladores.clase import generar_clases_semana, registrar_clase
+from ui.table_utils import enable_table_copy
 from ui.theme import Palette, set_button_variant
 
 
@@ -58,6 +59,7 @@ class AsistenciaDialog(QDialog):
         self.table.itemChanged.connect(self._on_item_changed)
         self.table.setSelectionMode(QTableWidget.ExtendedSelection)
         self.table.setSelectionBehavior(QTableWidget.SelectItems)
+        enable_table_copy(self.table)
         self.table.horizontalHeader().setSectionsClickable(True)
         self.table.verticalHeader().setSectionsClickable(True)
         self.table.verticalHeader().sectionClicked.connect(self._seleccionar_fila)
@@ -102,15 +104,15 @@ class AsistenciaDialog(QDialog):
         self._syncing_table = True
         try:
             self.table.setStyleSheet(f"""
-                QTableWidget::item {
+                QTableWidget::item {{
                     padding: 10px;
                     border: 1px solid {Palette.BORDER};
                     background-color: {Palette.SURFACE};
-                }
-                QTableWidget::item:selected {
+                }}
+                QTableWidget::item:selected {{
                     background-color: {Palette.SELECTION};
                     color: {Palette.TEXT};
-                }
+                }}
             """)
             self.table.clear()
             self.table.clearSpans()

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from controladores.acceso import crear_usuario, eliminar_usuario, listar_usuarios, modificar_usuario
+from ui.table_utils import enable_table_copy
 from ui.theme import set_button_variant
 
 
@@ -29,6 +30,7 @@ class UsuariosDialog(QDialog):
         self.table.setHorizontalHeaderLabels(["Usuari", "Rol", "Actiu", "Últim accés", "ID"])
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
+        enable_table_copy(self.table)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)

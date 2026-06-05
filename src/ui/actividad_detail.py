@@ -19,6 +19,7 @@ from exportador.pdf_inscripciones import generar_pdf_matriculados_actividad
 from models import EstadoInscripcion
 from ui.seleccionar_socio_dialog import SeleccionarSocioDialog
 from ui.table_models import DictTableModel
+from ui.table_utils import enable_table_copy
 from ui.theme import Palette, fit_combo_popup_to_contents, set_button_variant
 
 
@@ -226,6 +227,7 @@ class ActividadDetailWidget(QWidget):
         self.inscrits_table.verticalHeader().setVisible(False)
         self.inscrits_table.setSelectionBehavior(QTableView.SelectRows)
         self.inscrits_table.setSelectionMode(QTableView.SingleSelection)
+        enable_table_copy(self.inscrits_table)
         self.inscrits_table.setAlternatingRowColors(True)
         self.inscrits_table.setSortingEnabled(True)
         self.inscrits_table.setMinimumHeight(300)
