@@ -248,7 +248,7 @@ class SociosTab(QWidget):
     menu.addAction(inscripciones_action)
     menu.addSeparator()
 
-    carnet_action = QAction(QIcon("ui/assets/id-card.svg"), "Visualitzar Carnet", self)
+    carnet_action = QAction("Visualitzar Carnet", self)
     carnet_action.triggered.connect(self._generar_carnet_socio)
     menu.addAction(carnet_action)
 
@@ -262,13 +262,13 @@ class SociosTab(QWidget):
 
     menu.addSeparator()
     
-    lopd_action = QAction(QIcon("ui/assets/signature.svg"), "LOPD - Signatura", self)
+    lopd_action = QAction("LOPD - Signatura", self)
     lopd_action.triggered.connect(self._abrir_lopd_dialog)
     menu.addAction(lopd_action)
 
     menu.addSeparator()
 
-    eliminar_action = QAction(QIcon("ui/assets/trash.svg"), "Eliminar", self)
+    eliminar_action = QAction("Eliminar", self)
     eliminar_action.triggered.connect(self._eliminar_socio)
     menu.addAction(eliminar_action)
 

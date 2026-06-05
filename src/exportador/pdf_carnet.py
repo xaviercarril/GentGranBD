@@ -77,11 +77,6 @@ def _styles():
 
 
 def _story(soci, styles):
-    foto_flow = Spacer(0, 0)  # placeholder
-    if soci.foto:
-        foto_buf = _resize_photo(soci.foto)
-        foto_flow = Image(foto_buf, width=FOTO_W, height=FOTO_H)
-
     nom_complet = f"{soci.nombre} {soci.apellido1 or ''} {soci.apellido2 or ''}".strip()
     text_flow = [
         Paragraph(nom_complet, styles["NomSoci"]),
@@ -89,14 +84,18 @@ def _story(soci, styles):
         Paragraph(f"Núm. Soci: <b>{soci.id:06d}</b>", styles["Normal"]),
     ]
 
-    table = Table(
-        [[foto_flow, text_flow]],
-        colWidths=[FOTO_W + 2 * mm, CARD_W - FOTO_W - 3 * MARGE],
-        hAlign="LEFT"
-    )
+    if soci.foto:
+        foto_buf = _resize_photo(soci.foto)
+        table_data = [[Image(foto_buf, width=FOTO_W, height=FOTO_H), text_flow]]
+        col_widths = [FOTO_W + 2 * mm, CARD_W - FOTO_W - 3 * MARGE]
+    else:
+        table_data = [[text_flow]]
+        col_widths = [CARD_W - 2 * MARGE]
+
+    table = Table(table_data, colWidths=col_widths, hAlign="LEFT")
     table.setStyle(TableStyle([
         ('VALIGN', (0, 0), (0, 0), 'TOP'),
-        ('VALIGN', (1, 0), (1, 0), 'MIDDLE'),
+        ('VALIGN', (-1, 0), (-1, 0), 'MIDDLE'),
         ('LEFTPADDING',  (0, 0), (-1, -1), 0),
         ('RIGHTPADDING', (0, 0), (-1, -1), 0),
         ('TOPPADDING',   (0, 0), (-1, -1), 0),

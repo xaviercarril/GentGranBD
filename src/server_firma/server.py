@@ -330,7 +330,7 @@ _SIGNATURE_HTML = """<!DOCTYPE html>
     h1 { font-size: 1.45rem; margin: 0 0 0.35rem; }
     .card { background: white; padding: 1rem; border: 1px solid #d7d7d2; border-radius: 8px; }
     .muted { color: #59636e; }
-    .person { margin: 1rem 0; padding: 0.8rem; border-left: 4px solid #6f914d; background: #f7faf4; }
+    .person { margin: 1rem 0; padding: 0.8rem; border-left: 4px solid #6f914d; background: transparent; }
     .person strong { display: block; font-size: 1.2rem; }
     canvas { width: 100%; height: auto; border: 2px dashed #6f914d; border-radius: 8px; background: #fff; touch-action: none; }
     button { background: #6f914d; border: none; color: white; font-size: 1rem; padding: 0.65rem 1.1rem; border-radius: 6px; margin-right: 0.5rem; }

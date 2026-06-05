@@ -128,14 +128,15 @@ class MainWindow(QMainWindow):
         menu_arxiu.addAction(action_importar_socis)
         menu_arxiu.addSeparator()
 
-        action_backup_db = QAction("Còpia de seguretat de la BD…", self)
-        action_backup_db.triggered.connect(self._backup_database)
-        menu_arxiu.addAction(action_backup_db)
+        if self._is_admin():
+            action_backup_db = QAction("Còpia de seguretat de la BD…", self)
+            action_backup_db.triggered.connect(self._backup_database)
+            menu_arxiu.addAction(action_backup_db)
 
-        action_restore_db = QAction("Restaurar BD des d'una còpia…", self)
-        action_restore_db.triggered.connect(self._restore_database)
-        menu_arxiu.addAction(action_restore_db)
-        menu_arxiu.addSeparator()
+            action_restore_db = QAction("Restaurar BD des d'una còpia…", self)
+            action_restore_db.triggered.connect(self._restore_database)
+            menu_arxiu.addAction(action_restore_db)
+            menu_arxiu.addSeparator()
 
         action_logout = QAction("Tancar sessió", self)
         action_logout.triggered.connect(self._logout)
@@ -149,7 +150,7 @@ class MainWindow(QMainWindow):
         action_about.triggered.connect(self._show_version_info)
         menu_ajuda.addAction(action_about)
 
-        if self.current_user.get("rol") == "ADMIN":
+        if self._is_admin():
             menu_admin = menu_bar.addMenu("Administració")
             action_usuaris = QAction("Usuaris", self)
             action_usuaris.triggered.connect(self._mostrar_usuaris)
@@ -167,6 +168,9 @@ class MainWindow(QMainWindow):
         if username:
             self.setWindowTitle(f"Associació Gent Gran de Castelldefels – Gestió ({username})")
         self.statusBar().showMessage(f"Usuari: {username} | BD: {safe_url}")
+
+    def _is_admin(self) -> bool:
+        return self.current_user.get("rol") == "ADMIN"
 
     def _show_version_info(self):
         from version import APP_VERSION
@@ -304,7 +308,7 @@ class MainWindow(QMainWindow):
         QApplication.quit()
 
     def _mostrar_usuaris(self):
-        if self.current_user.get("rol") != "ADMIN":
+        if not self._is_admin():
             QMessageBox.warning(self, "Accés denegat", "Només els administradors poden gestionar usuaris.")
             return
         from ui.usuarios_dialog import UsuariosDialog
@@ -544,6 +548,14 @@ class MainWindow(QMainWindow):
         return datetime.now() - last > timedelta(days=7)
 
     def _backup_database(self):
+        if not self._is_admin():
+            QMessageBox.warning(
+                self,
+                "Accés denegat",
+                "Només els administradors poden fer còpies de seguretat de la BD.",
+            )
+            return
+
         from database import engine
 
         if engine.url.get_backend_name() != "sqlite":
@@ -602,6 +614,14 @@ class MainWindow(QMainWindow):
         )
 
     def _restore_database(self):
+        if not self._is_admin():
+            QMessageBox.warning(
+                self,
+                "Accés denegat",
+                "Només els administradors poden restaurar la BD.",
+            )
+            return
+
         from database import engine
 
         if engine.url.get_backend_name() != "sqlite":
