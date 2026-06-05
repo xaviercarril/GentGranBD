@@ -78,6 +78,12 @@ def _build_qr_pixmap(text: str, size_px: int) -> QPixmap:
     return QPixmap.fromImage(image)
 
 
+def _transparent_label(text: str = "") -> QLabel:
+    label = QLabel(text)
+    label.setStyleSheet("background: transparent;")
+    return label
+
+
 def _make_qr_matrix(text: str) -> list[list[bool]]:
     """Genera un QR byte-mode Version 3-L, suficient per a URLs locals."""
 
@@ -290,10 +296,10 @@ class LOPDFirmaDialog(QDialog):
         self.setWindowTitle("Gestió LOPD del soci")
         self.setMinimumWidth(480)
 
-        self._status_label = QLabel("")
+        self._status_label = _transparent_label()
         self._status_label.setWordWrap(True)
 
-        self._progress_label = QLabel("")
+        self._progress_label = _transparent_label()
         self._progress_label.setWordWrap(True)
 
         self._server_url = QLineEdit()
@@ -342,9 +348,9 @@ class LOPDFirmaDialog(QDialog):
         if info:
             nombre = f"{info['nombre']} {info.get('apellido1', '') or ''} {info.get('apellido2', '') or ''}".strip()
             dni = info.get("dniNie", "")
-            ly.addWidget(QLabel(f"<b>{nombre}</b> — DNI {dni}"))
+            ly.addWidget(_transparent_label(f"<b>{nombre}</b> — DNI {dni}"))
         else:
-            ly.addWidget(QLabel("No s'han pogut obtenir les dades del soci."))
+            ly.addWidget(_transparent_label("No s'han pogut obtenir les dades del soci."))
         return box
 
     def _build_signed_box(self) -> QGroupBox:
