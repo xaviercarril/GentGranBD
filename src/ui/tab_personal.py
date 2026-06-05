@@ -6,6 +6,7 @@ from controladores.personal import listar_profesores, eliminar_personal, listar_
 from ui.profe_detail import ProfeDetailWidget
 from ui.profe_dialog import ProfeDialog
 from ui.table_models import DictTableModel
+from ui.table_utils import enable_table_copy
 from ui.volun_detail import VolunDetailWidget
 from ui.volun_dialog import VolunDialog
 from ui.theme import set_button_icon, set_button_variant
@@ -42,6 +43,7 @@ class PersonalTab(QWidget):
         # -- Configuració de selecció i estil --
         self.prof_table.setSelectionBehavior(QTableView.SelectRows)
         self.prof_table.setSelectionMode(QTableView.SingleSelection)
+        enable_table_copy(self.prof_table)
         self.prof_table.setAlternatingRowColors(True)
         self._refresh_profe()
 
@@ -99,6 +101,7 @@ class PersonalTab(QWidget):
         # -- Configuració de selecció i estil --
         self.volun_table.setSelectionBehavior(QTableView.SelectRows)
         self.volun_table.setSelectionMode(QTableView.SingleSelection)
+        enable_table_copy(self.volun_table)
         self.volun_table.setAlternatingRowColors(True)
         self._refresh_volun()
 

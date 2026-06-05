@@ -75,6 +75,7 @@ class MainWindow(QMainWindow):
         self.current_user = current_user or {}
         self._logging_out = False
         self._installing_update = False
+        self._closing = False
         self._update_check_thread = None
         self._update_install_thread = None
         self._update_progress_dialog = None
@@ -182,6 +183,8 @@ class MainWindow(QMainWindow):
         )
 
     def _start_update_check(self, manual: bool = False):
+        if self._closing:
+            return
         if self._update_check_thread is not None:
             if manual:
                 QMessageBox.information(self, "Actualitzacions", "Utilitzant la versió més recent.")
@@ -245,7 +248,9 @@ class MainWindow(QMainWindow):
             later_button.setEnabled(True)
 
     def _start_update_install(self, update_info):
-        if self._update_install_thread is not None:
+        if self._closing:
+            return
+        if self._update_install_thread is not None and not self._installing_update:
             QMessageBox.information(self, "Actualitzacions", "Ja s'està preparant una actualització.")
             return
         if not self._confirm_all_pending_changes():
@@ -683,8 +688,45 @@ class MainWindow(QMainWindow):
             pass
 
     def closeEvent(self, event):
+        if self._update_install_thread is not None and not self._installing_update:
+            QMessageBox.information(
+                self,
+                "Actualització en curs",
+                "Espera que acabi la instal·lació de l'actualització abans de tancar l'aplicació.",
+            )
+            event.ignore()
+            return
+
         if not self._logging_out and not self._installing_update and not self._confirm_all_pending_changes():
             event.ignore()
             return
 
+        self._closing = True
+        if not self._stop_update_thread("_update_check_thread"):
+            self._closing = False
+            event.ignore()
+            return
+        if not self._stop_update_thread("_update_install_thread"):
+            self._closing = False
+            event.ignore()
+            return
         super().closeEvent(event)
+
+    def _stop_update_thread(self, attr_name: str) -> bool:
+        thread = getattr(self, attr_name, None)
+        if thread is None:
+            return True
+        try:
+            if thread.isRunning():
+                thread.quit()
+                if not thread.wait(25000):
+                    QMessageBox.warning(
+                        self,
+                        "Tancament ajornat",
+                        "Encara hi ha una tasca d'actualització en curs. Torna a tancar l'aplicació en uns segons.",
+                    )
+                    return False
+        except RuntimeError:
+            pass
+        setattr(self, attr_name, None)
+        return True

@@ -5,6 +5,7 @@ from datetime import date
 from controladores.curso_academico import eliminar_cursoA, listar_trimestres_por_cursoA, listar_cursosA, generar_T1, generar_T2, generar_T3, generar_T4
 from controladores.trimestre import modificar_trimestre
 from ui.table_models import DictTableModel
+from ui.table_utils import enable_table_copy
 from ui.theme import set_button_icon, set_button_variant
 
 class CursoAcademicoDialog(QDialog):
@@ -33,6 +34,7 @@ class CursoAcademicoDialog(QDialog):
         self.tabla = QTableView()
         self.tabla.setSelectionBehavior(QTableView.SelectRows)
         self.tabla.setSelectionMode(QTableView.SingleSelection)
+        enable_table_copy(self.tabla)
         self.tabla.setAlternatingRowColors(True)
         self._refresh_table()
 

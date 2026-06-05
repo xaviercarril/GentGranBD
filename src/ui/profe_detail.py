@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, Signal
 from controladores.personal import modificar_personal, consultar_personal, listar_actividades_por_Personal
 from controladores.curso_academico import consultar_cursoA
 from ui.table_models import DictTableModel
+from ui.table_utils import enable_table_copy
 
 class ProfeDetailWidget(QWidget):
     """Panell lateral de detall i edició auto-guardada."""
@@ -41,6 +42,7 @@ class ProfeDetailWidget(QWidget):
         self.imparteix_table.verticalHeader().setVisible(False)
         self.imparteix_table.setSelectionBehavior(QTableView.SelectRows)
         self.imparteix_table.setSelectionMode(QTableView.NoSelection)
+        enable_table_copy(self.imparteix_table)
         self.imparteix_table.setAlternatingRowColors(True)
 
         layout.addLayout(form)

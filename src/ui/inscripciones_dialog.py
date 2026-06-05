@@ -1,9 +1,9 @@
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QLabel, QListWidget, QPushButton, QHBoxLayout,
     QMessageBox, QComboBox, QTableView, QHeaderView, QStyledItemDelegate,
-    QDialogButtonBox, QLineEdit, QTabBar
+    QDialogButtonBox, QLineEdit, QTabBar, QMenu
 )
-from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, QItemSelectionModel, Qt
 from controladores.inscripcion_socio import (
     consultar_actividadID_InscripcionSocio, consultar_socioID_InscripcionSocio, registrar_inscripcion, eliminar_inscripcion
 )
@@ -14,6 +14,7 @@ from datetime import date, datetime
 from controladores.inscripcion_socio import modificar_inscripcion, listar_pagos_por_InscripcionSocio
 from controladores.pagos import modificar_pago
 from ui.table_models import DictTableModel
+from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.theme import set_button_variant
 
 
@@ -57,7 +58,10 @@ class SeleccionarActividadInscripcionDialog(QDialog):
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(QTableView.SelectRows)
         self.table.setSelectionMode(QTableView.SingleSelection)
+        enable_table_copy(self.table)
         self.table.setEditTriggers(QTableView.NoEditTriggers)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._show_table_context_menu)
         self.table.doubleClicked.connect(self._accept_selection)
         layout.addWidget(self.table, 1)
 
@@ -148,6 +152,22 @@ class SeleccionarActividadInscripcionDialog(QDialog):
             return
         self.selected_actividad_id = self._rows[index.row()]["_id"]
         self.accept()
+
+    def _show_table_context_menu(self, pos):
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        self.table.setCurrentIndex(index)
+        self.table.selectionModel().select(
+            index,
+            QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+        )
+        menu = QMenu(self)
+        add_table_copy_actions(menu, self.table, index)
+        menu.addSeparator()
+        action = menu.addAction("Afegir activitat")
+        action.triggered.connect(self._accept_selection)
+        menu.exec(self.table.viewport().mapToGlobal(pos))
 
 
 class PagosTableModel(QAbstractTableModel):
@@ -292,6 +312,7 @@ class InscripcionesDialog(QDialog):
         self.pagos_table.verticalHeader().setVisible(False)
         self.pagos_table.setSelectionBehavior(QTableView.SelectRows)
         self.pagos_table.setSelectionMode(QTableView.SingleSelection)
+        enable_table_copy(self.pagos_table)
         self.pagos_table.setEditTriggers(QTableView.DoubleClicked | QTableView.EditKeyPressed)
         self.pagos_table.setAlternatingRowColors(True)
         self.pagos_table.horizontalHeader().setVisible(True)

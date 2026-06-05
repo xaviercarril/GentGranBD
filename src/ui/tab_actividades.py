@@ -6,7 +6,7 @@ from controladores.personal import consultar_personal
 from controladores.curso_academico import listar_cursosA, listar_actividades_por_CursoAcademico
 from PySide6.QtWidgets import (
   QWidget, QVBoxLayout, QHBoxLayout, QTableView,
-  QPushButton, QMessageBox, QLineEdit, QComboBox, QSizePolicy, QTabWidget
+  QPushButton, QMessageBox, QLineEdit, QComboBox, QSizePolicy, QTabWidget, QMenu
 )
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtCore import QSize, QModelIndex, QItemSelectionModel, Qt, QUrl, QTimer
@@ -14,6 +14,7 @@ from exportador.pdf_actividades import generar_pdf_actividades_curso
 from ui.actividad_dialog import ActividadDialog
 from ui.actividad_detail import ActividadDetailWidget
 from ui.table_models import DictTableModel
+from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.asistencia_dialog import AsistenciaDialog
 from ui.theme import set_button_icon, set_button_variant
 from models import EstadoInscripcion
@@ -50,7 +51,10 @@ class ActividadesTab(QWidget):
     self.table_activitats.verticalHeader().setVisible(False)
     self.table_activitats.setSelectionBehavior(QTableView.SelectRows)
     self.table_activitats.setSelectionMode(QTableView.SingleSelection)
+    enable_table_copy(self.table_activitats)
     self.table_activitats.setAlternatingRowColors(True)
+    self.table_activitats.setContextMenuPolicy(Qt.CustomContextMenu)
+    self.table_activitats.customContextMenuRequested.connect(self._show_actividad_context_menu)
     self.table_activitats.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
     header = self.table_activitats.horizontalHeader()
     header.setSectionsClickable(True)
@@ -256,6 +260,26 @@ class ActividadesTab(QWidget):
     actividad = self.table_activitats.model().rows[index.row()]
     dlg = AsistenciaDialog(actividad["id"], actividad["cursoAcademico_id"], self)
     dlg.exec()
+
+  def _show_actividad_context_menu(self, pos):
+    index = self.table_activitats.indexAt(pos)
+    if not index.isValid():
+      return
+
+    self.table_activitats.setCurrentIndex(index)
+    self.table_activitats.selectionModel().select(
+      index,
+      QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
+    )
+
+    menu = QMenu(self)
+    add_table_copy_actions(menu, self.table_activitats, index)
+    menu.addSeparator()
+    asistencia_action = menu.addAction("Obrir assistència")
+    asistencia_action.triggered.connect(
+      lambda _checked=False, idx=index: self._abrir_asistencia(idx)
+    )
+    menu.exec(self.table_activitats.viewport().mapToGlobal(pos))
 
   def _dialog_nova_actividad(self):
     curso_id = self._curso_selector.currentData()
