@@ -1,9 +1,16 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QObject, QRect, Qt, QTimer
+from PySide6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QPropertyAnimation, QRect, Qt, QTimer
 from PySide6.QtGui import QKeySequence
-from PySide6.QtCore import QPropertyAnimation
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QLabel, QGraphicsOpacityEffect, QMenu, QTableView, QTableWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QAbstractItemView,
+    QLabel,
+    QGraphicsOpacityEffect,
+    QMenu,
+    QTableView,
+    QTableWidget,
+)
 
 
 class TableCopyFilter(QObject):
