@@ -14,7 +14,7 @@ from exportador.pdf_actividades import generar_pdf_actividades_curso
 from ui.actividad_dialog import ActividadDialog
 from ui.actividad_detail import ActividadDetailWidget
 from ui.table_models import DictTableModel
-from ui.table_utils import enable_table_copy
+from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.asistencia_dialog import AsistenciaDialog
 from ui.theme import set_button_icon, set_button_variant
 from models import EstadoInscripcion
@@ -59,6 +59,7 @@ class ActividadesTab(QWidget):
     header = self.table_activitats.horizontalHeader()
     header.setSectionsClickable(True)
     header.sectionClicked.connect(self._sort_by_header)
+    self.table_activitats.doubleClicked.connect(self._abrir_asistencia)
 
     self.detail_actividad = ActividadDetailWidget()
     self.detail_actividad.saved.connect(self._refresh_activitats)
@@ -272,6 +273,8 @@ class ActividadesTab(QWidget):
     )
 
     menu = QMenu(self)
+    add_table_copy_actions(menu, self.table_activitats, index)
+    menu.addSeparator()
     asistencia_action = menu.addAction("Obrir assistència")
     asistencia_action.triggered.connect(
       lambda _checked=False, idx=index: self._abrir_asistencia(idx)

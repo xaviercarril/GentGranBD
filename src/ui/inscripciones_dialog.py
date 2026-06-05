@@ -14,7 +14,7 @@ from datetime import date, datetime
 from controladores.inscripcion_socio import modificar_inscripcion, listar_pagos_por_InscripcionSocio
 from controladores.pagos import modificar_pago
 from ui.table_models import DictTableModel
-from ui.table_utils import enable_table_copy
+from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.theme import set_button_variant
 
 
@@ -62,6 +62,7 @@ class SeleccionarActividadInscripcionDialog(QDialog):
         self.table.setEditTriggers(QTableView.NoEditTriggers)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_table_context_menu)
+        self.table.doubleClicked.connect(self._accept_selection)
         layout.addWidget(self.table, 1)
 
         self.info = QLabel("")
@@ -162,6 +163,8 @@ class SeleccionarActividadInscripcionDialog(QDialog):
             QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
         )
         menu = QMenu(self)
+        add_table_copy_actions(menu, self.table, index)
+        menu.addSeparator()
         action = menu.addAction("Afegir activitat")
         action.triggered.connect(self._accept_selection)
         menu.exec(self.table.viewport().mapToGlobal(pos))

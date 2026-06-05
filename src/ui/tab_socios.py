@@ -15,7 +15,7 @@ from controladores.socios import (
 )
 from ui.socio_dialog import SocioDialog
 from ui.lopd_dialog import LOPDFirmaDialog
-from ui.table_utils import enable_table_copy
+from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.theme import set_button_icon, set_button_variant
 
 class SociosTab(QWidget):
@@ -56,6 +56,7 @@ class SociosTab(QWidget):
 
     # Quan seleccionem fila → carregar detall
     self.table_socis.selectionModel().currentRowChanged.connect(self._row_changed)
+    self.table_socis.doubleClicked.connect(self._abrir_inscripciones_socio)
     # Splitter horitzontal perquè la taula i el detall s'adaptin al resize.
     self.splitter = QSplitter(Qt.Horizontal)
     self.splitter.addWidget(self.table_socis)
@@ -237,6 +238,8 @@ class SociosTab(QWidget):
       )
 
     menu = QMenu(self)
+    add_table_copy_actions(menu, self.table_socis, index)
+    menu.addSeparator()
 
     inscripciones_action = QAction("Obrir inscripcions", self)
     inscripciones_action.triggered.connect(

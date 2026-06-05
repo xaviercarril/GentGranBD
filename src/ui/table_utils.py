@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEasingCurve, QEvent, QObject, QRect, Qt
+from PySide6.QtCore import QEasingCurve, QEvent, QItemSelectionModel, QObject, QRect, Qt, QTimer
 from PySide6.QtGui import QKeySequence
 from PySide6.QtCore import QPropertyAnimation
-from PySide6.QtWidgets import QApplication, QAbstractItemView, QLabel, QGraphicsOpacityEffect, QTableView, QTableWidget
+from PySide6.QtWidgets import QApplication, QAbstractItemView, QLabel, QGraphicsOpacityEffect, QMenu, QTableView, QTableWidget
 
 
 class TableCopyFilter(QObject):
@@ -17,11 +17,22 @@ class TableCopyFilter(QObject):
             if copied:
                 show_copy_feedback(self._table)
                 return True
-        if event.type() == QEvent.MouseButtonDblClick and event.button() == Qt.LeftButton:
-            copied = copy_table_cell_text_at(self._table, event.pos())
-            if copied:
-                show_copy_feedback(self._table, event.pos())
-                return True
+        if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
+            QTimer.singleShot(0, lambda: show_current_cell_border(self._table))
+        if event.type() == QEvent.ContextMenu and self._table.contextMenuPolicy() != Qt.CustomContextMenu:
+            pos = event.pos()
+            if obj is self._table:
+                pos = self._table.viewport().mapFrom(self._table, pos)
+            index = self._table.indexAt(pos)
+            if index.isValid():
+                self._table.setCurrentIndex(index)
+                show_current_cell_border(self._table)
+            menu = QMenu(self._table)
+            add_table_copy_actions(menu, self._table, index)
+            menu.exec(self._table.viewport().mapToGlobal(pos))
+            return True
+        if event.type() in {QEvent.Resize, QEvent.Wheel}:
+            QTimer.singleShot(0, lambda: show_current_cell_border(self._table))
         return super().eventFilter(obj, event)
 
 
@@ -76,6 +87,42 @@ def copy_table_cell_text_at(table: QAbstractItemView, pos) -> bool:
     return True
 
 
+def copy_current_cell_text(table: QAbstractItemView) -> bool:
+    index = table.currentIndex()
+    if not index.isValid() or table.isRowHidden(index.row()) or table.isColumnHidden(index.column()):
+        return False
+    QApplication.clipboard().setText(_cell_text(table, index.row(), index.column()))
+    show_copy_feedback(table, table.visualRect(index).center())
+    return True
+
+
+def copy_current_row_text(table: QAbstractItemView) -> bool:
+    index = table.currentIndex()
+    model = table.model()
+    if model is None or not index.isValid() or table.isRowHidden(index.row()):
+        return False
+    values = []
+    for column in range(model.columnCount()):
+        if not table.isColumnHidden(column):
+            values.append(_cell_text(table, index.row(), column))
+    QApplication.clipboard().setText("\t".join(values))
+    show_copy_feedback(table)
+    return True
+
+
+def add_table_copy_actions(menu: QMenu, table: QAbstractItemView, index=None) -> None:
+    if index is not None and index.isValid():
+        selection_model = table.selectionModel()
+        if selection_model is not None:
+            selection_model.setCurrentIndex(index, QItemSelectionModel.NoUpdate)
+        else:
+            table.setCurrentIndex(index)
+    copy_cell = menu.addAction("Copiar camp")
+    copy_cell.triggered.connect(lambda _checked=False: copy_current_cell_text(table))
+    copy_selection = menu.addAction("Copiar selecció")
+    copy_selection.triggered.connect(lambda _checked=False: copy_selected_table_text(table) and show_copy_feedback(table))
+
+
 def show_copy_feedback(table: QAbstractItemView, pos=None) -> None:
     rect = _feedback_rect(table, pos)
     if rect.isNull():
@@ -119,6 +166,37 @@ def show_copy_feedback(table: QAbstractItemView, pos=None) -> None:
     animation.finished.connect(label.hide)
     label._copy_feedback_animation = animation
     animation.start()
+
+
+def show_current_cell_border(table: QAbstractItemView) -> None:
+    index = table.currentIndex()
+    border = getattr(table, "_current_cell_border", None)
+    if border is None:
+        border = QLabel(table.viewport())
+        border.setObjectName("currentCellBorder")
+        border.setAttribute(Qt.WA_TransparentForMouseEvents)
+        border.setStyleSheet(
+            """
+            QLabel#currentCellBorder {
+                background: transparent;
+                border: 2px solid #5f7f3f;
+                border-radius: 2px;
+            }
+            """
+        )
+        table._current_cell_border = border
+
+    if not index.isValid() or table.isRowHidden(index.row()) or table.isColumnHidden(index.column()):
+        border.hide()
+        return
+
+    rect = table.visualRect(index).intersected(table.viewport().rect())
+    if rect.isNull():
+        border.hide()
+        return
+    border.setGeometry(rect.adjusted(1, 1, -1, -1))
+    border.show()
+    border.raise_()
 
 
 def _feedback_rect(table: QAbstractItemView, pos=None) -> QRect:

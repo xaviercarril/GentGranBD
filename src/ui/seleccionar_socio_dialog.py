@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from controladores.socios import listar_socios_activos
 from ui.table_models import DictTableModel
-from ui.table_utils import enable_table_copy
+from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.theme import set_button_variant
 
 
@@ -41,6 +41,7 @@ class SeleccionarSocioDialog(QDialog):
         self.table.setAlternatingRowColors(True)
         self.table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._show_table_context_menu)
+        self.table.doubleClicked.connect(self.accept)
 
         self.buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.btn_no_soci = QPushButton("Afegir no soci")
@@ -132,6 +133,8 @@ class SeleccionarSocioDialog(QDialog):
             QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows,
         )
         menu = QMenu(self)
+        add_table_copy_actions(menu, self.table, index)
+        menu.addSeparator()
         action = menu.addAction("Seleccionar soci")
         action.triggered.connect(self.accept)
         menu.exec(self.table.viewport().mapToGlobal(pos))
