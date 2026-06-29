@@ -261,7 +261,22 @@ def _download_update_assets(update: UpdateInfo) -> tuple[Path, Path]:
     _update_log(f"SHA256 descarregat: {sha_path}")
     verify_sha256(installer_path, parse_sha256_file(sha_path))
     _update_log("SHA256 verificat correctament")
+    _cleanup_old_update_downloads(keep_tag=update.tag)
     return installer_path, sha_path
+
+
+def _cleanup_old_update_downloads(keep_tag: str | None = None) -> None:
+    updates_dir = _user_data_dir() / "updates"
+    if not updates_dir.exists():
+        return
+    for child in updates_dir.iterdir():
+        if not child.is_dir() or child.name == keep_tag:
+            continue
+        try:
+            shutil.rmtree(child)
+            _update_log(f"Descàrrega antiga eliminada: {child}")
+        except Exception as exc:
+            _update_log(f"No s'ha pogut eliminar la descàrrega antiga {child}: {exc}")
 
 
 def install_update(update: UpdateInfo, app_path: Path | None = None) -> InstallResult:
@@ -310,12 +325,16 @@ if not errorlevel 1 (
   timeout /t 1 /nobreak > nul
   goto wait
 )
-echo %date% %time% [install_windows_update.cmd] GentGranBD tancat. Llançant instal·lador silenciós.>> "%LOG%"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "$argsForInstaller = '/S /LAUNCH /D=' + $env:INSTALL_DIR; Start-Process -FilePath $env:INSTALLER -ArgumentList $argsForInstaller -Verb RunAs"
+echo %date% %time% [install_windows_update.cmd] GentGranBD tancat. Llançant instal·lador visible.>> "%LOG%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference = 'Stop'; $argsForInstaller = '/LAUNCH /D=' + $env:INSTALL_DIR; $process = Start-Process -FilePath $env:INSTALLER -ArgumentList $argsForInstaller -Verb RunAs -Wait -PassThru; exit $process.ExitCode"
 if errorlevel 1 (
-  echo %date% %time% [install_windows_update.cmd] No s'ha pogut llançar l'instal·lador. ERRORLEVEL=%ERRORLEVEL%>> "%LOG%"
+  echo %date% %time% [install_windows_update.cmd] L'instal·lador ha fallat o s'ha cancel·lat. ERRORLEVEL=%ERRORLEVEL%>> "%LOG%"
 ) else (
-  echo %date% %time% [install_windows_update.cmd] Instal·lador llançat.>> "%LOG%"
+  echo %date% %time% [install_windows_update.cmd] Instal·lador completat. Eliminant descàrrega.>> "%LOG%"
+  if exist "%INSTALLER%" del /f /q "%INSTALLER%" >> "%LOG%" 2>&1
+  if exist "%INSTALLER%.sha256" del /f /q "%INSTALLER%.sha256" >> "%LOG%" 2>&1
+  for %%I in ("%INSTALLER%") do set "INSTALLER_DIR=%%~dpI"
+  if defined INSTALLER_DIR rd "%INSTALLER_DIR%" >> "%LOG%" 2>&1
 )
 endlocal
 """,
