@@ -163,5 +163,28 @@ def test_launch_windows_helper_pasa_directorio_actual_al_instalador(monkeypatch,
     content = helper.read_text(encoding="utf-8")
     assert 'set "INSTALL_DIR=' in content
     assert str(tmp_path / "App Dir") in content
-    assert "/D=' + $env:INSTALL_DIR" in content
+    assert "'/LAUNCH /D=' + $env:INSTALL_DIR" in content
+    assert "'/S /LAUNCH" not in content
+    assert "-Wait -PassThru" in content
+    assert 'del /f /q "%INSTALLER%"' in content
+    assert 'del /f /q "%INSTALLER%.sha256"' in content
     assert popen_calls == [(["cmd.exe", "/c", str(helper)], {"close_fds": True})]
+
+
+def test_cleanup_old_update_downloads_conserva_tag_actual(monkeypatch, tmp_path):
+    updates_dir = tmp_path / "updates"
+    keep = updates_dir / "v1.2.0"
+    old = updates_dir / "v1.1.0"
+    keep.mkdir(parents=True)
+    old.mkdir()
+    (keep / "current.exe").write_text("current", encoding="utf-8")
+    (old / "old.exe").write_text("old", encoding="utf-8")
+    (updates_dir / "updater.log").write_text("log", encoding="utf-8")
+
+    monkeypatch.setattr(updater, "_user_data_dir", lambda: tmp_path)
+
+    updater._cleanup_old_update_downloads(keep_tag="v1.2.0")
+
+    assert keep.exists()
+    assert not old.exists()
+    assert (updates_dir / "updater.log").exists()
