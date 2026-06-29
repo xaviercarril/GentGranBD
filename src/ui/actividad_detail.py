@@ -327,16 +327,16 @@ class ActividadDetailWidget(QWidget):
     def _load_inscrits_table(self):
         try:
             inscripciones = listar_inscripciones_por_Actividad(self._actividadID)
-            dni_label = "DNI" if self._tipo_actividad == "VIATGE" else "DNI/NIE"
             headers = [
                 ("ID", "id"),
+                ("Num Soci", "esSocio"),
+                ("Primer Cognom", "apellido1"),
+                ("Segon Cognom", "apellido2"),
                 ("Nom", "nombre"),
-                ("Primer cognom", "apellido1"),
-                ("Segon cognom", "apellido2"),
-                (dni_label, "dniNie"),
-                ("Soci", "esSocio"),
+                ("Telf. Movil", "telefonoMovil"),
             ]
             if self._tipo_actividad == "VIATGE":
+                headers.append(("DNI", "dniNie"))
                 headers.append(("Pagat", "pagat"))
             headers.extend(
                 [
@@ -354,14 +354,16 @@ class ActividadDetailWidget(QWidget):
                     inscripcion["apellido1"] = socio.get("apellido1", "")
                     inscripcion["apellido2"] = socio.get("apellido2", "")
                     inscripcion["dniNie"] = socio.get("dniNie", "")
-                    inscripcion["esSocio"] = "Sí"
+                    inscripcion["telefonoMovil"] = socio.get("telefonoMovil", "")
+                    inscripcion["esSocio"] = socio_id
                     
                 else:
                     inscripcion["nombre"] = inscripcion.get("noSocioNombre") or "Desconegut"
                     inscripcion["apellido1"] = inscripcion.get("noSocioApellido1") or ""
                     inscripcion["apellido2"] = inscripcion.get("noSocioApellido2") or ""
                     inscripcion["dniNie"] = inscripcion.get("noSocioDni") or ""
-                    inscripcion["esSocio"] = "No"
+                    inscripcion["telefonoMovil"] = inscripcion.get("noSocioTelefono") or ""
+                    inscripcion["esSocio"] = "-"
                 if self._tipo_actividad == "VIATGE":
                     self._set_pagat_info(inscripcion)
             self._inscripciones = inscripciones
@@ -526,7 +528,15 @@ class ActividadDetailWidget(QWidget):
         modificar_inscripcion(inscripcion_id, {field: value})
         if field == "fechaInscripcion":
             actualizar_estados_inscripciones(self._actividadID)
-            QTimer.singleShot(0, self._load_inscrits_table)
+            # El cambio puede intercambiar INSCRIT/RESERVA. Se refrescan
+            # primero los participantes y después la tabla superior común
+            # a Cursos y Viatges, una vez finalizada la edición del modelo.
+            QTimer.singleShot(0, self._finish_fecha_inscripcion_update)
+            return
+        self.saved.emit()
+
+    def _finish_fecha_inscripcion_update(self):
+        self._load_inscrits_table()
         self.saved.emit()
 
     def _set_pagat_info(self, inscripcion):

@@ -202,20 +202,14 @@ def actualizar_estados_inscripciones(actividadID: int) -> list[dict] | None:
         return
 
     todas = listar_inscripciones_por_Actividad(actividadID)
+    todas.sort(key=lambda i: (i["fechaInscripcion"], i["id"]))
 
-    # Separar inscripciones
-    reservas = [i for i in todas if i["estado"].value == "RESERVA"]
-    inscritos = [i for i in todas if i["estado"].value == "INSCRIT"]
+    max_alumnes = max(0, act.get("numMaxAlumnos") or 0)
 
-    # Ordenar por fecha
-    reservas.sort(key=lambda i: i["fechaInscripcion"])
-    inscritos.sort(key=lambda i: i["fechaInscripcion"])
-
-    max_alumnes = act.get("numMaxAlumnos", 0)
-
-    # Determinar quién debe estar inscrito y quién en reserva
-    nuevos_inscritos = inscritos[:max_alumnes] + reservas[: max(0, max_alumnes - len(inscritos))]
-    nuevos_reservas = inscritos[max_alumnes:] + reservas[max(0, max_alumnes - len(inscritos)) :]
+    # La fecha de inscripción determina la prioridad, con el ID como
+    # desempate estable para inscripciones registradas el mismo día.
+    nuevos_inscritos = todas[:max_alumnes]
+    nuevos_reservas = todas[max_alumnes:]
 
     actualizados = []
     for ins in nuevos_inscritos:

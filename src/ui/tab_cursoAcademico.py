@@ -1,8 +1,8 @@
-from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QDateEdit, QFormLayout, QTableWidget, QTableWidgetItem, QMessageBox, QTableView, QGroupBox, QHBoxLayout
+from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QDateEdit, QFormLayout, QTableWidget, QTableWidgetItem, QMessageBox, QTableView, QGroupBox, QHBoxLayout, QInputDialog, QLineEdit
 from PySide6.QtCore import QDate, Qt, QSize
 from PySide6.QtGui import QIcon, QPixmap
 from datetime import date
-from controladores.curso_academico import eliminar_cursoA, listar_trimestres_por_cursoA, listar_cursosA, generar_T1, generar_T2, generar_T3, generar_T4
+from controladores.curso_academico import duplicar_cursoA, eliminar_cursoA, listar_trimestres_por_cursoA, listar_cursosA, generar_T1, generar_T2, generar_T3, generar_T4
 from controladores.trimestre import modificar_trimestre
 from ui.table_models import DictTableModel
 from ui.table_utils import enable_table_copy
@@ -18,6 +18,10 @@ class CursoAcademicoDialog(QDialog):
         set_button_icon(btn_nou, "ui/assets/plus.svg")
         set_button_variant(btn_nou, "primary")
         btn_nou.clicked.connect(self._mostrar_dialog_crear)
+        btn_duplicar = QPushButton("Duplicar Curs Acadèmic")
+        set_button_icon(btn_duplicar, "ui/assets/plus.svg")
+        set_button_variant(btn_duplicar, "secondary")
+        btn_duplicar.clicked.connect(self._duplicar_curso)
         btn_borrar = QPushButton("Eliminar Curs Acadèmic")
         set_button_icon(btn_borrar, "ui/assets/minus.svg")
         set_button_variant(btn_borrar, "danger")
@@ -25,6 +29,7 @@ class CursoAcademicoDialog(QDialog):
         
         top_buttons_layout = QHBoxLayout()
         top_buttons_layout.addWidget(btn_nou)
+        top_buttons_layout.addWidget(btn_duplicar)
         top_buttons_layout.addWidget(btn_borrar)
         top_buttons_layout.addStretch()
         main_layout.addLayout(top_buttons_layout)
@@ -132,6 +137,37 @@ class CursoAcademicoDialog(QDialog):
 
       eliminar_cursoA(curso["id"])
       self._refresh_table()
+
+    def _duplicar_curso(self):
+      sel = self.tabla.selectionModel().selectedRows()
+      if not sel:
+        QMessageBox.information(
+          self,
+          "Duplicar curs acadèmic",
+          "Selecciona el curs acadèmic que vols duplicar.",
+        )
+        return
+
+      curso = self.tabla.model().rows[sel[0].row()]
+      nuevo_nombre, aceptado = QInputDialog.getText(
+        self,
+        "Duplicar curs acadèmic",
+        "Nom del nou curs:",
+        QLineEdit.Normal,
+        f"{curso['nombre']} - còpia",
+      )
+      if not aceptado:
+        return
+
+      try:
+        nuevo_id = duplicar_cursoA(curso["id"], nuevo_nombre)
+        self._refresh_table()
+        for row, item in enumerate(self.tabla.model().rows):
+          if item["id"] == nuevo_id:
+            self.tabla.selectRow(row)
+            break
+      except ValueError as e:
+        QMessageBox.warning(self, "No s'ha pogut duplicar", str(e))
 
     def _filter_rows(self, text):
       if not text.strip():

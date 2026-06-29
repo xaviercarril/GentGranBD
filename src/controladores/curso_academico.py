@@ -99,7 +99,80 @@ def eliminar_cursoA(cursoAcademicoID: int) -> None:
       db.commit()
   except Exception as e:
     raise ValueError(f"Error al eliminar curso académico: {e}")
-  
+
+
+def duplicar_cursoA(cursoAcademicoID: int, nuevo_nombre: str) -> int:
+  """Duplica un curso académico con sus trimestres y actividades."""
+  nombre = (nuevo_nombre or "").strip()
+  if not nombre:
+    raise ValueError("El nom del nou curs és obligatori.")
+
+  with SessionLocal() as db:
+    curso_origen = db.get(CursoAcademico, cursoAcademicoID)
+    if not curso_origen:
+      raise ValueError("Curso inexistent")
+
+    if nombre == curso_origen.nombre:
+      raise ValueError("El nou curs ha de tenir un nom diferent.")
+
+    nombre_existente = (
+      db.query(CursoAcademico)
+      .filter(CursoAcademico.nombre == nombre)
+      .first()
+    )
+    if nombre_existente:
+      raise ValueError("Ja existeix un curs acadèmic amb aquest nom.")
+
+    try:
+      nuevo_curso = CursoAcademico(
+        nombre=nombre,
+        fechaInicio=curso_origen.fechaInicio,
+        fechaFin=curso_origen.fechaFin,
+      )
+      db.add(nuevo_curso)
+      db.flush()
+
+      trimestres = (
+        db.query(Trimestre)
+        .filter(Trimestre.cursoAcademicoID == cursoAcademicoID)
+        .order_by(Trimestre.id)
+        .all()
+      )
+      for trimestre in trimestres:
+        db.add(Trimestre(
+          nombre=trimestre.nombre,
+          fechaInicio=trimestre.fechaInicio,
+          fechaFin=trimestre.fechaFin,
+          cursoAcademicoID=nuevo_curso.id,
+        ))
+
+      actividades = (
+        db.query(Actividad)
+        .filter(Actividad.cursoAcademicoID == cursoAcademicoID)
+        .order_by(Actividad.id)
+        .all()
+      )
+      for actividad in actividades:
+        db.add(Actividad(
+          nombre=actividad.nombre,
+          tipo=actividad.tipo,
+          descripcion=actividad.descripcion,
+          numMaxAlumnos=actividad.numMaxAlumnos,
+          cursoAcademicoID=nuevo_curso.id,
+          lugarID=actividad.lugarID,
+          personalID=actividad.personalID,
+          precio_matricula=actividad.precio_matricula,
+        ))
+
+      db.commit()
+      return nuevo_curso.id
+    except IntegrityError as e:
+      db.rollback()
+      raise ValueError(f"Error al duplicar curso académico: {e.orig}")
+    except Exception as e:
+      db.rollback()
+      raise ValueError(f"Error al duplicar curso académico: {e}") from e
+
 # ────────────────── Consultas ──────────────────
 def listar_cursosA() -> list[dict]:
   """Devuelve todos los cursos académicos"""
