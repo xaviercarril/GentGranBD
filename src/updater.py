@@ -280,26 +280,50 @@ def install_update(update: UpdateInfo, app_path: Path | None = None) -> InstallR
     raise UpdateError("Plataforma no suportada per instal·lar automàticament.")
 
 
+def _current_windows_install_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path.cwd().resolve()
+
+
 def _launch_windows_helper(installer_path: Path) -> None:
     if os.name != "nt":
         raise UpdateError("L'instal·lador de Windows només es pot executar a Windows.")
-    helper_path = _user_data_dir() / "updates" / "install_windows_update.cmd"
+    updates_dir = _user_data_dir() / "updates"
+    helper_path = updates_dir / "install_windows_update.cmd"
+    helper_log = updates_dir / "install_windows_update.log"
+    install_dir = _current_windows_install_dir()
+    updates_dir.mkdir(parents=True, exist_ok=True)
     helper_path.write_text(
         f"""@echo off
 setlocal
-set PID={os.getpid()}
-set INSTALLER={installer_path}
+set "PID={os.getpid()}"
+set "INSTALLER={installer_path}"
+set "INSTALL_DIR={install_dir}"
+set "LOG={helper_log}"
+if not exist "%~dp0" mkdir "%~dp0" > nul 2> nul
+echo %date% %time% [install_windows_update.cmd] Helper iniciat. PID=%PID% INSTALLER=%INSTALLER% INSTALL_DIR=%INSTALL_DIR%>> "%LOG%"
 :wait
 tasklist /FI "PID eq %PID%" | find "%PID%" > nul
 if not errorlevel 1 (
+  echo %date% %time% [install_windows_update.cmd] Esperant que es tanqui GentGranBD...>> "%LOG%"
   timeout /t 1 /nobreak > nul
   goto wait
 )
-powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath '%INSTALLER%' -ArgumentList '/S /LAUNCH' -Verb RunAs"
+echo %date% %time% [install_windows_update.cmd] GentGranBD tancat. Llançant instal·lador silenciós.>> "%LOG%"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$argsForInstaller = '/S /LAUNCH /D=' + $env:INSTALL_DIR; Start-Process -FilePath $env:INSTALLER -ArgumentList $argsForInstaller -Verb RunAs"
+if errorlevel 1 (
+  echo %date% %time% [install_windows_update.cmd] No s'ha pogut llançar l'instal·lador. ERRORLEVEL=%ERRORLEVEL%>> "%LOG%"
+) else (
+  echo %date% %time% [install_windows_update.cmd] Instal·lador llançat.>> "%LOG%"
+)
 endlocal
 """,
         encoding="utf-8",
     )
+    _update_log(f"Helper Windows escrit a {helper_path}")
+    _update_log(f"Log del helper Windows: {helper_log}")
+    _update_log(f"Directori d'instal·lació Windows detectat: {install_dir}")
     subprocess.Popen(["cmd.exe", "/c", str(helper_path)], close_fds=True)
 
 

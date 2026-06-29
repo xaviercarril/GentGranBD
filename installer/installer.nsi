@@ -8,6 +8,7 @@
 !define VERSION "1.0.0"
 !endif
 !define COMPANY "Gent Gran"
+!define REGKEY "Software\${COMPANY}\${APPNAME}"
 ; Allow overriding DISTDIR from CLI: makensis -DDISTDIR=path installer.nsi
 !ifndef DISTDIR
 !define DISTDIR "dist\GentGranBD"
@@ -16,10 +17,18 @@
 
 OutFile "GentGranBD-Setup-${VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
+InstallDirRegKey HKLM "${REGKEY}" "InstallDir"
 RequestExecutionLevel admin
 
 Page directory
 Page instfiles
+
+Function .onInit
+  ReadRegStr $0 HKLM "${REGKEY}" "InstallDir"
+  IfFileExists "$0\GentGranBD.exe" 0 done
+    StrCpy $INSTDIR "$0"
+  done:
+FunctionEnd
 
 Section "Install"
   SetOutPath "$INSTDIR"
@@ -31,6 +40,7 @@ Section "Install"
   !else
     File /r "${DISTDIR}\*.*"
   !endif
+  WriteRegStr HKLM "${REGKEY}" "InstallDir" "$INSTDIR"
   CreateShortCut "$DESKTOP\${APPNAME}.lnk" "$INSTDIR\GentGranBD.exe"
 
   ${GetParameters} $R0

@@ -142,3 +142,26 @@ def test_check_for_update_falla_si_falta_hash(monkeypatch):
 
     with pytest.raises(updater.UpdateError):
         updater.check_for_update(current_version="1.0.0", token="token")
+
+
+def test_launch_windows_helper_pasa_directorio_actual_al_instalador(monkeypatch, tmp_path):
+    monkeypatch.setattr(updater.os, "name", "nt")
+    monkeypatch.setattr(updater.os, "getpid", lambda: 1234)
+    monkeypatch.setattr(updater, "_current_windows_install_dir", lambda: tmp_path / "App Dir")
+    monkeypatch.setattr(updater, "_user_data_dir", lambda: tmp_path / "data")
+
+    popen_calls = []
+
+    def fake_popen(args, **kwargs):
+        popen_calls.append((args, kwargs))
+
+    monkeypatch.setattr(updater.subprocess, "Popen", fake_popen)
+
+    updater._launch_windows_helper(tmp_path / "downloads" / "GentGranBD-Setup.exe")
+
+    helper = tmp_path / "data" / "updates" / "install_windows_update.cmd"
+    content = helper.read_text(encoding="utf-8")
+    assert 'set "INSTALL_DIR=' in content
+    assert str(tmp_path / "App Dir") in content
+    assert "/D=' + $env:INSTALL_DIR" in content
+    assert popen_calls == [(["cmd.exe", "/c", str(helper)], {"close_fds": True})]
