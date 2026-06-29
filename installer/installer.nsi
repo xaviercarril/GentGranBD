@@ -15,6 +15,7 @@
 !endif
 ; Allow passing a single EXE path for one-file builds: makensis -DAPP_EXE=dist\GentGranBD.exe
 
+Name "${APPNAME}"
 OutFile "GentGranBD-Setup-${VERSION}.exe"
 InstallDir "$PROGRAMFILES64\${COMPANY}\${APPNAME}"
 InstallDirRegKey HKLM "${REGKEY}" "InstallDir"
@@ -32,6 +33,9 @@ FunctionEnd
 
 Section "Install"
   SetOutPath "$INSTDIR"
+  DetailPrint "Tancant GentGranBD si encara està en execució..."
+  nsExec::ExecToLog '"$SYSDIR\taskkill.exe" /F /T /IM GentGranBD.exe'
+  Sleep 1500
   ; Replace the previous PyInstaller payload. User data lives in %APPDATA%\GentGranBD.
   Delete "$INSTDIR\GentGranBD.exe"
   RMDir /r "$INSTDIR\_internal"
