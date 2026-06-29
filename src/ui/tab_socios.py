@@ -3,15 +3,15 @@ import sys
 import tempfile
 
 # src/ui/tab_socios.py
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox, QMenu, QSplitter, QScrollArea
-from PySide6.QtGui import QIcon, QPixmap, QAction
-from PySide6.QtCore import QSize, QItemSelectionModel
-from PySide6.QtCore import QEvent, Qt
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QTableView, QLineEdit, QMessageBox, QMenu, QSplitter, QScrollArea, QComboBox
+from PySide6.QtGui import QDesktopServices, QIcon, QPixmap, QAction
+from PySide6.QtCore import QItemSelectionModel
+from PySide6.QtCore import QEvent, Qt, QTimer, QUrl
 from ui.table_models import DictTableModel
 from ui.socio_detail import SocioDetailWidget
 from controladores.socios import (
-    listar_socios, eliminar_socio, consultar_socio, generar_carnet_pdf,
-    generar_ficha_socio_pdf, generar_hoja_ficha_carnet_pdf
+    listar_socios_tabla, eliminar_socio, consultar_socio, generar_carnet_pdf,
+    generar_ficha_socio_pdf, generar_hoja_ficha_carnet_pdf, generar_socios_tabla_pdf
 )
 from ui.socio_dialog import SocioDialog
 from ui.lopd_dialog import LOPDFirmaDialog
@@ -27,12 +27,55 @@ class SociosTab(QWidget):
     self._restoring_selection = False
     self._sort_key = "id"
     self._sort_order = Qt.AscendingOrder
+    self._all_socios = []
+    self._search_text_by_field_by_id = {}
+    self._socios_loaded = False
+    self._table_headers = [
+      ("Num Soci", "id"),
+      ("Primer Cognom", "apellido1"),
+      ("Segon Cognom", "apellido2"),
+      ("Nom", "nombre"),
+      ("DNI", "dniNie"),
+      ("Telf. Movil", "telefonoMovil"),
+      ("Telf. Fixe", "telefonoFijo"),
+      ("Adreça", "direccion"),
+      ("Data alta", "fechaAlta"),
+      ("Data naixement", "fechaNacimiento"),
+      ("Grup difusió", "grupoDifusion"),
+      ("Email", "email"),
+    ]
+    self._column_widths = {
+      "id": 90,
+      "apellido1": 150,
+      "apellido2": 150,
+      "nombre": 140,
+      "dniNie": 110,
+      "telefonoMovil": 110,
+      "telefonoFijo": 110,
+      "direccion": 220,
+      "fechaAlta": 105,
+      "fechaNacimiento": 125,
+      "grupoDifusion": 130,
+      "email": 220,
+    }
     # Taula esquerra
     self.table_socis = QTableView()
 
     # Caixa de cerca
+    self._search_field_combo = QComboBox()
+    for label, key in self._table_headers:
+      self._search_field_combo.addItem(label, key)
+    default_search_field = self._search_field_combo.findData("nombre")
+    if default_search_field >= 0:
+      self._search_field_combo.setCurrentIndex(default_search_field)
+    self._search_field_combo.currentIndexChanged.connect(self._filtrar_socios)
+
     self._search_box = QLineEdit()
     self._search_box.setPlaceholderText("Cerca...")
+    self._search_timer = QTimer(self)
+    self._search_timer.setSingleShot(True)
+    self._search_timer.setInterval(150)
+    self._search_timer.timeout.connect(self._apply_current_filter)
     self._search_box.textChanged.connect(self._filtrar_socios)
 
     # Oculta la columna de número de fila
@@ -83,14 +126,23 @@ class SociosTab(QWidget):
     set_button_variant(btn_nou, "primary")
     btn_nou.clicked.connect(self._dialog_nou_socio)
 
+    btn_exportar_pdf = QPushButton("Exportar PDF")
+    set_button_icon(btn_exportar_pdf, "ui/assets/pdf.svg")
+    set_button_variant(btn_exportar_pdf, "secondary")
+    btn_exportar_pdf.clicked.connect(self._exportar_socios_pdf)
+
     top_buttons = QHBoxLayout()
     top_buttons.addWidget(btn_nou)
+    top_buttons.addWidget(btn_exportar_pdf)
     top_buttons.addStretch()
 
     page = QWidget()
     ly = QVBoxLayout(page)
     ly.addLayout(top_buttons)
-    ly.addWidget(self._search_box)
+    search_bar = QHBoxLayout()
+    search_bar.addWidget(self._search_field_combo)
+    search_bar.addWidget(self._search_box, 1)
+    ly.addLayout(search_bar)
     ly.addWidget(self.splitter, 1)
     self.setLayout(ly)
     self.table_socis.installEventFilter(self)
@@ -139,36 +191,37 @@ class SociosTab(QWidget):
   def _refresh_socios(self, keep_socio_id=None):
     if keep_socio_id is None:
       keep_socio_id = self._selected_socio_id()
-    rows = listar_socios() or []
+    rows = listar_socios_tabla() or []
     self._all_socios = rows
-    headers = self._headers_with_sort_indicator([
-      ("Soci ID", "id"),
-      ("DNI/NIE", "dniNie"),
-      ("Nom", "nombre"),
-      ("1r Cognom", "apellido1"),
-      ("2n Cognom", "apellido2"),
-      ("Adreça", "direccion"),
-      ("Tel. fix", "telefonoFijo"),
-      ("Mòbil", "telefonoMovil"),
-      ("Email", "email"),
-      ("Grup Difusió", "grupoDifusion"),
-      ("Data naixement", "fechaNacimiento"),
-    ])
-    filtered_rows = self._filter_rows(self._search_box.text())
-    filtered_rows = self._sort_rows(filtered_rows)
-    model = DictTableModel(filtered_rows, headers)
+    self._socios_loaded = True
+    self._rebuild_search_index()
+    self._apply_current_filter(keep_socio_id=keep_socio_id, resize_columns=True)
+
+  def _set_table_rows(self, rows, keep_socio_id=None, resize_columns=False):
+    headers = self._headers_with_sort_indicator(self._table_headers)
+    model = DictTableModel(rows, headers)
     self.table_socis.setModel(model)
-    self.table_socis.resizeColumnsToContents()
-    # self.table_socis.hideColumn(0)
+    if resize_columns:
+      self._apply_column_widths()
 
     new_sel = self.table_socis.selectionModel()
     try:
       new_sel.currentRowChanged.disconnect()
     except (TypeError, RuntimeError):
       pass
-    new_sel.currentRowChanged.connect(self._row_changed)
+    if hasattr(self, "detail"):
+      new_sel.currentRowChanged.connect(self._row_changed)
     self._sel_model = new_sel
     self._select_socio_id(keep_socio_id)
+
+  def _apply_column_widths(self):
+    model = self.table_socis.model()
+    if not model:
+      return
+    for column, key in enumerate(getattr(model, "keys", [])):
+      width = self._column_widths.get(key)
+      if width:
+        self.table_socis.setColumnWidth(column, width)
 
   def _headers_with_sort_indicator(self, headers):
     indicator = "▲" if self._sort_order == Qt.AscendingOrder else "▼"
@@ -213,7 +266,7 @@ class SociosTab(QWidget):
       self._sort_key = key
       self._sort_order = Qt.AscendingOrder
 
-    self._refresh_socios()
+    self._apply_current_filter(keep_socio_id=self._selected_socio_id())
 
   def _dialog_nou_socio(self):
     dlg = SocioDialog(self)
@@ -476,6 +529,30 @@ class SociosTab(QWidget):
         f"La fulla imprimible s'ha generat correctament:\n{pdf_path}",
       )
 
+  def _exportar_socios_pdf(self):
+    model = self.table_socis.model()
+    rows = list(getattr(model, "rows", []) or [])
+    if not rows:
+      QMessageBox.warning(self, "Error", "No hi ha socis per exportar.")
+      return
+
+    try:
+      with tempfile.NamedTemporaryFile(
+        prefix="socis-",
+        suffix=".pdf",
+        delete=False,
+      ) as tmp:
+        ruta = tmp.name
+      generar_socios_tabla_pdf(rows, ruta)
+      if not QDesktopServices.openUrl(QUrl.fromLocalFile(ruta)):
+        QMessageBox.warning(
+          self,
+          "Avís",
+          f"No s'ha pogut obrir el visor PDF del sistema.\nPDF temporal: {ruta}",
+        )
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"No s'ha pogut generar el PDF:\n{e}")
+
   def _temporary_pdf_path(self, prefix: str) -> str:
     tmp = tempfile.NamedTemporaryFile(prefix=prefix, suffix=".pdf", delete=False)
     tmp.close()
@@ -491,22 +568,54 @@ class SociosTab(QWidget):
       subprocess.Popen(["xdg-open", path])
 
   def _filtrar_socios(self):
-    if not self.detail.confirm_pending_changes():
+    self._search_timer.start()
+
+  def _apply_current_filter(self, keep_socio_id=None, resize_columns=False):
+    if hasattr(self, "detail") and not self.detail.confirm_pending_changes():
       return
-    self._refresh_socios()
+    if keep_socio_id is None:
+      keep_socio_id = self._selected_socio_id()
+    filtered_rows = self._filter_rows(self._search_box.text())
+    filtered_rows = self._sort_rows(filtered_rows)
+    self._set_table_rows(
+      filtered_rows,
+      keep_socio_id=keep_socio_id,
+      resize_columns=resize_columns,
+    )
 
   def _filter_rows(self, text):
-    if not text.strip():
+    text = text.strip().casefold()
+    if not text:
       return self._all_socios
-    text = text.lower()
+    field_key = self._selected_search_field()
+    return [
+      row for row in self._all_socios
+      if text in self._search_text_by_field_by_id.get(row.get("id"), {}).get(field_key, "")
+    ]
 
-    def matches(s):
-      return any(
-        text in str(value).lower() if value else ""
-        for value in s.values()
-      )
+  def _rebuild_search_index(self):
+    self._search_text_by_field_by_id = {
+      row.get("id"): self._row_search_text_by_field(row)
+      for row in self._all_socios
+    }
 
-    return [s for s in self._all_socios if matches(s)]
+  def _row_search_text_by_field(self, row):
+    text_by_field = {}
+    for _label, key in self._table_headers:
+      value = row.get(key)
+      if value is None:
+        text_by_field[key] = ""
+        continue
+      values = [str(value)]
+      if hasattr(value, "strftime"):
+        values.append(value.strftime("%d/%m/%Y"))
+      text_by_field[key] = " ".join(values).casefold()
+    return text_by_field
+
+  def _selected_search_field(self):
+    if not hasattr(self, "_search_field_combo"):
+      return "nombre"
+    return self._search_field_combo.currentData() or "nombre"
 
   def _abrir_inscripciones_socio(self, index):
       if not index.isValid():
@@ -518,12 +627,13 @@ class SociosTab(QWidget):
 
   def showEvent(self, event):
       super().showEvent(event)
-      self._refresh_socios()
+      if not self._socios_loaded:
+          self._refresh_socios()
 
   def confirm_pending_changes(self):
       return self.detail.confirm_pending_changes()
   def eventFilter(self, obj, event):
-      if obj == self.table_socis and event.type() == QEvent.KeyPress:
+      if hasattr(self, "table_socis") and obj == self.table_socis and event.type() == QEvent.KeyPress:
           if event.key() == Qt.Key_Delete:
               self._eliminar_socio()
               return True

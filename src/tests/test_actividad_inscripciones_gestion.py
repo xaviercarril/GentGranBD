@@ -122,7 +122,7 @@ def test_modificar_fecha_inscripcion_reordena_promocion_de_reservas(patched_sess
         "socioID": socio_1,
         "actividadID": act_id,
         "fechaInscripcion": date(2026, 1, 10),
-        "estado": EstadoInscripcion.RESERVA.value,
+        "estado": EstadoInscripcion.INSCRIT.value,
     })
     ins_2 = inscripciones.registrar_inscripcion({
         "socioID": socio_2,

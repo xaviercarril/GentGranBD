@@ -255,6 +255,50 @@ def listar_socios() -> list[dict]:
     except Exception as e:
         raise ValueError(f"Error al llistar socis: {e}")
 
+
+def listar_socios_tabla() -> list[dict]:
+    """Retorna els camps necessaris per a la taula de socis, sense blobs."""
+    try:
+        with SessionLocal() as db:
+            rows = (
+                db.query(
+                    Socio.id,
+                    Socio.apellido1,
+                    Socio.apellido2,
+                    Socio.nombre,
+                    Socio.dniNie,
+                    Socio.telefonoMovil,
+                    Socio.telefonoFijo,
+                    Socio.direccion,
+                    Socio.fechaAlta,
+                    Socio.fechaNacimiento,
+                    Socio.grupoDifusion,
+                    Socio.email,
+                )
+                .order_by(Socio.id)
+                .all()
+            )
+            return [
+                {
+                    "id": row.id,
+                    "apellido1": row.apellido1,
+                    "apellido2": row.apellido2,
+                    "nombre": row.nombre,
+                    "dniNie": row.dniNie,
+                    "telefonoMovil": normalize_phone(row.telefonoMovil),
+                    "telefonoFijo": normalize_phone(row.telefonoFijo),
+                    "direccion": row.direccion,
+                    "fechaAlta": row.fechaAlta,
+                    "fechaNacimiento": row.fechaNacimiento,
+                    "grupoDifusion": row.grupoDifusion,
+                    "email": row.email,
+                }
+                for row in rows
+            ]
+    except Exception as e:
+        raise ValueError(f"Error al llistar socis per a la taula: {e}")
+
+
 def listar_socios_activos() -> list[dict]:
     """Retorna una llista de dicts amb els socis actius."""
     try:
@@ -393,6 +437,13 @@ def generar_hoja_ficha_carnet_pdf(socioID: int, ruta_pdf: str) -> None:
     logo_path = _resolve_logo_path()
     with SessionLocal() as db:
         generar_hoja_ficha_carnet_socio(db, socioID, ruta_pdf, logo_path=logo_path)
+
+
+def generar_socios_tabla_pdf(socios: list[dict], ruta_pdf: str) -> None:
+    """Genera un PDF amb les files visibles de la taula de socis."""
+    from exportador.pdf_socios import generar_pdf_socios_tabla
+
+    generar_pdf_socios_tabla(socios or [], ruta_pdf)
 
 # Añadido: generar_pdf_LOPD para exportar consentimiento de protección de datos
 def generar_pdf_LOPD(
