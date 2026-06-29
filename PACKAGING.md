@@ -23,7 +23,7 @@ py -m pip install -r requirements.txt
 Using VS Code tasks:
 - Run the task "package:mac" (macOS one-folder)
 - Run the task "package:mac-app" (macOS .app bundle)
-- Run the task "package:win" (Windows one-folder)
+- Run the task "package:win" (Windows one-file)
 - Run the task "installer:win" (Windows installer via NSIS)
 
 Or from terminal:
@@ -33,13 +33,13 @@ Or from terminal:
 pyinstaller pyinstaller.spec
 
 # Windows
-pyinstaller pyinstaller.spec
+py -m PyInstaller pyinstaller-win.spec --noconfirm
 ```
 
-Artifacts will be under `dist/GentGranBD/`.
+Artifacts will be under `dist/`.
 - macOS one-folder: `GentGranBD/GentGranBD` binary
 - macOS .app: `GentGranBD/GentGranBD.app`
-- Windows: `GentGranBD/GentGranBD.exe`
+- Windows one-file: `dist/GentGranBD.exe`
 
 ## Notes
 - The SQLite database is stored in a user-writable directory:
@@ -63,5 +63,7 @@ py -m PyInstaller pyinstaller-win.spec
 ```
 2) Build installer with NSIS (requires NSIS installed):
 ```bat
-makensis installer\installer.nsi
+makensis -DAPP_EXE=dist\GentGranBD.exe installer\installer.nsi
 ```
+
+Do not pass `dist\GentGranBD\GentGranBD.exe` as `APP_EXE`: that is the launcher from a PyInstaller one-folder build and needs the adjacent `_internal` runtime directory. Packaging only that EXE causes startup errors such as `Failed to load Python DLL ... python311.dll`.

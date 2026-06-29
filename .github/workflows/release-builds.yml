@@ -48,16 +48,19 @@ jobs:
           if (-not (Test-Path $nsis)) { Write-Error 'NSIS not found after install'; exit 1 }
           $nsis | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
-      - name: Locate EXE and tag-rename
+      - name: Locate one-file EXE and tag-rename
         shell: pwsh
         run: |
-          $exe = Get-ChildItem -Path dist -Filter GentGranBD.exe -File -Recurse | Select-Object -First 1
-          if (-not $exe) { Write-Error 'No GentGranBD.exe found under dist/'; exit 1 }
+          $exePath = Join-Path $PWD 'dist\GentGranBD.exe'
+          if (-not (Test-Path $exePath -PathType Leaf)) {
+            Write-Error 'Expected one-file build at dist\GentGranBD.exe. Refusing to package a one-folder stub without its runtime DLLs.'
+            exit 1
+          }
           $dest = Join-Path $PWD ("GentGranBD-Windows-${env:RELEASE_TAG}.exe")
-          Copy-Item $exe.FullName $dest -Force
+          Copy-Item $exePath $dest -Force
 
           # Build NSIS installer from the found EXE
-          makensis -DVERSION="${env:RELEASE_TAG}" -DAPP_EXE="$($exe.FullName)" installer\installer.nsi
+          makensis -DVERSION="${env:RELEASE_TAG}" -DAPP_EXE="$exePath" installer\installer.nsi
 
           $setup = Get-ChildItem -Path installer -Filter 'GentGranBD-Setup-*.exe' -File | Select-Object -First 1
           if (-not $setup) { $setup = Get-ChildItem -Path . -Filter 'GentGranBD-Setup-*.exe' -File | Select-Object -First 1 }
