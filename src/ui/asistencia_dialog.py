@@ -4,9 +4,9 @@ import tempfile
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QComboBox,
     QTableWidget, QTableWidgetItem, QCheckBox, QMessageBox, QTimeEdit, QSpinBox, QGroupBox, QGridLayout,
-    QFrame, QSizePolicy, QHeaderView
+    QFrame, QSizePolicy, QHeaderView, QMenu
 )
-from PySide6.QtCore import Qt, QTime, QUrl
+from PySide6.QtCore import Qt, QTime, QUrl, QSettings, QSignalBlocker
 from PySide6.QtGui import QColor, QDesktopServices, QFont
 from controladores.socios import consultar_socio
 from controladores.trimestre import listar_clases_por_trimestre
@@ -77,6 +77,8 @@ class AsistenciaDialog(QDialog):
         self.table.verticalHeader().sectionClicked.connect(self._seleccionar_fila)
         self.table.horizontalHeader().sectionClicked.connect(self._seleccionar_columna)
         self.table.cellClicked.connect(self._on_cell_clicked)
+        self.table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.table.customContextMenuRequested.connect(self._mostrar_menu_contextual_tabla)
 
         title_label = QLabel("Assistència")
         title_label.setProperty("role", "sectionTitle")
@@ -106,6 +108,9 @@ class AsistenciaDialog(QDialog):
         label_trimestre.setProperty("role", "muted")
         top_layout.addWidget(label_trimestre)
         top_layout.addWidget(self.trimestre_selector)
+        self.trimestre_dates_label = QLabel("")
+        self.trimestre_dates_label.setProperty("role", "muted")
+        top_layout.addWidget(self.trimestre_dates_label)
         top_layout.addStretch()
         top_layout.addWidget(self.btn_exportar)
         top_layout.addWidget(self.btn_generar_dialog)
@@ -159,14 +164,24 @@ class AsistenciaDialog(QDialog):
 
     def _cargar_trimestres(self):
         self.trimestres = listar_trimestres_por_cursoA(self.cursoAcademicoID)
+        blocker = QSignalBlocker(self.trimestre_selector)
         self.trimestre_selector.clear()
         for t in self.trimestres:
             self.trimestre_selector.addItem(str(t["nombre"].value), t["id"])
+        index = self._indice_trimestre_recordado()
+        if index >= 0:
+            self.trimestre_selector.setCurrentIndex(index)
+        del blocker
+        self._actualizar_fechas_trimestre()
+        self._cargar_parrilla()
 
     def _cargar_parrilla(self):
         trimestre_id = self.trimestre_selector.currentData()
         if not trimestre_id:
             return
+
+        self._guardar_trimestre_seleccionado()
+        self._actualizar_fechas_trimestre()
 
         clases = [c for c in listar_clases_por_trimestre(trimestre_id) if c["actividadID"] == self.actividadID]
         clases.sort(key=lambda c: (c["fecha"], c.get("horaInicio")))
@@ -295,6 +310,57 @@ class AsistenciaDialog(QDialog):
         finally:
             self._syncing_table = False
             self._update_summary(row_count, col_count, total_asistencias)
+
+    def _indice_trimestre_recordado(self):
+        if not self.trimestres:
+            return -1
+
+        settings = QSettings("GentGran", "GentGranBD")
+        last_id = settings.value(self._last_trimestre_id_key(), None)
+        try:
+            last_id = int(last_id) if last_id is not None else None
+        except (TypeError, ValueError):
+            last_id = None
+
+        if last_id is not None:
+            for index in range(self.trimestre_selector.count()):
+                if self.trimestre_selector.itemData(index) == last_id:
+                    return index
+
+        last_nombre = settings.value("asistencia/last_trimestre_nombre", "", type=str) or ""
+        if last_nombre:
+            for index, trimestre in enumerate(self.trimestres):
+                if str(trimestre["nombre"].value) == last_nombre:
+                    return index
+
+        return 0
+
+    def _guardar_trimestre_seleccionado(self):
+        trimestre_id = self.trimestre_selector.currentData()
+        trimestre = self._trimestre_actual()
+        if not trimestre_id or not trimestre:
+            return
+
+        settings = QSettings("GentGran", "GentGranBD")
+        settings.setValue(self._last_trimestre_id_key(), trimestre_id)
+        settings.setValue("asistencia/last_trimestre_nombre", str(trimestre["nombre"].value))
+
+    def _actualizar_fechas_trimestre(self):
+        trimestre = self._trimestre_actual()
+        if not trimestre:
+            self.trimestre_dates_label.setText("")
+            return
+
+        inicio = trimestre["fechaInicio"].strftime("%d-%m-%Y")
+        fin = trimestre["fechaFin"].strftime("%d-%m-%Y")
+        self.trimestre_dates_label.setText(f"{inicio} - {fin}")
+
+    def _trimestre_actual(self):
+        trimestre_id = self.trimestre_selector.currentData()
+        return next((t for t in self.trimestres if t["id"] == trimestre_id), None)
+
+    def _last_trimestre_id_key(self):
+        return f"asistencia/curso/{self.cursoAcademicoID}/last_trimestre_id"
 
     def _update_summary(self, participants, classes, attendances):
         self._summary_participants = participants
@@ -433,10 +499,64 @@ class AsistenciaDialog(QDialog):
 
         for item in fila_items:
             self._set_cell_presence(item, nuevo_estado, save=True)
+
+    def _mostrar_menu_contextual_tabla(self, pos):
+        index = self.table.indexAt(pos)
+        if not index.isValid():
+            return
+        if index.row() != 1 or index.column() < self.DATA_COLUMN_OFFSET:
+            return
+
+        columna = index.column() - self.DATA_COLUMN_OFFSET
+
+        menu = QMenu(self)
+        action_eliminar = menu.addAction("Eliminar classe")
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if action == action_eliminar:
+            self._eliminar_clases_por_columnas([columna])
+
+    def _clases_actuales(self):
+        trimestre_id = self.trimestre_selector.currentData()
+        if not trimestre_id:
+            return []
+        clases = [c for c in listar_clases_por_trimestre(trimestre_id) if c["actividadID"] == self.actividadID]
+        clases.sort(key=lambda c: (c["fecha"], c.get("horaInicio")))
+        return clases
+
+    def _eliminar_clases_por_columnas(self, columnas):
+        from controladores.clase import eliminar_clase
+
+        columnas = sorted(set(col for col in columnas if col >= 0))
+        if not columnas:
+            return False
+
+        clases = self._clases_actuales()
+        clases_a_eliminar = [clases[col] for col in columnas if col < len(clases)]
+        if not clases_a_eliminar:
+            return False
+
+        if len(clases_a_eliminar) == 1:
+            fecha = clases_a_eliminar[0]["fecha"].strftime("%d-%m-%Y")
+            texto = f"Vols eliminar la classe del {fecha}?"
+        else:
+            texto = f"Vols eliminar {len(clases_a_eliminar)} classes seleccionades?"
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirmar eliminació",
+            texto,
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if confirm != QMessageBox.Yes:
+            return False
+
+        for clase in clases_a_eliminar:
+            eliminar_clase(clase["id"])
+        self._cargar_parrilla()
+        return True
     
     def keyPressEvent(self, event):
         from PySide6.QtGui import QKeyEvent
-        from controladores.clase import eliminar_clase
         if isinstance(event, QKeyEvent) and event.key() in (Qt.Key_Space, Qt.Key_Return, Qt.Key_Enter):
             items = []
             for index in self.table.selectedIndexes():
@@ -458,19 +578,8 @@ class AsistenciaDialog(QDialog):
             columnas = [col for col in columnas if col >= 0]
             if not columnas:
                 return
-            trimestre_id = self.trimestre_selector.currentData()
-            clases = [c for c in listar_clases_por_trimestre(trimestre_id) if c["actividadID"] == self.actividadID]
-            clases.sort(key=lambda c: (c["fecha"], c.get("horaInicio")))
-            clases_a_eliminar = [clases[col] for col in columnas if col < len(clases)]
-            if not clases_a_eliminar:
-                return
-            confirm = QMessageBox.question(self, "Confirmar eliminació",
-                                           f"Vols eliminar {len(clases_a_eliminar)} classe(s) seleccionada(es)?",
-                                           QMessageBox.Yes | QMessageBox.No)
-            if confirm == QMessageBox.Yes:
-                for clase in clases_a_eliminar:
-                    eliminar_clase(clase["id"])
-                self._cargar_parrilla()
+            self._eliminar_clases_por_columnas(columnas)
+            return
 
     def _guardar_asistencia(self, socio_id, clase_id, checked):
         if checked:
@@ -514,7 +623,11 @@ class AsistenciaDialog(QDialog):
                 self._set_cell_presence(item, not self._is_item_checked(item), save=True, default_color=color)
 
     def _abrir_dialog_generar(self):
-        dlg = GenerarClasesDialog(self.actividadID, self.cursoAcademicoID, self)
+        trimestre_id = self.trimestre_selector.currentData()
+        if not trimestre_id:
+            QMessageBox.warning(self, "Error", "Selecciona un trimestre primer")
+            return
+        dlg = GenerarClasesDialog(self.actividadID, self.cursoAcademicoID, trimestre_id, self)
         if dlg.exec():
             self._cargar_parrilla()
 
@@ -550,11 +663,12 @@ class AsistenciaDialog(QDialog):
             QMessageBox.critical(self, "Error", f"No s'ha pogut generar el PDF:\n{e}")
             
 class GenerarClasesDialog(QDialog):
-    def __init__(self, actividadID, cursoAcademicoID, parent=None):
+    def __init__(self, actividadID, cursoAcademicoID, trimestreID=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Generar classes automàticament")
         self.actividadID = actividadID
         self.cursoAcademicoID = cursoAcademicoID
+        self.trimestreID = trimestreID
 
         from controladores.curso_academico import listar_trimestres_por_cursoA
         self.trimestres = listar_trimestres_por_cursoA(cursoAcademicoID)
@@ -562,6 +676,11 @@ class GenerarClasesDialog(QDialog):
         self.trimestre_selector = QComboBox()
         for t in self.trimestres:
             self.trimestre_selector.addItem(str(t["nombre"].value), t["id"])
+        if trimestreID is not None:
+            index = self.trimestre_selector.findData(trimestreID)
+            if index >= 0:
+                self.trimestre_selector.setCurrentIndex(index)
+            self.trimestre_selector.setEnabled(False)
 
         self.dias_checkboxes = []
         dias_layout = QGridLayout()
@@ -587,7 +706,7 @@ class GenerarClasesDialog(QDialog):
         layout = QVBoxLayout(self)
 
         form_layout = QGridLayout()
-        form_layout.addWidget(QLabel("Trimestre:"), 0, 0)
+        form_layout.addWidget(QLabel("Trimestre seleccionat:"), 0, 0)
         form_layout.addWidget(self.trimestre_selector, 0, 1)
         form_layout.addWidget(QLabel("Dies de la setmana:"), 1, 0)
         form_layout.addWidget(dias_group, 1, 1)
