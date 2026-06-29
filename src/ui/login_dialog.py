@@ -17,6 +17,7 @@ from controladores.acceso import autenticar_usuario, bootstrap_admin_si_no_hay_u
 from database import default_database_url, ensure_schema_updates, set_database_url
 from models import Base
 from ui.theme import Palette, set_button_variant
+from version import APP_VERSION
 import database
 
 
@@ -46,6 +47,11 @@ class LoginDialog(QDialog):
                 color: %s;
                 background: transparent;
             }
+            QLabel#version {
+                color: %s;
+                font-size: 11px;
+                background: transparent;
+            }
             QLabel {
                 background: transparent;
             }
@@ -68,6 +74,7 @@ class LoginDialog(QDialog):
                 Palette.APP_BG,
                 Palette.BORDER,
                 Palette.TEXT,
+                Palette.TEXT_MUTED,
                 Palette.TEXT_MUTED,
                 Palette.BORDER_STRONG,
                 Palette.SURFACE,
@@ -101,6 +108,9 @@ class LoginDialog(QDialog):
         subtitle = QLabel("Inicia sessió per accedir a la gestió")
         subtitle.setObjectName("subtitle")
         subtitle.setAlignment(Qt.AlignCenter)
+        version = QLabel(f"Versió {APP_VERSION}")
+        version.setObjectName("version")
+        version.setAlignment(Qt.AlignCenter)
 
         form = QFormLayout()
         form.setLabelAlignment(Qt.AlignRight)
@@ -128,6 +138,7 @@ class LoginDialog(QDialog):
         panel_layout.addWidget(logo)
         panel_layout.addWidget(title)
         panel_layout.addWidget(subtitle)
+        panel_layout.addWidget(version)
         panel_layout.addSpacing(8)
         panel_layout.addLayout(form)
         panel_layout.addWidget(self.buttons)
