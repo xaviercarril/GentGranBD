@@ -101,7 +101,7 @@ def eliminar_cursoA(cursoAcademicoID: int) -> None:
     raise ValueError(f"Error al eliminar curso académico: {e}")
 
 
-def duplicar_cursoA(cursoAcademicoID: int, nuevo_nombre: str) -> int:
+def duplicar_cursoA(cursoAcademicoID: int, nuevo_nombre: str, sumar_anio: bool = False) -> int:
   """Duplica un curso académico con sus trimestres y actividades."""
   nombre = (nuevo_nombre or "").strip()
   if not nombre:
@@ -124,10 +124,13 @@ def duplicar_cursoA(cursoAcademicoID: int, nuevo_nombre: str) -> int:
       raise ValueError("Ja existeix un curs acadèmic amb aquest nom.")
 
     try:
+      def ajustar_fecha(valor: date) -> date:
+        return valor + relativedelta(years=1) if sumar_anio else valor
+
       nuevo_curso = CursoAcademico(
         nombre=nombre,
-        fechaInicio=curso_origen.fechaInicio,
-        fechaFin=curso_origen.fechaFin,
+        fechaInicio=ajustar_fecha(curso_origen.fechaInicio),
+        fechaFin=ajustar_fecha(curso_origen.fechaFin),
       )
       db.add(nuevo_curso)
       db.flush()
@@ -141,8 +144,8 @@ def duplicar_cursoA(cursoAcademicoID: int, nuevo_nombre: str) -> int:
       for trimestre in trimestres:
         db.add(Trimestre(
           nombre=trimestre.nombre,
-          fechaInicio=trimestre.fechaInicio,
-          fechaFin=trimestre.fechaFin,
+          fechaInicio=ajustar_fecha(trimestre.fechaInicio),
+          fechaFin=ajustar_fecha(trimestre.fechaFin),
           cursoAcademicoID=nuevo_curso.id,
         ))
 
@@ -183,7 +186,12 @@ def listar_cursosA() -> list[dict]:
 def listar_trimestres_por_cursoA(cursoAcademicoID: int) -> list[dict]:
   """Devuelve los trimestres de un curso académico."""
   with SessionLocal() as db:
-    trimestres = db.query(Trimestre).filter(Trimestre.cursoAcademicoID == cursoAcademicoID).all()
+    trimestres = (
+      db.query(Trimestre)
+      .filter(Trimestre.cursoAcademicoID == cursoAcademicoID)
+      .order_by(Trimestre.id)
+      .all()
+    )
     return [trimestre_to_dto(t).model_dump() for t in trimestres]
   
 def _normalizar_tipo_actividad(tipo) -> TipoActividadEnum | None:

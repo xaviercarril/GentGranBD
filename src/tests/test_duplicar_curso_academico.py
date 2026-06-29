@@ -69,6 +69,23 @@ def test_duplica_curso_con_trimestres_y_actividades_sin_inscripciones(patched_se
         assert db.query(InscripcionSocio).filter_by(actividadID=actividades[0].id).count() == 0
 
 
+def test_duplica_curso_sumando_un_anio_a_curso_y_trimestres(patched_session):
+    Session = patched_session
+    curso_id = _crear_curso_origen(Session)
+
+    nuevo_id = cursos.duplicar_cursoA(curso_id, "2026-2027", sumar_anio=True)
+
+    with Session() as db:
+        nuevo = db.get(CursoAcademico, nuevo_id)
+        assert nuevo.fechaInicio == date(2026, 9, 1)
+        assert nuevo.fechaFin == date(2027, 6, 30)
+
+        trimestres = db.query(Trimestre).filter_by(cursoAcademicoID=nuevo_id).all()
+        assert [(t.nombre, t.fechaInicio, t.fechaFin) for t in trimestres] == [
+            (TrimestreEnum.T1, date(2026, 9, 1), date(2026, 11, 30))
+        ]
+
+
 def test_rechaza_nombre_vacio_repetido_o_igual_al_original(patched_session):
     Session = patched_session
     curso_id = _crear_curso_origen(Session)
