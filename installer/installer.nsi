@@ -23,6 +23,9 @@ Page instfiles
 
 Section "Install"
   SetOutPath "$INSTDIR"
+  ; Replace the previous PyInstaller payload. User data lives in %APPDATA%\GentGranBD.
+  Delete "$INSTDIR\GentGranBD.exe"
+  RMDir /r "$INSTDIR\_internal"
   !ifdef APP_EXE
     File /oname=GentGranBD.exe "${APP_EXE}"
   !else
