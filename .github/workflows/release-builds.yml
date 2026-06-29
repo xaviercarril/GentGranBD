@@ -74,6 +74,7 @@ jobs:
       - name: Upload assets to Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             GentGranBD-Windows-${{ env.RELEASE_TAG }}.exe
             GentGranBD-Windows-${{ env.RELEASE_TAG }}.exe.sha256
@@ -122,6 +123,7 @@ jobs:
       - name: Upload asset to Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ env.RELEASE_TAG }}
           files: |
             GentGranBD-macOS-${{ env.RELEASE_TAG }}.zip
             GentGranBD-macOS-${{ env.RELEASE_TAG }}.zip.sha256
