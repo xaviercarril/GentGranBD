@@ -337,13 +337,18 @@ if errorlevel 1 (
   if defined INSTALLER_DIR rd "%INSTALLER_DIR%" >> "%LOG%" 2>&1
 )
 endlocal
+exit /b %ERRORLEVEL%
 """,
         encoding="utf-8",
     )
     _update_log(f"Helper Windows escrit a {helper_path}")
     _update_log(f"Log del helper Windows: {helper_log}")
     _update_log(f"Directori d'instal·lació Windows detectat: {install_dir}")
-    subprocess.Popen(["cmd.exe", "/c", str(helper_path)], close_fds=True)
+    popen_kwargs = {"close_fds": True}
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    if creationflags:
+        popen_kwargs["creationflags"] = creationflags
+    subprocess.Popen(["cmd.exe", "/c", str(helper_path)], **popen_kwargs)
 
 
 def _current_macos_app_path() -> Path:

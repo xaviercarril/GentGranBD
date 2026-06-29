@@ -156,6 +156,7 @@ def test_launch_windows_helper_pasa_directorio_actual_al_instalador(monkeypatch,
         popen_calls.append((args, kwargs))
 
     monkeypatch.setattr(updater.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(updater.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
 
     updater._launch_windows_helper(tmp_path / "downloads" / "GentGranBD-Setup.exe")
 
@@ -168,7 +169,10 @@ def test_launch_windows_helper_pasa_directorio_actual_al_instalador(monkeypatch,
     assert "-Wait -PassThru" in content
     assert 'del /f /q "%INSTALLER%"' in content
     assert 'del /f /q "%INSTALLER%.sha256"' in content
-    assert popen_calls == [(["cmd.exe", "/c", str(helper)], {"close_fds": True})]
+    assert "exit /b %ERRORLEVEL%" in content
+    assert popen_calls == [
+        (["cmd.exe", "/c", str(helper)], {"close_fds": True, "creationflags": 0x08000000})
+    ]
 
 
 def test_cleanup_old_update_downloads_conserva_tag_actual(monkeypatch, tmp_path):
