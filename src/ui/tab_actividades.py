@@ -176,6 +176,10 @@ class ActividadesTab(QWidget):
     if not restored_selection:
         self.detail_actividad.load(None)
 
+  def refresh_from_realtime(self):
+    self._refresh_activitats()
+    return True
+
   def _filter_activitats_rows(self, text, rows):
     if not text.strip():
       return rows

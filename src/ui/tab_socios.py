@@ -166,6 +166,12 @@ class SociosTab(QWidget):
       return
     self._refresh_socios()
 
+  def refresh_from_realtime(self):
+    if hasattr(self, "detail") and self.detail.has_pending_changes():
+      return False
+    self._refresh_socios()
+    return True
+
   def _set_detail_visible(self, visible: bool):
     self.detail_panel.setVisible(visible)
     self._update_detail_toggle_button(visible)

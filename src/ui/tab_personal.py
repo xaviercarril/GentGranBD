@@ -143,6 +143,11 @@ class PersonalTab(QWidget):
         ly.addWidget(self.search_box_volun)
         ly.addWidget(splitter, 1)
         self.volun_tab.setLayout(ly)
+
+    def refresh_from_realtime(self):
+        self._refresh_profe()
+        self._refresh_volun()
+        return True
     
     ########################
     # ---- Methods for managing profes ----
