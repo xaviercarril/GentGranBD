@@ -101,21 +101,29 @@ class SociosTab(QWidget):
     self.splitter = QSplitter(Qt.Horizontal)
     self.splitter.addWidget(self.table_socis)
 
+    self.detail_panel = QWidget()
+    detail_panel_layout = QVBoxLayout(self.detail_panel)
+    detail_panel_layout.setContentsMargins(0, 0, 0, 0)
+    detail_panel_layout.setSpacing(4)
+
     self.detail_scroll = QScrollArea()
     self.detail_scroll.setWidgetResizable(True)
     self.detail_scroll.setFrameShape(QScrollArea.NoFrame)
     self.detail_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-    self.detail.setMinimumWidth(430)
-    self.detail.setMaximumWidth(480)
-    self.detail_scroll.setMinimumWidth(450)
-    self.detail_scroll.setMaximumWidth(510)
+    self.detail.setMinimumWidth(330)
+    self.detail.setMaximumWidth(355)
+    self.detail_scroll.setMinimumWidth(350)
+    self.detail_scroll.setMaximumWidth(385)
     self.detail_scroll.setWidget(self.detail)
-    self.splitter.addWidget(self.detail_scroll)
+    detail_panel_layout.addWidget(self.detail_scroll, 1)
+    self.detail_panel.setMinimumWidth(350)
+    self.detail_panel.setMaximumWidth(385)
+    self.splitter.addWidget(self.detail_panel)
     self.splitter.setStretchFactor(0, 1)
     self.splitter.setStretchFactor(1, 0)
     self.splitter.setCollapsible(0, False)
-    self.splitter.setCollapsible(1, False)
-    self.splitter.setSizes([850, 450])
+    self.splitter.setCollapsible(1, True)
+    self.splitter.setSizes([950, 350])
 
     # Botons alta / baixa
     btn_nou = QPushButton("Nou soci")
@@ -128,10 +136,17 @@ class SociosTab(QWidget):
     set_button_variant(btn_exportar_pdf, "secondary")
     btn_exportar_pdf.clicked.connect(self._exportar_socios_pdf)
 
+    self.btn_toggle_detail = QPushButton()
+    self.btn_toggle_detail.setFixedSize(28, 28)
+    set_button_variant(self.btn_toggle_detail, "secondary")
+    self.btn_toggle_detail.clicked.connect(self._toggle_detail_visible)
+    self._update_detail_toggle_button(True)
+
     top_buttons = QHBoxLayout()
     top_buttons.addWidget(btn_nou)
     top_buttons.addWidget(btn_exportar_pdf)
     top_buttons.addStretch()
+    top_buttons.addWidget(self.btn_toggle_detail)
 
     page = QWidget()
     ly = QVBoxLayout(page)
@@ -150,6 +165,22 @@ class SociosTab(QWidget):
     if hasattr(self, "detail") and not self.detail.confirm_pending_changes():
       return
     self._refresh_socios()
+
+  def _set_detail_visible(self, visible: bool):
+    self.detail_panel.setVisible(visible)
+    self._update_detail_toggle_button(visible)
+    if visible:
+      self.splitter.setSizes([max(900, self.width() - 350), 350])
+
+  def _toggle_detail_visible(self):
+    self._set_detail_visible(not self.detail_panel.isVisible())
+
+  def _update_detail_toggle_button(self, detail_visible: bool):
+    if detail_visible:
+      self.btn_toggle_detail.setToolTip("Ocultar detall")
+    else:
+      self.btn_toggle_detail.setToolTip("Mostrar detall")
+    set_button_icon(self.btn_toggle_detail, "ui/assets/panel-detail.svg", 18)
 
   def _selected_socio_id(self):
     sel_model = self.table_socis.selectionModel()
@@ -323,7 +354,7 @@ class SociosTab(QWidget):
 
     menu.addSeparator()
 
-    eliminar_action = QAction("Eliminar", self)
+    eliminar_action = QAction("Eliminar soci/s", self)
     eliminar_action.triggered.connect(self._eliminar_socio)
     menu.addAction(eliminar_action)
 

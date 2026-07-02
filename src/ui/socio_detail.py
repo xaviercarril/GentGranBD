@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout
 )
 from PySide6.QtGui import QPixmap, QIntValidator
-from PySide6.QtCore import Qt, QDate, Signal
+from PySide6.QtCore import Qt, QDate, Signal, QTimer
 
 from controladores.socios import (
     consultar_socio, modificar_socio
@@ -16,6 +16,8 @@ from ui.theme import Palette, set_button_variant
 
 
 EMPTY_DATE = QDate(1900, 1, 1)
+DETAIL_FIELD_WIDTH = 200
+OBS_MIN_HEIGHT = 70
 
 
 class SocioDetailWidget(QWidget):
@@ -30,27 +32,27 @@ class SocioDetailWidget(QWidget):
         self._foto_path: str | None = None   # ruta temporal de la nova foto
         # ── widgets ──
         self.id_field = QLineEdit()
-        self.id_field.setFixedWidth(300)
+        self.id_field.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.id_field.setPlaceholderText("S'assigna automàticament si es deixa en blanc")
         self.id_field.setValidator(QIntValidator(0, 999999999, self))
         self.dni = QLineEdit()
-        self.dni.setFixedWidth(300)
+        self.dni.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.nom = QLineEdit()
-        self.nom.setFixedWidth(300)
+        self.nom.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.c1 = QLineEdit()
-        self.c1.setFixedWidth(300)
+        self.c1.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.c2 = QLineEdit()
-        self.c2.setFixedWidth(300)
+        self.c2.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.dir = QLineEdit()
-        self.dir.setFixedWidth(300)
+        self.dir.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.tf = QLineEdit()
-        self.tf.setFixedWidth(300)
+        self.tf.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.tm = QLineEdit()
-        self.tm.setFixedWidth(300)
+        self.tm.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.email = QLineEdit()
-        self.email.setFixedWidth(300)
+        self.email.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.grup = QLineEdit()
-        self.grup.setFixedWidth(300)
+        self.grup.setFixedWidth(DETAIL_FIELD_WIDTH)
         self.fe_naixement = QDateEdit(); self.fe_naixement.setCalendarPopup(True)
         self.fe_naixement.setDisplayFormat("dd/MM/yyyy")
         self.fe_naixement.setMinimumDate(EMPTY_DATE)
@@ -67,6 +69,11 @@ class SocioDetailWidget(QWidget):
             self.cb_baixa.setChecked(True)
             self.fe_baixa.setEnabled(True)               # si hi ha baixa, activat
         self.obs = QTextEdit()
+        self.obs.setFixedWidth(DETAIL_FIELD_WIDTH)
+        self.obs.setMinimumHeight(OBS_MIN_HEIGHT)
+        self.obs.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.obs.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.obs.setLineWrapMode(QTextEdit.WidgetWidth)
         self.status_label = QLabel("")
         self.status_label.setProperty("role", "muted")
 
@@ -77,25 +84,26 @@ class SocioDetailWidget(QWidget):
         set_button_variant(btn_foto, "secondary")
         btn_foto.clicked.connect(self._canviar_foto)
         foto_container = QWidget()
+        foto_container.setFixedWidth(DETAIL_FIELD_WIDTH)
         foto_box = QHBoxLayout(foto_container)
-        foto_box.setContentsMargins(0, 0, 0, 12)
+        foto_box.setContentsMargins(0, 0, 0, 6)
+        foto_box.setSpacing(12)
+        foto_box.addStretch()
         foto_box.addWidget(self.preview)
-        foto_box.addSpacing(12)                 # espai entre la foto i el botó
         foto_box.addWidget(btn_foto)
         foto_box.addStretch()
-        foto_box.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        foto_box.setAlignment(Qt.AlignVCenter)
         
 
         # ── layout ──
         root = QVBoxLayout(self)
         root.setContentsMargins(10, 10, 10, 10)
         root.setSpacing(10)
-        root.addWidget(QLabel("Foto:"))
-        root.addWidget(foto_container)
 
         f = QFormLayout()
         f.setHorizontalSpacing(10)
         f.setVerticalSpacing(6)
+        f.addRow("", foto_container)
         f.addRow("ID soci:", self.id_field)
         f.addRow("DNI/NIE*:", self.dni)
         f.addRow("Nom*:", self.nom)
@@ -139,6 +147,7 @@ class SocioDetailWidget(QWidget):
         self.fe_baixa.dateChanged.connect(self._mark_dirty)
         self.cb_baixa.toggled.connect(self._mark_dirty)
         self.obs.textChanged.connect(self._mark_dirty)
+        self.obs.textChanged.connect(self._schedule_obs_height_adjust)
 
     # ------------------------------------------------------------------
     # API pública
@@ -185,6 +194,7 @@ class SocioDetailWidget(QWidget):
             self.fe_baixa.setEnabled(False)
             self.fe_baixa.setDate(QDate())
         self.obs.setPlainText(s.get("observaciones", "") or "")
+        self._schedule_obs_height_adjust()
 
         if s.get("foto"):
             pix = QPixmap(); pix.loadFromData(s["foto"])
@@ -200,6 +210,7 @@ class SocioDetailWidget(QWidget):
                   self.tm, self.email, self.grup): w.clear()
         self.id_field.clear()
         self.fe_naixement.setDate(EMPTY_DATE); self.fe_alta.clear(); self.fe_baixa.clear(); self.obs.clear()
+        self._schedule_obs_height_adjust()
         self.cb_baixa.setChecked(False)
         self.fe_baixa.setEnabled(False)
         self.preview.setPixmap(QPixmap())
@@ -280,6 +291,23 @@ class SocioDetailWidget(QWidget):
             self.status_label.clear()
         else:
             self.status_label.clear()
+
+    def _schedule_obs_height_adjust(self):
+        QTimer.singleShot(0, self._adjust_obs_height)
+
+    def _adjust_obs_height(self):
+        text_width = self.obs.viewport().width() or DETAIL_FIELD_WIDTH
+        self.obs.document().setTextWidth(text_width)
+        margins = self.obs.contentsMargins()
+        frame = self.obs.frameWidth() * 2
+        document_height = self.obs.document().size().height()
+        height = max(
+            OBS_MIN_HEIGHT,
+            int(document_height + margins.top() + margins.bottom() + frame + 8),
+        )
+        if self.obs.height() != height:
+            self.obs.setFixedHeight(height)
+            self.obs.updateGeometry()
      # ─────────────────────────────────────────────────────────
     # Guardar
     # ─────────────────────────────────────────────────────────
