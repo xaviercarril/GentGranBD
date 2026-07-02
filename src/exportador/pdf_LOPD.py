@@ -11,6 +11,7 @@ from reportlab.lib import utils
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm
 from reportlab.pdfgen import canvas
+from reportlab.pdfbase import pdfmetrics
 
 try:
     from PIL import Image, ImageOps
@@ -25,6 +26,24 @@ def _resolve_logo_path(logo_path: str | None) -> str | None:
     if cand.exists():
         return str(cand)
     return None
+
+
+def _wrap_text_to_width(paragraph: str, font_name: str, font_size: int, max_width: float) -> list[str]:
+    """Wrap text using ReportLab's measured text width instead of character counts."""
+
+    lines: list[str] = []
+    current = ""
+    for word in paragraph.split():
+        candidate = f"{current} {word}" if current else word
+        if pdfmetrics.stringWidth(candidate, font_name, font_size) <= max_width:
+            current = candidate
+            continue
+        if current:
+            lines.append(current)
+        current = word
+    if current:
+        lines.append(current)
+    return lines
 
 
 def generar_pdf_lopd(
@@ -80,7 +99,7 @@ def generar_pdf_lopd(
             mask="auto",
         )
 
-    c.setFont("Helvetica-Bold", 14)
+    c.setFont("Helvetica-Bold", 16)
     c.drawCentredString(width / 2, texto_inicio_y, "DOCUMENT DE CONSENTIMENT - LOPD")
 
     cuerpo = f"""
@@ -104,11 +123,12 @@ ___________________________________________
 """
 
     textobject = c.beginText(margen, texto_inicio_y - 2 * cm)
-    leading = 15
+    body_font_name = "Helvetica"
+    body_font_size = 12
+    leading = 17
+    max_text_width = width - 2 * margen
     textobject.setLeading(leading)
-    textobject.setFont("Helvetica", 11)
-
-    import textwrap
+    textobject.setFont(body_font_name, body_font_size)
 
     signature_line_y: float | None = None
     blank_leading = leading
@@ -117,7 +137,7 @@ ___________________________________________
         if not paragraph:
             textobject.textLine("")
             continue
-        for line in textwrap.wrap(paragraph, width=95):
+        for line in _wrap_text_to_width(paragraph, body_font_name, body_font_size, max_text_width):
             trimmed = line.strip()
             textobject.textLine(line)
             if signature_line_y is None and trimmed.startswith("________________________________"):
