@@ -7,7 +7,7 @@ from datetime import datetime
 from sqlalchemy import func, select
 
 from database import SessionLocal
-from models import Usuario, UsuarioRol
+from models import Auditoria, Usuario, UsuarioRol
 
 
 PBKDF2_ITERATIONS = 260_000
@@ -188,6 +188,19 @@ def modificar_usuario(
         return usuario_to_dict(usuario)
 
 
+def cambiar_password_usuario(usuario_id: int, password_actual: str, password_nueva: str) -> dict:
+    with SessionLocal() as db:
+        usuario = db.get(Usuario, usuario_id)
+        if not usuario or not usuario.activo:
+            raise ValueError("Usuari no trobat.")
+        if not verify_password(password_actual, usuario.password_hash):
+            raise ValueError("La contrasenya actual no és correcta.")
+        usuario.password_hash = hash_password(password_nueva)
+        db.commit()
+        db.refresh(usuario)
+        return usuario_to_dict(usuario)
+
+
 def eliminar_usuario(usuario_id: int) -> None:
     with SessionLocal() as db:
         usuario = db.get(Usuario, usuario_id)
@@ -197,3 +210,26 @@ def eliminar_usuario(usuario_id: int) -> None:
             raise ValueError("No es pot eliminar l'últim administrador actiu.")
         db.delete(usuario)
         db.commit()
+
+
+def listar_auditoria_usuario(username: str, limit: int = 500) -> list[dict]:
+    username = _normalizar_username(username)
+    with SessionLocal() as db:
+        rows = db.scalars(
+            select(Auditoria)
+            .where(Auditoria.usuario_app == username)
+            .order_by(Auditoria.fecha_hora.desc(), Auditoria.id.desc())
+            .limit(limit)
+        ).all()
+        return [
+            {
+                "id": row.id,
+                "usuario_app": row.usuario_app,
+                "accion": row.accion,
+                "tabla": row.tabla,
+                "registro_id": row.registro_id,
+                "fecha_hora": row.fecha_hora,
+                "detalle": row.detalle,
+            }
+            for row in rows
+        ]

@@ -168,6 +168,10 @@ class MainWindow(QMainWindow):
             menu_arxiu.addAction(action_restore_db)
             menu_arxiu.addSeparator()
 
+        action_password = QAction("Canviar contrasenya", self)
+        action_password.triggered.connect(self._cambiar_password)
+        menu_arxiu.addAction(action_password)
+
         action_logout = QAction("Tancar sessió", self)
         action_logout.triggered.connect(self._logout)
         menu_arxiu.addAction(action_logout)
@@ -195,8 +199,7 @@ class MainWindow(QMainWindow):
 
         username = self.current_user.get("username", "")
         safe_url = engine.url.render_as_string(hide_password=True)
-        if username:
-            self.setWindowTitle(f"Associació Gent Gran de Castelldefels – Gestió ({username})")
+        self.setWindowTitle(f"Associació Gent Gran de Castelldefels")
         self._base_status_message = f"Usuari: {username} | BD: {safe_url}"
         self.statusBar().showMessage(self._base_status_message)
 
@@ -409,6 +412,11 @@ class MainWindow(QMainWindow):
 
         dlg = UsuariosDialog(self)
         dlg.exec()
+
+    def _cambiar_password(self):
+        from ui.usuarios_dialog import cambiar_password_actual
+
+        cambiar_password_actual(self, self.current_user)
 
     def _logout(self):
         if not self._confirm_all_pending_changes():

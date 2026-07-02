@@ -5,6 +5,7 @@ import os
 import subprocess
 from pathlib import Path
 from PyInstaller.building.datastruct import Tree, TOC
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
 
 block_cipher = None
 
@@ -12,6 +13,7 @@ block_cipher = None
 app_script = os.path.join('src', 'ui', 'app.py')
 
 datas = []
+binaries = collect_dynamic_libs('psycopg_binary')
 
 # Minimal hidden imports for PySide6 (avoid pulling entire Qt stack)
 hiddenimports = [
@@ -21,7 +23,8 @@ hiddenimports = [
     'PySide6.QtPrintSupport',
     'PySide6.QtPdf',
     'PySide6.QtSvg',
-]
+    'sqlalchemy.dialects.postgresql.psycopg',
+] + collect_submodules('psycopg') + collect_submodules('psycopg_binary')
 
 # Mac: bundle as app, Win: onefolder by default
 
@@ -29,7 +32,7 @@ a = Analysis([
     app_script,
 ],
     pathex=['.', 'src'],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],

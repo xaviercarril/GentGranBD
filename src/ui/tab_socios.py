@@ -28,7 +28,6 @@ class SociosTab(QWidget):
     self._sort_key = "id"
     self._sort_order = Qt.AscendingOrder
     self._all_socios = []
-    self._search_text_by_field_by_id = {}
     self._socios_loaded = False
     self._table_headers = [
       ("Num Soci", "id"),
@@ -74,8 +73,8 @@ class SociosTab(QWidget):
     self._search_box.setPlaceholderText("Cerca...")
     self._search_timer = QTimer(self)
     self._search_timer.setSingleShot(True)
-    self._search_timer.setInterval(150)
-    self._search_timer.timeout.connect(self._apply_current_filter)
+    self._search_timer.setInterval(250)
+    self._search_timer.timeout.connect(self._refresh_socios)
     self._search_box.textChanged.connect(self._filtrar_socios)
 
     # Oculta la columna de número de fila
@@ -91,14 +90,12 @@ class SociosTab(QWidget):
     header = self.table_socis.horizontalHeader()
     header.setSectionsClickable(True)
     header.sectionClicked.connect(self._sort_by_header)
-    self._refresh_socios()
 
     # Panell de detall dreta
     self.detail = SocioDetailWidget()
     self.detail.saved.connect(self._on_socio_saved)
 
     # Quan seleccionem fila → carregar detall
-    self.table_socis.selectionModel().currentRowChanged.connect(self._row_changed)
     self.table_socis.doubleClicked.connect(self._abrir_inscripciones_socio)
     # Splitter horitzontal perquè la taula i el detall s'adaptin al resize.
     self.splitter = QSplitter(Qt.Horizontal)
@@ -145,6 +142,7 @@ class SociosTab(QWidget):
     ly.addLayout(search_bar)
     ly.addWidget(self.splitter, 1)
     self.setLayout(ly)
+    self._refresh_socios()
     self.table_socis.installEventFilter(self)
 
   def refresh(self):
@@ -191,11 +189,15 @@ class SociosTab(QWidget):
   def _refresh_socios(self, keep_socio_id=None):
     if keep_socio_id is None:
       keep_socio_id = self._selected_socio_id()
-    rows = listar_socios_tabla() or []
+    rows = listar_socios_tabla(
+      search_field=self._selected_search_field(),
+      search_text=self._search_box.text(),
+      order_by=self._sort_key,
+      descending=self._sort_order == Qt.DescendingOrder,
+    ) or []
     self._all_socios = rows
     self._socios_loaded = True
-    self._rebuild_search_index()
-    self._apply_current_filter(keep_socio_id=keep_socio_id, resize_columns=True)
+    self._set_table_rows(self._all_socios, keep_socio_id=keep_socio_id, resize_columns=True)
 
   def _set_table_rows(self, rows, keep_socio_id=None, resize_columns=False):
     headers = self._headers_with_sort_indicator(self._table_headers)
@@ -226,7 +228,7 @@ class SociosTab(QWidget):
   def _headers_with_sort_indicator(self, headers):
     indicator = "▲" if self._sort_order == Qt.AscendingOrder else "▼"
     return [
-      (f"{label} {indicator}" if key == self._sort_key else label, key)
+      ((f"{label} {indicator}" if key == self._sort_key else label), key)
       for label, key in headers
     ]
 
@@ -266,7 +268,7 @@ class SociosTab(QWidget):
       self._sort_key = key
       self._sort_order = Qt.AscendingOrder
 
-    self._apply_current_filter(keep_socio_id=self._selected_socio_id())
+    self._refresh_socios(keep_socio_id=self._selected_socio_id())
 
   def _dialog_nou_socio(self):
     dlg = SocioDialog(self)
@@ -567,37 +569,19 @@ class SociosTab(QWidget):
     else:
       subprocess.Popen(["xdg-open", path])
 
-  def _filtrar_socios(self):
+  def _filtrar_socios(self, *_args):
     self._search_timer.start()
 
   def _apply_current_filter(self, keep_socio_id=None, resize_columns=False):
     if hasattr(self, "detail") and not self.detail.confirm_pending_changes():
       return
-    if keep_socio_id is None:
-      keep_socio_id = self._selected_socio_id()
-    filtered_rows = self._filter_rows(self._search_box.text())
-    filtered_rows = self._sort_rows(filtered_rows)
-    self._set_table_rows(
-      filtered_rows,
-      keep_socio_id=keep_socio_id,
-      resize_columns=resize_columns,
-    )
+    self._refresh_socios(keep_socio_id=keep_socio_id or self._selected_socio_id())
 
   def _filter_rows(self, text):
-    text = text.strip().casefold()
-    if not text:
-      return self._all_socios
-    field_key = self._selected_search_field()
-    return [
-      row for row in self._all_socios
-      if text in self._search_text_by_field_by_id.get(row.get("id"), {}).get(field_key, "")
-    ]
+    return self._all_socios
 
   def _rebuild_search_index(self):
-    self._search_text_by_field_by_id = {
-      row.get("id"): self._row_search_text_by_field(row)
-      for row in self._all_socios
-    }
+    return
 
   def _row_search_text_by_field(self, row):
     text_by_field = {}

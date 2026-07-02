@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from pydantic import BaseModel, ValidationError
 
@@ -256,45 +257,100 @@ def listar_socios() -> list[dict]:
         raise ValueError(f"Error al llistar socis: {e}")
 
 
-def listar_socios_tabla() -> list[dict]:
+SOCIOS_TABLA_SEARCH_FIELDS = {
+    "id": Socio.id,
+    "apellido1": Socio.apellido1,
+    "apellido2": Socio.apellido2,
+    "nombre": Socio.nombre,
+    "dniNie": Socio.dniNie,
+    "telefonoMovil": Socio.telefonoMovil,
+    "telefonoFijo": Socio.telefonoFijo,
+    "direccion": Socio.direccion,
+    "grupoDifusion": Socio.grupoDifusion,
+    "email": Socio.email,
+}
+
+
+def _socio_tabla_row(row) -> dict:
+    return {
+        "id": row.id,
+        "apellido1": row.apellido1,
+        "apellido2": row.apellido2,
+        "nombre": row.nombre,
+        "dniNie": row.dniNie,
+        "telefonoMovil": normalize_phone(row.telefonoMovil),
+        "telefonoFijo": normalize_phone(row.telefonoFijo),
+        "direccion": row.direccion,
+        "fechaAlta": row.fechaAlta,
+        "fechaNacimiento": row.fechaNacimiento,
+        "grupoDifusion": row.grupoDifusion,
+        "email": row.email,
+    }
+
+
+def _apply_socios_search(query, search_field: str | None, search_text: str | None):
+    text = (search_text or "").strip()
+    if not text:
+        return query
+
+    pattern = f"%{text.casefold()}%"
+    if search_field == "id":
+        try:
+            return query.filter(Socio.id == int(text))
+        except ValueError:
+            return query.filter(False)
+
+    column = SOCIOS_TABLA_SEARCH_FIELDS.get(search_field or "")
+    if column is not None:
+        return query.filter(func.lower(column).like(pattern))
+
+    return query.filter(
+        or_(
+            func.lower(Socio.nombre).like(pattern),
+            func.lower(Socio.apellido1).like(pattern),
+            func.lower(Socio.apellido2).like(pattern),
+            func.lower(Socio.dniNie).like(pattern),
+            func.lower(Socio.telefonoMovil).like(pattern),
+            func.lower(Socio.telefonoFijo).like(pattern),
+            func.lower(Socio.email).like(pattern),
+        )
+    )
+
+
+def listar_socios_tabla(
+    *,
+    search_field: str | None = None,
+    search_text: str | None = None,
+    limit: int | None = None,
+    offset: int = 0,
+    order_by: str = "id",
+    descending: bool = False,
+) -> list[dict]:
     """Retorna els camps necessaris per a la taula de socis, sense blobs."""
     try:
         with SessionLocal() as db:
-            rows = (
-                db.query(
-                    Socio.id,
-                    Socio.apellido1,
-                    Socio.apellido2,
-                    Socio.nombre,
-                    Socio.dniNie,
-                    Socio.telefonoMovil,
-                    Socio.telefonoFijo,
-                    Socio.direccion,
-                    Socio.fechaAlta,
-                    Socio.fechaNacimiento,
-                    Socio.grupoDifusion,
-                    Socio.email,
-                )
-                .order_by(Socio.id)
-                .all()
+            query = db.query(
+                Socio.id,
+                Socio.apellido1,
+                Socio.apellido2,
+                Socio.nombre,
+                Socio.dniNie,
+                Socio.telefonoMovil,
+                Socio.telefonoFijo,
+                Socio.direccion,
+                Socio.fechaAlta,
+                Socio.fechaNacimiento,
+                Socio.grupoDifusion,
+                Socio.email,
             )
-            return [
-                {
-                    "id": row.id,
-                    "apellido1": row.apellido1,
-                    "apellido2": row.apellido2,
-                    "nombre": row.nombre,
-                    "dniNie": row.dniNie,
-                    "telefonoMovil": normalize_phone(row.telefonoMovil),
-                    "telefonoFijo": normalize_phone(row.telefonoFijo),
-                    "direccion": row.direccion,
-                    "fechaAlta": row.fechaAlta,
-                    "fechaNacimiento": row.fechaNacimiento,
-                    "grupoDifusion": row.grupoDifusion,
-                    "email": row.email,
-                }
-                for row in rows
-            ]
+            query = _apply_socios_search(query, search_field, search_text)
+            sort_column = SOCIOS_TABLA_SEARCH_FIELDS.get(order_by, Socio.id)
+            query = query.order_by(sort_column.desc() if descending else sort_column.asc())
+            if offset:
+                query = query.offset(max(0, offset))
+            if limit:
+                query = query.limit(max(1, limit))
+            return [_socio_tabla_row(row) for row in query.all()]
     except Exception as e:
         raise ValueError(f"Error al llistar socis per a la taula: {e}")
 

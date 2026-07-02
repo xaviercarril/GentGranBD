@@ -5,15 +5,17 @@ No expone objetos SQLAlchemy a la UI; devuelve y recibe dicts/DTOs.
 from __future__ import annotations
 
 from pydantic import BaseModel, ValidationError
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from controladores.dtos_models import ActividadDTO, ActividadUpdateDTO
 from controladores.dtos import actividad_to_dto, inscripcion_to_dto
 from controladores.inscripcion_socio import consultar_socioID_InscripcionSocio, modificar_inscripcion
+from controladores.dtos import normalize_phone
 from controladores.socios import consultar_socio
 from database import SessionLocal
 from models import (
-    Actividad, Clase, InscripcionSocio, TipoActividadEnum
+    Actividad, Clase, EstadoInscripcion, EstadoPago, InscripcionSocio, Pago, Personal, Socio, TipoActividadEnum
 )
 
 def _normalizar_tipo_actividad(tipo) -> TipoActividadEnum | None:
@@ -127,6 +129,68 @@ def listar_actividades(tipo=None) -> list[dict]:
     except Exception as e:
         raise ValueError(f"Error al listar actividades: {e}")
 
+
+def listar_actividades_resumen(curso_id: int | None = None, tipo=None) -> list[dict]:
+    """Lista actividades con personal e inscritos en una consulta agregada."""
+    try:
+        tipo_enum = _normalizar_tipo_actividad(tipo)
+        with SessionLocal() as db:
+            inscritos_subq = (
+                db.query(
+                    InscripcionSocio.actividadID.label("actividadID"),
+                    func.count(InscripcionSocio.id).label("inscritos"),
+                )
+                .filter(InscripcionSocio.estado == EstadoInscripcion.INSCRIT)
+                .group_by(InscripcionSocio.actividadID)
+                .subquery()
+            )
+            query = (
+                db.query(
+                    Actividad.id,
+                    Actividad.nombre,
+                    Actividad.tipo,
+                    Actividad.descripcion,
+                    Actividad.numMaxAlumnos,
+                    Actividad.cursoAcademicoID,
+                    Actividad.lugarID,
+                    Actividad.precio_matricula,
+                    Actividad.personalID,
+                    Personal.nombre.label("personal_nombre"),
+                    Personal.apellido1.label("personal_apellido1"),
+                    func.coalesce(inscritos_subq.c.inscritos, 0).label("inscritos"),
+                )
+                .outerjoin(Personal, Personal.id == Actividad.personalID)
+                .outerjoin(inscritos_subq, inscritos_subq.c.actividadID == Actividad.id)
+            )
+            if curso_id:
+                query = query.filter(Actividad.cursoAcademicoID == curso_id)
+            if tipo_enum is not None:
+                query = query.filter(Actividad.tipo == tipo_enum)
+            rows = query.order_by(Actividad.nombre).all()
+            result = []
+            for row in rows:
+                personal_nombre = "Desconegut"
+                if row.personal_nombre:
+                    personal_nombre = f"{row.personal_nombre} {row.personal_apellido1 or ''}".strip()
+                result.append(
+                    {
+                        "id": row.id,
+                        "nombre": row.nombre,
+                        "tipo": row.tipo,
+                        "descripcion": row.descripcion,
+                        "numMaxAlumnos": row.numMaxAlumnos,
+                        "cursoAcademico_id": row.cursoAcademicoID,
+                        "lugarID": row.lugarID,
+                        "precio_matricula": row.precio_matricula,
+                        "personalID": row.personalID,
+                        "personal_nombre": personal_nombre,
+                        "inscritos": int(row.inscritos or 0),
+                    }
+                )
+            return result
+    except Exception as e:
+        raise ValueError(f"Error al listar resumen de actividades: {e}")
+
 def listar_actividades_por_tipo(tipo) -> list[dict]:
     """Devuelve actividades filtradas por tipo."""
     try:
@@ -148,6 +212,77 @@ def listar_inscripciones_por_Actividad(actividadID: int) -> list[dict]:
             return [inscripcion_to_dto(i).model_dump() for i in inscripciones]
     except Exception as e:
         raise ValueError(f"Error al listar inscripciones por actividad: {e}")
+
+
+def listar_inscripciones_detalle_por_Actividad(actividadID: int) -> list[dict]:
+    """Lista inscripciones con datos básicos del socio y último pago en lote."""
+    try:
+        with SessionLocal() as db:
+            rows = (
+                db.query(
+                    InscripcionSocio,
+                    Socio.nombre.label("socio_nombre"),
+                    Socio.apellido1.label("socio_apellido1"),
+                    Socio.apellido2.label("socio_apellido2"),
+                    Socio.dniNie.label("socio_dniNie"),
+                    Socio.telefonoMovil.label("socio_telefonoMovil"),
+                )
+                .outerjoin(Socio, Socio.id == InscripcionSocio.socioID)
+                .filter(InscripcionSocio.actividadID == actividadID)
+                .order_by(InscripcionSocio.fechaInscripcion, InscripcionSocio.id)
+                .all()
+            )
+            inscripciones = [inscripcion_to_dto(row[0]).model_dump() for row in rows]
+            by_id = {ins["id"]: ins for ins in inscripciones}
+            by_pair = {
+                (ins.get("socioID"), ins.get("actividadID")): ins
+                for ins in inscripciones
+                if ins.get("socioID")
+            }
+
+            for row in rows:
+                inscripcion_orm = row[0]
+                inscripcion = by_id[inscripcion_orm.id]
+                if row.socio_nombre:
+                    inscripcion["nombre"] = row.socio_nombre or ""
+                    inscripcion["apellido1"] = row.socio_apellido1 or ""
+                    inscripcion["apellido2"] = row.socio_apellido2 or ""
+                    inscripcion["dniNie"] = row.socio_dniNie or ""
+                    inscripcion["telefonoMovil"] = normalize_phone(row.socio_telefonoMovil) or ""
+                    inscripcion["esSocio"] = inscripcion_orm.socioID
+                else:
+                    inscripcion["nombre"] = inscripcion.get("noSocioNombre") or "Desconegut"
+                    inscripcion["apellido1"] = inscripcion.get("noSocioApellido1") or ""
+                    inscripcion["apellido2"] = inscripcion.get("noSocioApellido2") or ""
+                    inscripcion["dniNie"] = inscripcion.get("noSocioDni") or ""
+                    inscripcion["telefonoMovil"] = normalize_phone(inscripcion.get("noSocioTelefono")) or ""
+                    inscripcion["esSocio"] = "-"
+
+            pagos = (
+                db.query(Pago)
+                .filter(Pago.actividadID == actividadID)
+                .order_by(Pago.fecha, Pago.id)
+                .all()
+            )
+            for pago in pagos:
+                inscripcion = None
+                if pago.inscripcionID:
+                    inscripcion = by_id.get(pago.inscripcionID)
+                if inscripcion is None:
+                    inscripcion = by_pair.get((pago.socioID, pago.actividadID))
+                if inscripcion is None:
+                    continue
+                inscripcion["_pago_id"] = pago.id
+                estado = getattr(pago.estado, "value", pago.estado)
+                inscripcion["pagat"] = "Sí" if estado == EstadoPago.PAGAT.value else "No"
+
+            for inscripcion in inscripciones:
+                inscripcion.setdefault("_pago_id", None)
+                inscripcion.setdefault("pagat", "No")
+
+            return inscripciones
+    except Exception as e:
+        raise ValueError(f"Error al listar detalle de inscripciones por actividad: {e}")
     
 def listar_clases_por_Actividad(actividadID: int) -> list[dict] :
     """Devuelve clases de una actividad."""

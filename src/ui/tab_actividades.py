@@ -1,9 +1,8 @@
 import re
 import tempfile
 
-from controladores.actividades import listar_actividades, consultar_actividad, eliminar_actividad, listar_inscripciones_por_Actividad
-from controladores.personal import consultar_personal
-from controladores.curso_academico import listar_cursosA, listar_actividades_por_CursoAcademico
+from controladores.actividades import eliminar_actividad, listar_actividades_resumen
+from controladores.curso_academico import listar_cursosA
 from PySide6.QtWidgets import (
   QWidget, QVBoxLayout, QHBoxLayout, QTableView,
   QPushButton, QMessageBox, QLineEdit, QComboBox, QSizePolicy, QTabWidget, QMenu
@@ -17,7 +16,6 @@ from ui.table_models import DictTableModel
 from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.asistencia_dialog import AsistenciaDialog
 from ui.theme import set_button_icon, set_button_variant
-from models import EstadoInscripcion
 
 class ActividadesTab(QWidget):
   def __init__(self, parent=None):
@@ -29,14 +27,14 @@ class ActividadesTab(QWidget):
 
     self._curso_selector = QComboBox()
     self._curso_selector.addItem("Tots els cursos", None)
-    for curso in listar_cursosA():
+    cursos = listar_cursosA()
+    for curso in cursos:
         self._curso_selector.addItem(curso["nombre"], curso["id"])
     from datetime import date
     hoy = date.today()
     for i in range(1, self._curso_selector.count()):
         curso_id = self._curso_selector.itemData(i)
-        curso_nombre = self._curso_selector.itemText(i)
-        for curso in listar_cursosA():
+        for curso in cursos:
             if curso["id"] == curso_id and curso["fechaInicio"] <= hoy <= curso["fechaFin"]:
                 self._curso_selector.setCurrentIndex(i)
                 break
@@ -132,11 +130,7 @@ class ActividadesTab(QWidget):
 
     curso_id = self._curso_selector.currentData()
     self.btn_nova_actividad.setEnabled(curso_id is not None)
-    rows = (
-      listar_actividades_por_CursoAcademico(curso_id, tipo=self._tipo_actual)
-      if curso_id
-      else listar_actividades(tipo=self._tipo_actual)
-    )
+    rows = listar_actividades_resumen(curso_id=curso_id, tipo=self._tipo_actual)
     headers = self._headers_with_sort_indicator([
       ("ID", "id"),
       ("Nom", "nombre"),
@@ -147,23 +141,8 @@ class ActividadesTab(QWidget):
       ("Descripció / itinerari" if self._tipo_actual == "VIATGE" else "Descripció", "descripcion")
     ])
 
-    # Enriquecer datos con nombre del personal y contar inscritos
     for row in rows:
         row["precio_matricula"] = f"{row['precio_matricula']:.2f} €"
-        try:
-            personal = consultar_personal(row["personalID"]) if row["personalID"] else None
-            row["personal_nombre"] = f"{personal['nombre']} {personal['apellido1']}" if personal else "Desconegut"
-        except Exception:
-            row["personal_nombre"] = "Desconegut"
-
-        try:
-            inscripciones = listar_inscripciones_por_Actividad(row["id"])
-            row["inscritos"] = sum(
-                1 for ins in inscripciones
-                if getattr(ins.get("estado"), "value", ins.get("estado")) == EstadoInscripcion.INSCRIT.value
-            )
-        except Exception:
-            row["inscritos"] = "?"
 
     filtered_rows = self._filter_activitats_rows(self._search_box.text(), rows)
     filtered_rows = self._sort_rows(filtered_rows)

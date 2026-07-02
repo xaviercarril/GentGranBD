@@ -145,6 +145,10 @@ def main():
         safe_url = database.engine.url.render_as_string(hide_password=True)
         _log(f"Database backend={database.engine.url.get_backend_name()} url={safe_url}")
         _log(f"Authenticated user={login.current_user.get('username') if login.current_user else ''}")
+        from audit import install_audit_listeners, set_current_user
+
+        install_audit_listeners()
+        set_current_user(login.current_user)
 
         _log("Creating MainWindow")
         win = MainWindow(current_user=login.current_user)

@@ -10,10 +10,10 @@ from PySide6.QtWidgets import (
     QTextEdit, QComboBox, QDoubleSpinBox, QTableView, QLabel, QPushButton,
     QHBoxLayout, QSizePolicy, QStyledItemDelegate
 )
-from controladores.actividades import consultar_actividad, modificar_actividad, listar_inscripciones_por_Actividad, actualizar_estados_inscripciones
-from controladores.inscripcion_socio import eliminar_inscripcion, modificar_inscripcion, registrar_inscripcion, listar_pagos_por_InscripcionSocio
+from controladores.actividades import consultar_actividad, modificar_actividad, listar_inscripciones_detalle_por_Actividad, actualizar_estados_inscripciones
+from controladores.inscripcion_socio import eliminar_inscripcion, modificar_inscripcion, registrar_inscripcion
 from controladores.pagos import modificar_pago, registrar_pago
-from controladores.personal import consultar_personal, listar_personal
+from controladores.personal import listar_personal
 from controladores.socios import consultar_socio
 from exportador.pdf_inscripciones import generar_pdf_matriculados_actividad
 from models import EstadoInscripcion
@@ -301,13 +301,9 @@ class ActividadDetailWidget(QWidget):
         if personalID is None:
             self.personal.setCurrentText("Desconegut")
         else:
-            personal = consultar_personal(personalID)
-            if personal.get("apellido2") is None:
-                self.personal.setCurrentText(f"{personal['apellido1']}, {personal['nombre']}".strip())
-            else:
-                self.personal.setCurrentText(
-                    f"{personal.get('apellido1', '')} {personal.get('apellido2', '')}, {personal.get('nombre', '')}".strip()
-                )
+            index = self.personal.findData(personalID)
+            if index >= 0:
+                self.personal.setCurrentIndex(index)
 
         numMaxAlumnos = act.get("numMaxAlumnos")
         if numMaxAlumnos is None:
@@ -326,7 +322,7 @@ class ActividadDetailWidget(QWidget):
 
     def _load_inscrits_table(self):
         try:
-            inscripciones = listar_inscripciones_por_Actividad(self._actividadID)
+            inscripciones = listar_inscripciones_detalle_por_Actividad(self._actividadID)
             headers = [
                 ("ID", "id"),
                 ("Num Soci", "esSocio"),
@@ -346,26 +342,7 @@ class ActividadDetailWidget(QWidget):
                 ]
             )
             for inscripcion in inscripciones:
-                socio_id = inscripcion.get("socioID")
-                socio = consultar_socio(socio_id) if socio_id else None
                 inscripcion["estado"] = self._estado_value(inscripcion["estado"])
-                if socio:
-                    inscripcion["nombre"] = socio.get("nombre", "")
-                    inscripcion["apellido1"] = socio.get("apellido1", "")
-                    inscripcion["apellido2"] = socio.get("apellido2", "")
-                    inscripcion["dniNie"] = socio.get("dniNie", "")
-                    inscripcion["telefonoMovil"] = socio.get("telefonoMovil", "")
-                    inscripcion["esSocio"] = socio_id
-                    
-                else:
-                    inscripcion["nombre"] = inscripcion.get("noSocioNombre") or "Desconegut"
-                    inscripcion["apellido1"] = inscripcion.get("noSocioApellido1") or ""
-                    inscripcion["apellido2"] = inscripcion.get("noSocioApellido2") or ""
-                    inscripcion["dniNie"] = inscripcion.get("noSocioDni") or ""
-                    inscripcion["telefonoMovil"] = inscripcion.get("noSocioTelefono") or ""
-                    inscripcion["esSocio"] = "-"
-                if self._tipo_actividad == "VIATGE":
-                    self._set_pagat_info(inscripcion)
             self._inscripciones = inscripciones
             self._update_inscrits_counter()
             self.inscrits_table.setModel(
@@ -538,24 +515,6 @@ class ActividadDetailWidget(QWidget):
     def _finish_fecha_inscripcion_update(self):
         self._load_inscrits_table()
         self.saved.emit()
-
-    def _set_pagat_info(self, inscripcion):
-        pago = self._latest_pago(inscripcion)
-        inscripcion["_pago_id"] = pago.get("id") if pago else None
-        estado = self._estado_value(pago.get("estado")) if pago else None
-        inscripcion["pagat"] = "Sí" if estado == "PAGAT" else "No"
-
-    def _latest_pago(self, inscripcion):
-        try:
-            pagos = listar_pagos_por_InscripcionSocio(inscripcion["id"])
-        except Exception:
-            return None
-        if not pagos:
-            return None
-        return sorted(
-            pagos,
-            key=lambda pago: (pago.get("fecha_pago") or date.min, pago.get("id") or 0),
-        )[-1]
 
     def _update_pagat_field(self, inscripcion_id, value):
         inscripcion = next((ins for ins in self._inscripciones if ins.get("id") == inscripcion_id), None)

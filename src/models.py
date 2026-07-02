@@ -54,6 +54,19 @@ class Usuario(Base):
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
     last_login = Column(DateTime)
 
+
+class Auditoria(Base):
+    __tablename__ = "auditoria"
+
+    id = Column(Integer, primary_key=True)
+    usuario_app = Column(String(50), nullable=False, index=True)
+    accion = Column(String(20), nullable=False, index=True)
+    tabla = Column(String(100), nullable=False, index=True)
+    registro_id = Column(String(100))
+    fecha_hora = Column(DateTime, nullable=False, default=datetime.utcnow, index=True)
+    detalle = Column(Text)
+
+
 # ---------------------------------------------
 # SOCIO + GDPR CONSENT
 # ---------------------------------------------
@@ -66,8 +79,8 @@ class Socio(Base):
     apellido1 = Column(String(50))
     apellido2 = Column(String(50))
     direccion = Column(String(255))
-    telefonoFijo = Column(String(20))
-    telefonoMovil = Column(String(20))
+    telefonoFijo = Column(String(50))
+    telefonoMovil = Column(String(50))
     email = Column(String(100))
     grupoDifusion = Column(String(50))
     fechaNacimiento = Column(Date)
@@ -103,7 +116,7 @@ class Personal(Base):
     apellido1 = Column(String(50))
     apellido2 = Column(String(50))
     email = Column(String(100))
-    telfMovil = Column(String(20))
+    telfMovil = Column(String(50))
     observaciones = Column(Text)
     tipo = Column(String(50))  # Needed for single-table inheritance discriminator
 
@@ -222,7 +235,7 @@ class InscripcionSocio(Base):
     noSocioApellido1 = Column(String(100))
     noSocioApellido2 = Column(String(100))
     noSocioDni = Column(String(20))
-    noSocioTelefono = Column(String(20))
+    noSocioTelefono = Column(String(50))
     noSocioEmail = Column(String(100))
     noSocioObservaciones = Column(Text)
 

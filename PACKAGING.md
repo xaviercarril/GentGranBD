@@ -46,8 +46,20 @@ Artifacts will be under `dist/`.
   - macOS: `~/Library/Application Support/GentGranBD/gentgran.db`
   - Windows: `%APPDATA%\\GentGranBD\\gentgran.db`
   - Linux: `~/.local/share/GentGranBD/gentgran.db`
+- For PostgreSQL/DigitalOcean in packaged builds, store the connection in:
+  - macOS: `~/Library/Application Support/GentGranBD/database.env`
+  - Windows: `%APPDATA%\\GentGranBD\\database.env`
+  - Linux: `~/.local/share/GentGranBD/database.env`
 - Assets under `src/ui/assets` and `src/extra` are bundled; relative paths like `ui/assets/...` and `extra/logo.png` are resolved at runtime.
 - If you need a macOS `.app` bundle or notarization, we can add a macOS-specific spec using `BUNDLE` and a proper Info.plist.
+
+Create the production database config once on each machine:
+
+```sh
+python3 scripts/configure_database.py
+```
+
+The script prompts for the DigitalOcean password and writes `database.env` outside the app/repo. After that, the packaged app can be opened from Finder/Explorer without entering the database URL each time.
  
 ### macOS .app
 Build a native app bundle:

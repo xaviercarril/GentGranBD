@@ -9,6 +9,9 @@ dist
 build
 src/gentgran.db
 .env
+.env.local
+.env.staging
+database.env
 postgres-data/
 logs/
 tmp
