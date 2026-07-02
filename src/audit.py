@@ -8,10 +8,12 @@ from enum import Enum
 from typing import Any
 
 from sqlalchemy import event, inspect
+from sqlalchemy import text
 
 from models import Auditoria, Base
 
 
+REALTIME_CHANNEL = "gentgran_changes"
 _current_username: ContextVar[str] = ContextVar("current_username", default="sistema")
 _listeners_installed = False
 
@@ -62,14 +64,38 @@ def _insert_audit(connection, target, action: str, detail: dict) -> None:
     if isinstance(target, Auditoria):
         return
 
+    table_name = target.__mapper__.local_table.name
+    record_id = _record_id(target)
+    username = get_current_user()
+
     connection.execute(
         Auditoria.__table__.insert().values(
-            usuario_app=get_current_user(),
+            usuario_app=username,
             accion=action,
-            tabla=target.__mapper__.local_table.name,
-            registro_id=_record_id(target),
+            tabla=table_name,
+            registro_id=record_id,
             detalle=json.dumps(detail, ensure_ascii=False, default=str),
         )
+    )
+    _notify_realtime_change(connection, table_name, record_id, action, username)
+
+
+def _notify_realtime_change(connection, table_name: str, record_id: str | None, action: str, username: str) -> None:
+    if connection.dialect.name != "postgresql":
+        return
+
+    payload = json.dumps(
+        {
+            "tabla": table_name,
+            "registro_id": record_id,
+            "accion": action,
+            "usuario_app": username,
+        },
+        ensure_ascii=False,
+    )
+    connection.execute(
+        text("SELECT pg_notify(:channel, :payload)"),
+        {"channel": REALTIME_CHANNEL, "payload": payload},
     )
 
 

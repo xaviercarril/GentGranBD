@@ -107,11 +107,17 @@ class MainWindow(QMainWindow):
         self._update_progress_dialog = None
         self._base_status_message = ""
         self._sel_model = None  # Model de selecció per a la taula de socis
+        self._realtime_service = None
+        self._pending_realtime_sections = set()
         self.setWindowTitle("Associació Gent Gran de Castelldefels – Gestió")
         self._initial_window_size = QSize(1350, 780)
         self.update_check_finished_on_main.connect(self._on_update_check_finished)
         self.update_check_thread_finished_on_main.connect(self._on_update_check_thread_finished)
         self.update_install_finished_on_main.connect(self._on_update_install_finished)
+        self._realtime_refresh_timer = QTimer(self)
+        self._realtime_refresh_timer.setSingleShot(True)
+        self._realtime_refresh_timer.setInterval(500)
+        self._realtime_refresh_timer.timeout.connect(self._flush_realtime_refresh)
 
         app = QApplication.instance()
         screen = app.primaryScreen() if app else None
@@ -134,9 +140,11 @@ class MainWindow(QMainWindow):
         self.socios_tab = SociosTab()
         self.tabs.addTab(self.socios_tab, "Socis")
         _startup_log("Creating ActividadesTab")
-        self.tabs.addTab(ActividadesTab(), "Activitats")
+        self.actividades_tab = ActividadesTab()
+        self.tabs.addTab(self.actividades_tab, "Activitats")
         _startup_log("Creating PersonalTab")
-        self.tabs.addTab(PersonalTab(), "Personal")
+        self.personal_tab = PersonalTab()
+        self.tabs.addTab(self.personal_tab, "Personal")
         self._current_tab_index = self.tabs.currentIndex()
         self._changing_tab_programmatically = False
         self.tabs.currentChanged.connect(self._on_tab_changed)
@@ -191,6 +199,7 @@ class MainWindow(QMainWindow):
             menu_admin.addAction(action_usuaris)
 
         self._update_session_status()
+        self._start_realtime_sync()
         _startup_log("MainWindow init finished")
         QTimer.singleShot(1200, lambda: self._start_update_check(manual=False))
 
@@ -205,6 +214,86 @@ class MainWindow(QMainWindow):
 
     def _show_base_status(self):
         self.statusBar().showMessage(self._base_status_message)
+
+    def _start_realtime_sync(self):
+        try:
+            from ui.realtime import RealtimeService
+
+            self._realtime_service = RealtimeService(self)
+            self._realtime_service.change_received.connect(self._on_realtime_change)
+            self._realtime_service.status_changed.connect(self._on_realtime_status)
+            self._realtime_service.start()
+        except Exception as exc:
+            _startup_log(f"Realtime sync disabled: {exc}")
+
+    def _on_realtime_status(self, status: str):
+        _startup_log(f"Realtime sync status: {status}")
+
+    def _on_realtime_change(self, payload):
+        if self._closing:
+            return
+        sections = self._realtime_sections_for_table(str((payload or {}).get("tabla") or ""))
+        if not sections:
+            return
+        self._pending_realtime_sections.update(sections)
+        if not self._realtime_refresh_timer.isActive():
+            self._realtime_refresh_timer.start()
+
+    def _realtime_sections_for_table(self, table_name: str) -> set[str]:
+        if table_name == "*":
+            return {"socios", "actividades", "personal"}
+        sections_by_table = {
+            "socios": {"socios"},
+            "firma_proteccion_datos": {"socios"},
+            "personal": {"personal", "actividades"},
+            "actividades": {"actividades"},
+            "inscripciones": {"actividades", "socios"},
+            "matricula_pagos": {"actividades", "socios"},
+            "clases": {"actividades"},
+            "asistencias_socio": {"actividades", "socios"},
+            "curso_academico": {"actividades"},
+            "trimestres": {"actividades"},
+            "lugares": {"actividades"},
+        }
+        return sections_by_table.get(table_name, set())
+
+    def _flush_realtime_refresh(self):
+        sections = set(self._pending_realtime_sections)
+        self._pending_realtime_sections.clear()
+        if not sections:
+            return
+
+        widgets = {
+            "socios": self.socios_tab,
+            "actividades": self.actividades_tab,
+            "personal": self.personal_tab,
+        }
+        refreshed = 0
+        skipped = 0
+        for section in sorted(sections):
+            widget = widgets.get(section)
+            if widget is None:
+                continue
+            try:
+                if hasattr(widget, "refresh_from_realtime"):
+                    did_refresh = bool(widget.refresh_from_realtime())
+                elif hasattr(widget, "refresh"):
+                    widget.refresh()
+                    did_refresh = True
+                else:
+                    did_refresh = False
+            except Exception as exc:
+                _startup_log(f"Realtime refresh failed for {section}: {exc}")
+                continue
+            if did_refresh:
+                refreshed += 1
+            else:
+                skipped += 1
+
+        if refreshed:
+            self.statusBar().showMessage("Dades actualitzades per canvis a la base de dades.", 2500)
+        elif skipped:
+            self.statusBar().showMessage("Hi ha canvis externs pendents; acaba l'edició per actualitzar.", 5000)
 
     def _is_admin(self) -> bool:
         return self.current_user.get("rol") == "ADMIN"
@@ -832,6 +921,12 @@ class MainWindow(QMainWindow):
             self._closing = False
             event.ignore()
             return
+        if self._realtime_service is not None:
+            try:
+                self._realtime_service.stop()
+            except Exception as exc:
+                _startup_log(f"Realtime sync stop failed: {exc}")
+            self._realtime_service = None
         super().closeEvent(event)
 
     def _stop_update_thread(self, attr_name: str) -> bool:
