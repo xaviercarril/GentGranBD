@@ -1,10 +1,12 @@
+import os
+
 import pytest
 from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import sessionmaker
 
 import controladores.acceso as acceso
 import database
-from models import Base, Usuario
+from models import Auditoria, Base, Usuario
 
 
 @pytest.fixture()
@@ -75,6 +77,36 @@ def test_admin_gestiona_usuario_normal_y_password(auth_session):
     assert acceso.autenticar_usuario("operador2", "nuevo")["username"] == "operador2"
 
 
+def test_usuario_cambia_su_propia_password(auth_session):
+    usuario = acceso.crear_usuario("operador", "secret", "USER")
+
+    with pytest.raises(ValueError):
+        acceso.cambiar_password_usuario(usuario["id"], "mal", "nuevo")
+
+    acceso.cambiar_password_usuario(usuario["id"], "secret", "nuevo")
+
+    with pytest.raises(ValueError):
+        acceso.autenticar_usuario("operador", "secret")
+    assert acceso.autenticar_usuario("operador", "nuevo")["username"] == "operador"
+
+
+def test_listar_auditoria_usuario_filtra_por_usuario(auth_session):
+    with auth_session() as db:
+        db.add_all(
+            [
+                Auditoria(usuario_app="operador", accion="CREATE", tabla="socios", registro_id="1"),
+                Auditoria(usuario_app="admin", accion="DELETE", tabla="socios", registro_id="2"),
+                Auditoria(usuario_app="operador", accion="UPDATE", tabla="pagos", registro_id="3"),
+            ]
+        )
+        db.commit()
+
+    rows = acceso.listar_auditoria_usuario("operador")
+
+    assert [row["accion"] for row in rows] == ["UPDATE", "CREATE"]
+    assert {row["usuario_app"] for row in rows} == {"operador"}
+
+
 def test_no_se_puede_eliminar_ni_desactivar_ultimo_admin(auth_session):
     acceso.bootstrap_admin_si_no_hay_usuarios()
     admin = acceso.autenticar_usuario("admin", "admin")
@@ -96,6 +128,41 @@ def test_ensure_schema_updates_crea_tabla_usuarios_en_sqlite_legacy(monkeypatch)
 
     assert "usuarios" in inspect(engine).get_table_names()
     engine.dispose()
+
+
+def test_database_url_postgresql_usa_driver_psycopg():
+    normalized = database._normalize_database_url(
+        "postgresql://user:pass@example.com:25060/gentgran?sslmode=require"
+    )
+    normalized_legacy = database._normalize_database_url(
+        " postgres://user:pass@example.com:25060/gentgran?sslmode=require "
+    )
+
+    assert normalized == (
+        "postgresql+psycopg://user:pass@example.com:25060/gentgran?sslmode=require"
+    )
+    assert normalized_legacy == (
+        "postgresql+psycopg://user:pass@example.com:25060/gentgran?sslmode=require"
+    )
+
+
+def test_load_env_file_no_sobrescribe_entorno(monkeypatch, tmp_path):
+    env_file = tmp_path / "database.env"
+    env_file.write_text(
+        "GENTGRAN_DATABASE_URL='postgresql://file:value@example.com:25060/gentgran?sslmode=require'\n"
+        "DATABASE_URL=postgresql://file2:value@example.com:25060/gentgran?sslmode=require\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setenv("GENTGRAN_DATABASE_URL", "postgresql://env:value@example.com/db")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+
+    database._load_env_file(env_file)
+
+    assert os.environ["GENTGRAN_DATABASE_URL"] == "postgresql://env:value@example.com/db"
+    assert os.environ["DATABASE_URL"] == (
+        "postgresql://file2:value@example.com:25060/gentgran?sslmode=require"
+    )
 
 
 def test_set_database_url_reconfigura_sessionlocal_compartido(tmp_path):

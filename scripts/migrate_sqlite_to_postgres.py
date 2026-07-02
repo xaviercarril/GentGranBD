@@ -32,6 +32,18 @@ DEFAULT_SQLITE_PATH = SRC_DIR / "gentgran.db"
 DEFAULT_POSTGRES_URL = (
     "postgresql+psycopg://gentgran:gentgran_dev@localhost:5432/gentgran_poc"
 )
+VARCHAR_EXPANSIONS = {
+    ("socios", "telefonoFijo"): 50,
+    ("socios", "telefonoMovil"): 50,
+    ("personal", "telfMovil"): 50,
+    ("inscripciones", "noSocioTelefono"): 50,
+}
+
+
+def normalize_postgres_url(postgres_url: str) -> str:
+    if postgres_url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + postgres_url[len("postgresql://") :]
+    return postgres_url
 
 
 def sqlite_url(path: Path) -> str:
@@ -110,9 +122,18 @@ def table_count(conn, table) -> int:
     return conn.execute(select(func.count()).select_from(table)).scalar_one()
 
 
-def fetch_rows(conn, table) -> list[dict[str, Any]]:
-    result = conn.execute(select(table))
-    return [dict(row._mapping) for row in result]
+def fetch_rows(conn, table, actual_columns: set[str]) -> list[dict[str, Any]]:
+    selected_columns = [column for column in table.columns if column.name in actual_columns]
+    result = conn.execute(select(*selected_columns))
+    rows = [dict(row._mapping) for row in result]
+    for row in rows:
+        for column in table.columns:
+            if column.name in row:
+                continue
+            default = column.default
+            if default is not None and default.is_scalar:
+                row[column.name] = default.arg
+    return rows
 
 
 def truncate_target(conn) -> None:
@@ -138,23 +159,110 @@ def reset_postgres_sequences(conn) -> None:
         )
 
 
-def validate_sqlite_data(source_conn) -> list[str]:
+def _row_identity(row) -> str:
+    values = dict(row)
+    if "id" in values:
+        return f"id={values['id']}"
+    return ", ".join(f"{key}={value}" for key, value in values.items() if key != "value")
+
+
+def validate_string_lengths(source_conn, source_tables, actual_columns_by_table) -> list[str]:
     issues: list[str] = []
-    duplicates = source_conn.execute(
-        select(
-            InscripcionSocio.socioID,
-            InscripcionSocio.actividadID,
-            func.count().label("count"),
-        )
-        .group_by(InscripcionSocio.socioID, InscripcionSocio.actividadID)
-        .having(func.count() > 1)
-    ).all()
-    if duplicates:
-        issues.append(
-            "PostgreSQL requires unique inscripciones(socioID, actividadID); "
-            f"found {len(duplicates)} duplicated pairs."
-        )
+    for table in source_tables:
+        actual_columns = actual_columns_by_table.get(table.name, set())
+        identity_columns = list(table.primary_key.columns)
+        identity_columns = [
+            column for column in identity_columns if column.name in actual_columns
+        ]
+        if not identity_columns:
+            identity_columns = [table.c.id] if "id" in table.c and "id" in actual_columns else []
+        for column in table.columns:
+            if column.name not in actual_columns:
+                continue
+            max_length = getattr(column.type, "length", None)
+            if not max_length:
+                continue
+            expanded_length = VARCHAR_EXPANSIONS.get((table.name, column.name))
+            if expanded_length and expanded_length > max_length:
+                max_length = expanded_length
+
+            query_columns = [*identity_columns, column.label("value")]
+            rows = (
+                source_conn.execute(
+                    select(*query_columns)
+                    .where(column.is_not(None))
+                    .where(func.length(column) > max_length)
+                    .limit(20)
+                )
+                .mappings()
+                .all()
+            )
+            if not rows:
+                continue
+
+            total = source_conn.execute(
+                select(func.count())
+                .select_from(table)
+                .where(column.is_not(None))
+                .where(func.length(column) > max_length)
+            ).scalar_one()
+            examples = "; ".join(
+                f"{_row_identity(row)} len={len(str(row['value']))} value={str(row['value'])[:80]!r}"
+                for row in rows[:5]
+            )
+            issues.append(
+                f"{table.name}.{column.name} exceeds VARCHAR({max_length}) "
+                f"in {total} row(s). Examples: {examples}"
+            )
     return issues
+
+
+def validate_sqlite_data(source_conn, source_tables, actual_columns_by_table) -> list[str]:
+    issues: list[str] = []
+    inscripcion_columns = actual_columns_by_table.get("inscripciones", set())
+    if {"socioID", "actividadID"}.issubset(inscripcion_columns):
+        duplicates = source_conn.execute(
+            select(
+                InscripcionSocio.socioID,
+                InscripcionSocio.actividadID,
+                func.count().label("count"),
+            )
+            .group_by(InscripcionSocio.socioID, InscripcionSocio.actividadID)
+            .having(func.count() > 1)
+        ).all()
+        if duplicates:
+            examples = "; ".join(
+                f"socioID={row.socioID}, actividadID={row.actividadID}, count={row.count}"
+                for row in duplicates[:5]
+            )
+            issues.append(
+                "PostgreSQL requires unique inscripciones(socioID, actividadID); "
+                f"found {len(duplicates)} duplicated pairs. Examples: {examples}"
+            )
+    return issues + validate_string_lengths(
+        source_conn,
+        source_tables,
+        actual_columns_by_table,
+    )
+
+
+def expand_postgres_varchars(conn) -> None:
+    inspector = inspect(conn)
+    table_names = set(inspector.get_table_names())
+    for (table_name, column_name), target_length in VARCHAR_EXPANSIONS.items():
+        if table_name not in table_names:
+            continue
+        for column in inspector.get_columns(table_name):
+            if column["name"] != column_name:
+                continue
+            current_length = getattr(column["type"], "length", None)
+            if current_length is not None and current_length < target_length:
+                conn.execute(
+                    text(
+                        f'ALTER TABLE {table_name} ALTER COLUMN "{column_name}" '
+                        f"TYPE VARCHAR({target_length})"
+                    )
+                )
 
 
 def main() -> int:
@@ -165,8 +273,13 @@ def main() -> int:
         return 2
 
     source_engine = create_engine(sqlite_url(sqlite_path), future=True)
-    source_table_names = set(inspect(source_engine).get_table_names())
+    source_inspector = inspect(source_engine)
+    source_table_names = set(source_inspector.get_table_names())
     source_tables = migratable_tables(source_table_names)
+    actual_columns_by_table = {
+        table_name: {column["name"] for column in source_inspector.get_columns(table_name)}
+        for table_name in source_table_names
+    }
 
     schema_issues = validate_sqlite_schema(source_engine)
     if schema_issues:
@@ -176,7 +289,7 @@ def main() -> int:
         return 1
 
     with source_engine.connect() as source_conn:
-        issues = validate_sqlite_data(source_conn)
+        issues = validate_sqlite_data(source_conn, source_tables, actual_columns_by_table)
         source_counts = {
             table.name: table_count(source_conn, table)
             for table in source_tables
@@ -197,16 +310,21 @@ def main() -> int:
         print("\nDry run completed; no PostgreSQL changes were made.")
         return 0
 
-    target_engine = create_engine(args.postgres_url, future=True)
+    target_engine = create_engine(normalize_postgres_url(args.postgres_url), future=True)
     print(f"\nTarget PostgreSQL: {target_engine.url.render_as_string(hide_password=True)}")
     Base.metadata.create_all(bind=target_engine)
 
     with source_engine.connect() as source_conn, target_engine.begin() as target_conn:
+        expand_postgres_varchars(target_conn)
         if args.truncate:
             truncate_target(target_conn)
 
         for table in source_tables:
-            rows = fetch_rows(source_conn, table)
+            rows = fetch_rows(
+                source_conn,
+                table,
+                actual_columns_by_table.get(table.name, set()),
+            )
             if rows:
                 target_conn.execute(table.insert(), rows)
             print(f"Copied {len(rows)} rows into {table.name}")

@@ -39,17 +39,77 @@ def _sqlite_url(path: Path) -> str:
     return f"sqlite:///{path.resolve().as_posix()}"
 
 
+def _project_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[1]
+
+
+def _parse_env_value(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+        os.environ[key] = _parse_env_value(value)
+
+
+def _load_database_config() -> None:
+    """Load local database config before creating the engine.
+
+    Packaged apps launched from Finder/Explorer do not inherit shell exports, so
+    production DB credentials can live in a user-local file outside the repo/app.
+    """
+    for path in (
+        _user_data_dir() / "database.env",
+        _project_root() / "database.env",
+        _project_root() / ".env.local",
+        _project_root() / ".env.staging",
+        _project_root() / ".env",
+    ):
+        _load_env_file(path)
+
+
+def _normalize_database_url(database_url: str) -> str:
+    """Use the installed psycopg v3 driver for plain PostgreSQL URLs."""
+    database_url = (database_url or "").strip()
+    if database_url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + database_url[len("postgresql://") :]
+    if database_url.startswith("postgres://"):
+        return "postgresql+psycopg://" + database_url[len("postgres://") :]
+    return database_url
+
+
 def _database_url() -> str:
     """Return the configured DB URL.
 
     By default the desktop app keeps using the local SQLite database. For the
     PostgreSQL POC, set DATABASE_URL or GENTGRAN_DATABASE_URL in the environment.
     """
-    return (
+    _load_database_config()
+    database_url = (
         os.getenv("GENTGRAN_DATABASE_URL")
         or os.getenv("DATABASE_URL")
         or _sqlite_url(_db_path())
     )
+    return _normalize_database_url(database_url)
 
 
 def _connect_args(database_url: str) -> dict:
@@ -81,6 +141,10 @@ def default_database_url() -> str:
     return _database_url()
 
 
+def local_database_url() -> str:
+    return _sqlite_url(_db_path())
+
+
 def set_database_url(database_url: str | None) -> None:
     """Configure the process-wide SQLAlchemy engine and existing SessionLocal.
 
@@ -89,7 +153,7 @@ def set_database_url(database_url: str | None) -> None:
     """
     global DATABASE_URL, engine
 
-    new_url = (database_url or "").strip() or default_database_url()
+    new_url = _normalize_database_url((database_url or "").strip() or default_database_url())
     if new_url == DATABASE_URL:
         return
 
@@ -122,7 +186,7 @@ def _drop_personal_dni_sqlite() -> None:
                     apellido1 VARCHAR(50),
                     apellido2 VARCHAR(50),
                     email VARCHAR(100),
-                    "telfMovil" VARCHAR(20),
+                    "telfMovil" VARCHAR(50),
                     observaciones TEXT,
                     tipo VARCHAR(50),
                     PRIMARY KEY (id)
@@ -219,14 +283,25 @@ def ensure_schema_updates() -> None:
     if "socios" not in table_names:
         return
 
-    socio_columns = {column["name"] for column in inspector.get_columns("socios")}
+    socio_columns_info = inspector.get_columns("socios")
+    socio_columns = {column["name"] for column in socio_columns_info}
+    personal_columns_info = (
+        inspector.get_columns("personal")
+        if "personal" in table_names
+        else []
+    )
     personal_columns = (
-        {column["name"] for column in inspector.get_columns("personal")}
+        {column["name"] for column in personal_columns_info}
         if "personal" in table_names
         else set()
     )
+    inscripcion_columns_info = (
+        inspector.get_columns("inscripciones")
+        if "inscripciones" in table_names
+        else []
+    )
     inscripcion_columns = (
-        {column["name"] for column in inspector.get_columns("inscripciones")}
+        {column["name"] for column in inscripcion_columns_info}
         if "inscripciones" in table_names
         else set()
     )
@@ -257,7 +332,7 @@ def ensure_schema_updates() -> None:
     if "inscripciones" in table_names and "noSocioDni" not in inscripcion_columns:
         statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioDni" VARCHAR(20)')
     if "inscripciones" in table_names and "noSocioTelefono" not in inscripcion_columns:
-        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioTelefono" VARCHAR(20)')
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioTelefono" VARCHAR(50)')
     if "inscripciones" in table_names and "noSocioEmail" not in inscripcion_columns:
         statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioEmail" VARCHAR(100)')
     if "inscripciones" in table_names and "noSocioObservaciones" not in inscripcion_columns:
@@ -276,6 +351,27 @@ def ensure_schema_updates() -> None:
             statements.append('ALTER TABLE matricula_pagos ALTER COLUMN "socioID" DROP NOT NULL')
     if "dniNie" in personal_columns and engine.url.get_backend_name() != "sqlite":
         statements.append('ALTER TABLE personal DROP COLUMN "dniNie"')
+    if engine.url.get_backend_name() != "sqlite":
+        info_by_table = {
+            "socios": socio_columns_info,
+            "personal": personal_columns_info,
+            "inscripciones": inscripcion_columns_info,
+        }
+        for table_name, column_name in (
+            ("socios", "telefonoFijo"),
+            ("socios", "telefonoMovil"),
+            ("personal", "telfMovil"),
+            ("inscripciones", "noSocioTelefono"),
+        ):
+            for column in info_by_table.get(table_name, []):
+                if column["name"] != column_name:
+                    continue
+                current_length = getattr(column["type"], "length", None)
+                if current_length is not None and current_length < 50:
+                    statements.append(
+                        f'ALTER TABLE {table_name} ALTER COLUMN "{column_name}" '
+                        "TYPE VARCHAR(50)"
+                    )
 
     if statements:
         with engine.begin() as conn:

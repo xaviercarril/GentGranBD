@@ -3,6 +3,7 @@
 
 import os
 from pathlib import Path
+from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
 block_cipher = None
 
 app_script = os.path.join('src', 'ui', 'app.py')
@@ -12,6 +13,8 @@ datas = [
     (os.path.join('src', 'extra'), 'extra'),
 ]
 
+binaries = collect_dynamic_libs('psycopg_binary')
+
 hiddenimports = [
     'PySide6.QtCore',
     'PySide6.QtGui',
@@ -19,7 +22,8 @@ hiddenimports = [
     'PySide6.QtPrintSupport',
     'PySide6.QtPdf',
     'PySide6.QtSvg',
-]
+    'sqlalchemy.dialects.postgresql.psycopg',
+] + collect_submodules('psycopg') + collect_submodules('psycopg_binary')
 
 excludes = [
     'PySide6.Qt3DCore', 'PySide6.Qt3DAnimation', 'PySide6.Qt3DExtras', 'PySide6.Qt3DInput', 'PySide6.Qt3DLogic', 'PySide6.Qt3DRender',
@@ -35,7 +39,7 @@ a = Analysis([
     app_script,
 ],
     pathex=['.', 'src'],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
