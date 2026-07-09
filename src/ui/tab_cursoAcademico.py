@@ -28,6 +28,10 @@ from controladores.trimestre import modificar_trimestre
 from ui.table_models import DictTableModel
 from ui.table_utils import enable_table_copy
 from ui.theme import set_button_icon, set_button_variant
+from ui.curso_academico_preferences import (
+    establecer_curso_academico_predeterminado,
+    obtener_curso_academico_predeterminado,
+)
 
 
 class DuplicarCursoDialog(QDialog):
@@ -167,10 +171,12 @@ class CursoAcademicoDialog(QDialog):
         self.curso_nombre = QLineEdit()
         self.curso_inicio = self._crear_date_edit()
         self.curso_fin = self._crear_date_edit()
+        self.curso_predeterminado = QCheckBox("Utilitza aquest curs com a predeterminat")
 
         form.addRow("Nom:", self.curso_nombre)
         form.addRow("Inici del curs:", self.curso_inicio)
         form.addRow("Final del curs:", self.curso_fin)
+        form.addRow("", self.curso_predeterminado)
 
         self.curso_box.setLayout(form)
         parent_layout.addWidget(self.curso_box)
@@ -178,6 +184,7 @@ class CursoAcademicoDialog(QDialog):
         self.curso_nombre.textEdited.connect(self._mark_dirty)
         self.curso_inicio.dateChanged.connect(self._mark_dirty)
         self.curso_fin.dateChanged.connect(self._mark_dirty)
+        self.curso_predeterminado.toggled.connect(self._mark_dirty)
 
     def _crear_editor_trimestres(self, parent_layout):
         self.trimestre_box = QGroupBox("Trimestres")
@@ -322,6 +329,8 @@ class CursoAcademicoDialog(QDialog):
             return
 
         eliminar_cursoA(curso["id"])
+        if obtener_curso_academico_predeterminado() == curso["id"]:
+            establecer_curso_academico_predeterminado(None)
         self._refresh_table()
 
     def _duplicar_curso(self):
@@ -379,6 +388,7 @@ class CursoAcademicoDialog(QDialog):
             QSignalBlocker(self.curso_nombre),
             QSignalBlocker(self.curso_inicio),
             QSignalBlocker(self.curso_fin),
+            QSignalBlocker(self.curso_predeterminado),
         ]
         for inicio_edit, fin_edit in self.trimestres_edits:
             blockers.append(QSignalBlocker(inicio_edit))
@@ -387,6 +397,9 @@ class CursoAcademicoDialog(QDialog):
         self.curso_nombre.setText(self._curso_actual["nombre"])
         self.curso_inicio.setDate(self._to_qdate(self._curso_actual["fechaInicio"]))
         self.curso_fin.setDate(self._to_qdate(self._curso_actual["fechaFin"]))
+        self.curso_predeterminado.setChecked(
+            obtener_curso_academico_predeterminado() == self._curso_actual["id"]
+        )
 
         fechas_generadas = self._calcular_trimestres(
             self._curso_actual["fechaInicio"],
@@ -446,6 +459,10 @@ class CursoAcademicoDialog(QDialog):
             QMessageBox.warning(self, "No s'han pogut guardar els canvis", str(e))
             return False
 
+        if self.curso_predeterminado.isChecked():
+            establecer_curso_academico_predeterminado(curso_id)
+        elif obtener_curso_academico_predeterminado() == curso_id:
+            establecer_curso_academico_predeterminado(None)
         self.lbl_estado.setText("Canvis guardats")
         self._set_dirty(False)
         self._curso_actual.update(curso_data)

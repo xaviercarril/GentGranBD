@@ -13,6 +13,7 @@ from PySide6.QtWidgets import QApplication, QWidget
 import controladores.socios as socios
 from models import Base, Socio
 import ui.tab_socios as tab_socios
+import ui.seleccionar_socio_dialog as seleccionar_socio_dialog
 
 
 @pytest.fixture()
@@ -127,6 +128,61 @@ def test_listar_socios_tabla_filtra_y_limita_en_base_de_datos(patched_session):
     )
 
     assert [row["nombre"] for row in rows] == ["Marta"]
+
+
+def test_listar_socios_activos_tabla_filtra_excluye_y_pagina(patched_session):
+    patched_session.add_all(
+        [
+            Socio(dniNie="12345678A", nombre="Maria", apellido1="Garcia", fechaAlta=date(2026, 1, 15)),
+            Socio(dniNie="87654321B", nombre="Joan", apellido1="Puig", fechaAlta=date(2026, 1, 16)),
+            Socio(dniNie="11111111C", nombre="Marta", apellido1="Garcia", fechaAlta=date(2026, 1, 17)),
+            Socio(dniNie="22222222D", nombre="Maria", apellido1="Baixa", fechaAlta=date(2026, 1, 18), fechaBaja=date(2026, 2, 1)),
+        ]
+    )
+    patched_session.commit()
+
+    assert socios.contar_socios_activos_tabla(search_field="nombre", search_text="maria") == 1
+    rows = socios.listar_socios_activos_tabla(limit=1, offset=1)
+    assert [row["nombre"] for row in rows] == ["Joan"]
+
+    rows = socios.listar_socios_activos_tabla(excluded_socio_ids=[1])
+    assert [row["id"] for row in rows] == [2, 3]
+
+
+def test_selector_socios_consulta_por_paginas_y_campo(monkeypatch, qapp):
+    calls = []
+
+    def fake_count(**kwargs):
+        calls.append(("count", kwargs))
+        return 51
+
+    def fake_list(**kwargs):
+        calls.append(("list", kwargs))
+        return [_row(socio_id=1)]
+
+    monkeypatch.setattr(seleccionar_socio_dialog, "contar_socios_activos_tabla", fake_count)
+    monkeypatch.setattr(seleccionar_socio_dialog, "listar_socios_activos_tabla", fake_list)
+
+    dialog = seleccionar_socio_dialog.SeleccionarSocioDialog(excluded_socio_ids=[8])
+    assert calls[-1] == (
+        "list",
+        {
+            "search_field": "nombre",
+            "search_text": "",
+            "excluded_socio_ids": {8},
+            "limit": 50,
+            "offset": 0,
+        },
+    )
+    assert dialog.btn_next_page.isEnabled()
+
+    dialog.search.setText("maria")
+    dialog._search_timer.stop()
+    dialog._refresh_table()
+    assert calls[-1][1]["search_text"] == "maria"
+
+    dialog._next_page()
+    assert calls[-1][1]["offset"] == 50
 
 
 def test_busqueda_en_socios_consulta_remota_con_parametros(monkeypatch, qapp):

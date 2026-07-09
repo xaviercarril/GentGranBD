@@ -152,8 +152,8 @@ def main():
 
         _log("Creating MainWindow")
         win = MainWindow(current_user=login.current_user)
-        _log("Showing MainWindow")
-        win.show()
+        _log("Showing MainWindow maximized")
+        win.showMaximized()
         win.raise_()
         win.activateWindow()
         _log("Entering Qt event loop")

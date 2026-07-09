@@ -364,6 +364,73 @@ def listar_socios_activos() -> list[dict]:
     except Exception as e:
         raise ValueError(f"Error al llistar socis actius: {e}")
 
+
+def _socios_activos_query(db, search_field=None, search_text=None, excluded_socio_ids=None):
+    """Construye la consulta reutilizable para seleccionar socios activos."""
+    query = db.query(
+        Socio.id,
+        Socio.apellido1,
+        Socio.apellido2,
+        Socio.nombre,
+        Socio.dniNie,
+        Socio.telefonoMovil,
+        Socio.telefonoFijo,
+        Socio.direccion,
+        Socio.fechaAlta,
+        Socio.fechaNacimiento,
+        Socio.grupoDifusion,
+        Socio.email,
+    ).filter(Socio.fechaBaja.is_(None))
+    query = _apply_socios_search(query, search_field, search_text)
+
+    excluded_ids = [socio_id for socio_id in (excluded_socio_ids or []) if socio_id is not None]
+    if excluded_ids:
+        query = query.filter(~Socio.id.in_(excluded_ids))
+    return query
+
+
+def contar_socios_activos_tabla(
+    *,
+    search_field: str | None = None,
+    search_text: str | None = None,
+    excluded_socio_ids=None,
+) -> int:
+    """Cuenta los socios activos disponibles para una inscripción."""
+    try:
+        with SessionLocal() as db:
+            query = _socios_activos_query(
+                db,
+                search_field=search_field,
+                search_text=search_text,
+                excluded_socio_ids=excluded_socio_ids,
+            )
+            return query.order_by(None).count()
+    except Exception as e:
+        raise ValueError(f"Error al comptar socis actius: {e}")
+
+
+def listar_socios_activos_tabla(
+    *,
+    search_field: str | None = None,
+    search_text: str | None = None,
+    excluded_socio_ids=None,
+    limit: int = 50,
+    offset: int = 0,
+) -> list[dict]:
+    """Lista una página ligera de socios activos para inscribirlos en una actividad."""
+    try:
+        with SessionLocal() as db:
+            query = _socios_activos_query(
+                db,
+                search_field=search_field,
+                search_text=search_text,
+                excluded_socio_ids=excluded_socio_ids,
+            ).order_by(Socio.id.asc())
+            query = query.offset(max(0, offset)).limit(max(1, limit))
+            return [_socio_tabla_row(row) for row in query.all()]
+    except Exception as e:
+        raise ValueError(f"Error al llistar socis actius per a la taula: {e}")
+
 def listar_asistencias_por_socio_clase(socioID: int, claseID: int) -> list[dict]:
     """Lista las asistencias de un socio a una clase específica."""
     try:

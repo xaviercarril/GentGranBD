@@ -5,7 +5,7 @@ from controladores.actividades import eliminar_actividad, listar_actividades_res
 from controladores.curso_academico import listar_cursosA
 from PySide6.QtWidgets import (
   QWidget, QVBoxLayout, QHBoxLayout, QTableView,
-  QPushButton, QMessageBox, QLineEdit, QComboBox, QSizePolicy, QTabWidget, QMenu
+  QPushButton, QMessageBox, QLineEdit, QComboBox, QSizePolicy, QTabWidget, QMenu, QLabel
 )
 from PySide6.QtGui import QDesktopServices, QIcon
 from PySide6.QtCore import QSize, QModelIndex, QItemSelectionModel, Qt, QUrl, QTimer
@@ -15,6 +15,7 @@ from ui.actividad_detail import ActividadDetailWidget
 from ui.table_models import DictTableModel
 from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.asistencia_dialog import AsistenciaDialog
+from ui.curso_academico_preferences import obtener_curso_academico_predeterminado
 from ui.theme import set_button_icon, set_button_variant
 
 class ActividadesTab(QWidget):
@@ -30,12 +31,18 @@ class ActividadesTab(QWidget):
     cursos = listar_cursosA()
     for curso in cursos:
         self._curso_selector.addItem(curso["nombre"], curso["id"])
-    from datetime import date
-    hoy = date.today()
-    for i in range(1, self._curso_selector.count()):
-        curso_id = self._curso_selector.itemData(i)
-        for curso in cursos:
-            if curso["id"] == curso_id and curso["fechaInicio"] <= hoy <= curso["fechaFin"]:
+    curso_predeterminado = obtener_curso_academico_predeterminado(cursos)
+    if curso_predeterminado is not None:
+        self._curso_selector.setCurrentIndex(self._curso_selector.findData(curso_predeterminado))
+    else:
+        from datetime import date
+        hoy = date.today()
+        for i in range(1, self._curso_selector.count()):
+            curso_id = self._curso_selector.itemData(i)
+            if any(
+              curso["id"] == curso_id and curso["fechaInicio"] <= hoy <= curso["fechaFin"]
+              for curso in cursos
+            ):
                 self._curso_selector.setCurrentIndex(i)
                 break
     self._curso_selector.currentIndexChanged.connect(self._refresh_activitats)
@@ -102,7 +109,10 @@ class ActividadesTab(QWidget):
     self._content_widget = QWidget()
     content_layout = QVBoxLayout(self._content_widget)
     content_layout.setContentsMargins(0, 0, 0, 0)
-    content_layout.addWidget(self._curso_selector)
+    curso_selector_layout = QHBoxLayout()
+    curso_selector_layout.addWidget(QLabel("Curs acadèmic:"))
+    curso_selector_layout.addWidget(self._curso_selector, 1)
+    content_layout.addLayout(curso_selector_layout)
     content_layout.addLayout(top_buttons)
     content_layout.addWidget(self._search_box)
 
@@ -267,9 +277,12 @@ class ActividadesTab(QWidget):
   def _dialog_nova_actividad(self):
     curso_id = self._curso_selector.currentData()
     if curso_id is None:
+        cursos = listar_cursosA()
+        curso_id = obtener_curso_academico_predeterminado(cursos)
+    if curso_id is None:
         from datetime import date
         hoy = date.today()
-        for c in listar_cursosA():
+        for c in cursos:
             if c["fechaInicio"] <= hoy <= c["fechaFin"]:
                 curso_id = c["id"]
                 break
@@ -346,7 +359,17 @@ class ActividadesTab(QWidget):
 
   def _on_subtab_changed(self, index):
     window = self.window()
-    previous_size = window.size() if window else None
+    previous_geometry = window.geometry() if window else None
+    previous_minimum_size = window.minimumSize() if window else None
+    previous_maximum_size = window.maximumSize() if window else None
+    is_maximized = window.isMaximized() if window else False
+
+    # El contenido se mueve entre las dos páginas y Qt recalcula sus tamaños.
+    # Bloqueamos la ventana sólo durante ese recálculo para evitar que cambie
+    # de tamaño al alternar entre Cursos y Viajes.
+    if window and previous_geometry and not is_maximized:
+      window.setFixedSize(previous_geometry.size())
+
     self._tipo_actual = "VIATGE" if index == 1 else "CURS"
     is_viatge = self._tipo_actual == "VIATGE"
     target_tab = self.viatges_tab if is_viatge else self.cursos_tab
@@ -357,5 +380,20 @@ class ActividadesTab(QWidget):
     self.detail_actividad.set_tipo_actividad(self._tipo_actual)
     self.detail_actividad.load(None)
     self._refresh_activitats()
-    if window and previous_size:
-      QTimer.singleShot(0, lambda: window.resize(previous_size))
+    if window and previous_geometry and not is_maximized:
+      QTimer.singleShot(
+        0,
+        lambda: self._release_window_size_lock(
+          window,
+          previous_geometry,
+          previous_minimum_size,
+          previous_maximum_size,
+        ),
+      )
+
+  @staticmethod
+  def _release_window_size_lock(window, geometry, minimum_size, maximum_size):
+    """Restaura los límites que tenía la ventana tras el cambio de pestaña."""
+    window.setMinimumSize(minimum_size)
+    window.setMaximumSize(maximum_size)
+    window.setGeometry(geometry)

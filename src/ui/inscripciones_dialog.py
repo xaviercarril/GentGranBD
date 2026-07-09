@@ -15,6 +15,7 @@ from controladores.inscripcion_socio import modificar_inscripcion, listar_pagos_
 from controladores.pagos import modificar_pago
 from ui.table_models import DictTableModel
 from ui.table_utils import add_table_copy_actions, enable_table_copy
+from ui.curso_academico_preferences import obtener_curso_academico_predeterminado
 from ui.theme import set_button_variant
 
 
@@ -356,12 +357,18 @@ class InscripcionesDialog(QDialog):
         self.combo_cursos.addItem("Tots els cursos", userData=None)
 
         index_to_select = 0
-        today = date.today()
+        curso_predeterminado = obtener_curso_academico_predeterminado(self._cursos)
 
         for i, curs in enumerate(self._cursos):
             self.combo_cursos.addItem(curs["nombre"], userData=curs["id"])
-            if curs["fechaInicio"] <= today <= curs["fechaFin"]:
+            if curs["id"] == curso_predeterminado:
                 index_to_select = i + 1  # +1 because "Tots els cursos" is at index 0
+
+        if curso_predeterminado is None:
+            today = date.today()
+            for i, curs in enumerate(self._cursos):
+                if curs["fechaInicio"] <= today <= curs["fechaFin"]:
+                    index_to_select = i + 1
 
         self.combo_cursos.setCurrentIndex(index_to_select)
 
