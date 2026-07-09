@@ -111,6 +111,7 @@ class MainWindow(QMainWindow):
         self._pending_realtime_sections = set()
         self.setWindowTitle("Associació Gent Gran de Castelldefels – Gestió")
         self._initial_window_size = QSize(1350, 780)
+        self._centered_on_startup = False
         self.update_check_finished_on_main.connect(self._on_update_check_finished)
         self.update_check_thread_finished_on_main.connect(self._on_update_check_thread_finished)
         self.update_install_finished_on_main.connect(self._on_update_install_finished)
@@ -118,18 +119,6 @@ class MainWindow(QMainWindow):
         self._realtime_refresh_timer.setSingleShot(True)
         self._realtime_refresh_timer.setInterval(500)
         self._realtime_refresh_timer.timeout.connect(self._flush_realtime_refresh)
-
-        app = QApplication.instance()
-        screen = app.primaryScreen() if app else None
-        if screen:
-            geometry = screen.availableGeometry()
-            self.move(
-                geometry.left() + max(0, (geometry.width() - self.width()) // 2),
-                geometry.top() + max(0, (geometry.height() - self.height()) // 2),
-            )
-            _startup_log(f"Window centered on primary screen: {geometry}")
-        else:
-            _startup_log("No primary screen detected")
 
         # ── QTabWidget ───────────────────────────────────────────
         _startup_log("Creating tabs")
@@ -148,6 +137,8 @@ class MainWindow(QMainWindow):
         self._current_tab_index = self.tabs.currentIndex()
         self._changing_tab_programmatically = False
         self.tabs.currentChanged.connect(self._on_tab_changed)
+        # Todas las vistas parten de la misma geometría, sin desactivar los
+        # controles nativos de la ventana (incluido maximizar).
         self.resize(self._bounded_window_size(self._initial_window_size))
 
         # ── Menú superior ───────────────────────────────────────
@@ -539,15 +530,70 @@ class MainWindow(QMainWindow):
 
         self._current_tab_index = index
 
+    def showEvent(self, event):
+        """Centra la ventana una vez Qt haya calculado su marco nativo."""
+        super().showEvent(event)
+        if not self._centered_on_startup:
+            self._centered_on_startup = True
+            if not self.isMaximized():
+                QTimer.singleShot(0, self._center_on_primary_screen)
+
+    def _center_on_primary_screen(self) -> None:
+        if self.isMaximized():
+            return
+
+        app = QApplication.instance()
+        screen = self.screen() or (app.primaryScreen() if app else None)
+        if not screen:
+            _startup_log("No primary screen detected")
+            return
+
+        available = screen.availableGeometry()
+        horizontal_margin = 24
+        top_margin = 24
+        # En macOS, Qt puede incluir el Dock en ``availableGeometry``. Esta
+        # reserva evita que la ventana inicial quede por debajo de él.
+        dock_clearance = 80 if sys.platform == "darwin" else 24
+        frame = self.frameGeometry()
+
+        # ``resize`` trabaja sobre el área cliente, mientras que el Dock y los
+        # límites de pantalla se comparan con el marco completo de macOS.
+        # Ajustamos después de mostrar la ventana, cuando ese marco ya existe.
+        max_frame_width = max(1, available.width() - 2 * horizontal_margin)
+        max_frame_height = max(1, available.height() - top_margin - dock_clearance)
+        excess_width = max(0, frame.width() - max_frame_width)
+        excess_height = max(0, frame.height() - max_frame_height)
+        if excess_width or excess_height:
+            self.resize(
+                max(1, self.width() - excess_width),
+                max(1, self.height() - excess_height),
+            )
+            frame = self.frameGeometry()
+
+        min_x = available.left() + horizontal_margin
+        min_y = available.top() + top_margin
+        max_x = available.right() - horizontal_margin - frame.width() + 1
+        max_y = available.bottom() - dock_clearance - frame.height() + 1
+        x = min_x + (max_x - min_x) // 2
+        y = min_y + (max_y - min_y) // 2
+        self.move(
+            max(min_x, min(x, max_x)) if max_x >= min_x else available.left(),
+            max(min_y, min(y, max_y)) if max_y >= min_y else available.top(),
+        )
+        _startup_log(f"Window centered on primary screen: {available}")
+
     def _bounded_window_size(self, target: QSize) -> QSize:
         app = QApplication.instance()
         screen = app.primaryScreen() if app else None
         if not screen:
             return target
         available = screen.availableGeometry()
+        horizontal_margin = 24
+        top_margin = 24
+        dock_clearance = 80 if sys.platform == "darwin" else 24
         return QSize(
-            min(target.width(), max(900, available.width() - 80)),
-            min(target.height(), max(600, available.height() - 80)),
+            min(target.width(), max(1, available.width() - 2 * horizontal_margin)),
+            min(target.height(), max(1, available.height() - top_margin - dock_clearance)),
         )
 
     def _mostrar_dialog_nou_curs(self):

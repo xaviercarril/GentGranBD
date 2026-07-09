@@ -277,9 +277,9 @@ def app_stylesheet() -> str:
         background: {Palette.PRIMARY_SOFT};
     }}
     QPushButton:disabled {{
-        background: #eef1ea;
-        color: #8b9583;
-        border-color: {Palette.BORDER};
+        background: #e7ebe2;
+        color: #7a8373;
+        border-color: #c4cbbd;
     }}
     QPushButton[variant="primary"] {{
         background: {Palette.PRIMARY};
@@ -304,6 +304,15 @@ def app_stylesheet() -> str:
     }}
     QPushButton[variant="secondary"] {{
         background: #f8faf5;
+    }}
+    /* This rule comes after the variants so primary and destructive actions
+       are visibly inactive too. */
+    QPushButton[variant="primary"]:disabled,
+    QPushButton[variant="danger"]:disabled,
+    QPushButton[variant="secondary"]:disabled {{
+        background: #e7ebe2;
+        color: #7a8373;
+        border-color: #c4cbbd;
     }}
 
     QTableView, QTableWidget {{

@@ -1,9 +1,11 @@
-from PySide6.QtCore import QItemSelectionModel, QSize, Qt
+from PySide6.QtCore import QItemSelectionModel, QSize, Qt, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QComboBox,
     QFormLayout,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -13,13 +15,15 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from controladores.socios import listar_socios_activos
+from controladores.socios import contar_socios_activos_tabla, listar_socios_activos_tabla
 from ui.table_models import DictTableModel
 from ui.table_utils import add_table_copy_actions, enable_table_copy
 from ui.theme import set_button_variant
 
 
 class SeleccionarSocioDialog(QDialog):
+    PAGE_SIZE = 50
+
     def __init__(self, excluded_socio_ids=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Afegir soci a l'activitat")
@@ -27,11 +31,23 @@ class SeleccionarSocioDialog(QDialog):
 
         self._excluded_socio_ids = set(excluded_socio_ids or [])
         self._selected_socio = None
-        self._socios = self._load_socios()
+        self._page = 0
+        self._total_socios = 0
 
+        self.search_field = QComboBox()
+        for label, key in self._search_fields():
+            self.search_field.addItem(label, key)
+        default_search_field = self.search_field.findData("nombre")
+        if default_search_field >= 0:
+            self.search_field.setCurrentIndex(default_search_field)
+        self.search_field.currentIndexChanged.connect(self._queue_search)
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Cerca per nom, cognoms o DNI/NIE...")
-        self.search.textChanged.connect(self._refresh_table)
+        self.search.setPlaceholderText("Cerca...")
+        self.search.textChanged.connect(self._queue_search)
+        self._search_timer = QTimer(self)
+        self._search_timer.setSingleShot(True)
+        self._search_timer.setInterval(250)
+        self._search_timer.timeout.connect(self._refresh_table)
 
         self.table = QTableView()
         self.table.verticalHeader().setVisible(False)
@@ -55,10 +71,25 @@ class SeleccionarSocioDialog(QDialog):
         self.buttons.rejected.connect(self.reject)
         self.btn_no_soci.clicked.connect(self._afegir_no_soci)
 
+        self.btn_previous_page = QPushButton("‹ Anterior")
+        self.btn_previous_page.clicked.connect(self._previous_page)
+        self.page_label = QLabel()
+        self.page_label.setAlignment(Qt.AlignCenter)
+        self.btn_next_page = QPushButton("Següent ›")
+        self.btn_next_page.clicked.connect(self._next_page)
+        pagination = QHBoxLayout()
+        pagination.addWidget(self.btn_previous_page)
+        pagination.addWidget(self.page_label, 1)
+        pagination.addWidget(self.btn_next_page)
+
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel("Selecciona un soci actiu:"))
-        layout.addWidget(self.search)
+        search_bar = QHBoxLayout()
+        search_bar.addWidget(self.search_field)
+        search_bar.addWidget(self.search, 1)
+        layout.addLayout(search_bar)
         layout.addWidget(self.table)
+        layout.addLayout(pagination)
         layout.addWidget(self.buttons)
 
         self._refresh_table()
@@ -75,19 +106,22 @@ class SeleccionarSocioDialog(QDialog):
         self._selected_socio = model.rows[row]
         super().accept()
 
-    def _load_socios(self):
-        socios = listar_socios_activos() or []
-        return [s for s in socios if s.get("id") not in self._excluded_socio_ids]
-
     def _refresh_table(self):
-        text = self.search.text().strip().lower()
-        rows = self._socios
-        if text:
-            rows = [
-                socio
-                for socio in rows
-                if text in self._search_text(socio)
-            ]
+        self._total_socios = contar_socios_activos_tabla(
+            search_field=self._selected_search_field(),
+            search_text=self.search.text(),
+            excluded_socio_ids=self._excluded_socio_ids,
+        )
+        total_pages = self._total_pages()
+        if self._page >= total_pages:
+            self._page = max(0, total_pages - 1)
+        rows = listar_socios_activos_tabla(
+            search_field=self._selected_search_field(),
+            search_text=self.search.text(),
+            excluded_socio_ids=self._excluded_socio_ids,
+            limit=self.PAGE_SIZE,
+            offset=self._page * self.PAGE_SIZE,
+        )
 
         headers = [
             ("ID", "id"),
@@ -107,15 +141,56 @@ class SeleccionarSocioDialog(QDialog):
                 index,
                 QItemSelectionModel.SelectCurrent | QItemSelectionModel.Rows,
             )
+        self._update_pagination()
 
-    def _search_text(self, socio):
-        values = [
-            socio.get("dniNie"),
-            socio.get("nombre"),
-            socio.get("apellido1"),
-            socio.get("apellido2"),
+    def _search_fields(self):
+        return [
+            ("Num Soci", "id"),
+            ("Primer cognom", "apellido1"),
+            ("Segon cognom", "apellido2"),
+            ("Nom", "nombre"),
+            ("DNI", "dniNie"),
+            ("Telf. Movil", "telefonoMovil"),
+            ("Telf. Fixe", "telefonoFijo"),
+            ("Adreça", "direccion"),
+            ("Grup difusió", "grupoDifusion"),
+            ("Email", "email"),
         ]
-        return " ".join(str(v).lower() for v in values if v)
+
+    def _selected_search_field(self):
+        return self.search_field.currentData() or "nombre"
+
+    def _queue_search(self, *_args):
+        self._page = 0
+        self._search_timer.start()
+
+    def _total_pages(self):
+        return (self._total_socios + self.PAGE_SIZE - 1) // self.PAGE_SIZE
+
+    def _previous_page(self):
+        if self._page <= 0:
+            return
+        self._page -= 1
+        self._refresh_table()
+
+    def _next_page(self):
+        if self._page + 1 >= self._total_pages():
+            return
+        self._page += 1
+        self._refresh_table()
+
+    def _update_pagination(self):
+        total_pages = self._total_pages()
+        if not total_pages:
+            self.page_label.setText("No s'han trobat socis")
+        else:
+            first = self._page * self.PAGE_SIZE + 1
+            last = min(first + self.PAGE_SIZE - 1, self._total_socios)
+            self.page_label.setText(
+                f"Socis {first}-{last} de {self._total_socios} · Pàgina {self._page + 1} de {total_pages}"
+            )
+        self.btn_previous_page.setEnabled(self._page > 0)
+        self.btn_next_page.setEnabled(self._page + 1 < total_pages)
 
     def _afegir_no_soci(self):
         dialog = NoSocioDialog(self)
