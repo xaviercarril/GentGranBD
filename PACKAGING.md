@@ -4,8 +4,8 @@ This app uses PySide6 and bundles as a standalone executable via PyInstaller.
 
 ## Prerequisites
 - Python 3.11+ installed
-- On macOS: Xcode Command Line Tools installed (for codesign if needed)
-- On Windows: Python launcher `py` available
+- On macOS: Xcode Command Line Tools and `libpq` from Homebrew installed
+- On Windows: Python launcher `py` and PostgreSQL client tools available during the build
 
 ## One-time setup
 Install dependencies:
@@ -40,6 +40,13 @@ Artifacts will be under `dist/`.
 - macOS one-folder: `GentGranBD/GentGranBD` binary
 - macOS .app: `GentGranBD/GentGranBD.app`
 - Windows one-file: `dist/GentGranBD.exe`
+
+All distributable artifacts embed `pg_dump` (and its required dynamic
+libraries on Windows/macOS). End users therefore do not need Homebrew,
+PostgreSQL or any separate client installation to back up DigitalOcean. The
+build intentionally fails if `pg_dump` cannot be found, preventing publication
+of an incomplete application. `GENTGRAN_PG_DUMP` can select a specific client
+binary at build time.
 
 ## Notes
 - The SQLite database is stored in a user-writable directory:

@@ -793,48 +793,40 @@ class MainWindow(QMainWindow):
             )
             return
 
-        from database import engine
-
-        if engine.url.get_backend_name() != "sqlite":
-            QMessageBox.information(
-                self,
-                "Còpia no disponible",
-                "La còpia de seguretat integrada només està disponible amb SQLite. "
-                "Amb PostgreSQL cal fer servir pg_dump o les còpies gestionades del servidor.",
-            )
-            return
-
-        db_location = engine.url.database
-        if not db_location:
-            QMessageBox.critical(self, "Error", "No s'ha pogut determinar la ruta de la base de dades.")
-            return
-
-        db_path = Path(db_location)
-        if not db_path.exists():
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"No s'ha trobat la base de dades a {db_path}",
-            )
-            return
+        from database import _user_data_dir, engine
+        from database_backup import BackupError, backup_extension, create_database_backup
 
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        suggested = f"{db_path.stem}_backup_{timestamp}{db_path.suffix or '.db'}"
-        default_dir = db_path.parent if db_path.parent.exists() else Path.home()
+        try:
+            extension = backup_extension(engine)
+        except BackupError as exc:
+            QMessageBox.critical(self, "Còpia no disponible", str(exc))
+            return
+
+        suggested = f"gentgran_backup_{timestamp}{extension}"
+        default_dir = Path(_user_data_dir()) / "backups"
+        default_dir.mkdir(parents=True, exist_ok=True)
+        file_filter = (
+            "SQLite (*.db);;Tots els arxius (*)"
+            if extension == ".db"
+            else "Còpia PostgreSQL (*.dump);;Tots els arxius (*)"
+        )
         target_str, _ = QFileDialog.getSaveFileName(
             self,
             "Desar còpia de seguretat",
             str(default_dir / suggested),
-            "SQLite (*.db);;Tots els arxius (*)",
+            file_filter,
         )
         if not target_str:
             return
 
-        target_path = Path(target_str)
         try:
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(db_path, target_path)
-        except Exception as exc:
+            target_path = create_database_backup(
+                engine,
+                target_str,
+                user_role=self.current_user.get("rol", ""),
+            )
+        except BackupError as exc:
             QMessageBox.critical(
                 self,
                 "Error en la còpia",
@@ -847,7 +839,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "Còpia creada",
-            f"Base de dades copiada a:\n{target_path}",
+            f"Còpia de seguretat creada correctament a:\n{target_path}",
         )
 
     def _restore_database(self):
@@ -859,15 +851,54 @@ class MainWindow(QMainWindow):
             )
             return
 
-        from database import engine
+        from database import _user_data_dir, engine
 
-        if engine.url.get_backend_name() != "sqlite":
+        if engine.url.get_backend_name() == "postgresql":
+            source_str, _ = QFileDialog.getOpenFileName(
+                self,
+                "Selecciona la còpia PostgreSQL",
+                str(Path(_user_data_dir()) / "backups"),
+                "Còpia PostgreSQL (*.dump);;Tots els arxius (*)",
+            )
+            if not source_str:
+                return
+
+            box = QMessageBox(self)
+            box.setWindowTitle("Restaurar base de dades PostgreSQL")
+            box.setText(
+                "Aquesta acció eliminarà i recrearà les dades de la base de dades "
+                "DigitalOcean actual amb la còpia seleccionada.\n\n"
+                f"Fitxer: {source_str}\n\nVols continuar?"
+            )
+            box.setIcon(QMessageBox.Warning)
+            box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+            box.button(QMessageBox.Yes).setText("Sí, restaurar")
+            box.button(QMessageBox.No).setText("No")
+            if box.exec() != QMessageBox.Yes:
+                return
+
+            try:
+                from database_backup import BackupError, restore_postgresql_backup
+
+                restore_postgresql_backup(
+                    engine,
+                    source_str,
+                    user_role=self.current_user.get("rol", ""),
+                )
+            except BackupError as exc:
+                QMessageBox.critical(self, "Error en la restauració", str(exc))
+                return
+
             QMessageBox.information(
                 self,
-                "Restauració no disponible",
-                "La restauració integrada només està disponible amb SQLite. "
-                "Amb PostgreSQL cal restaurar amb pg_restore/psql o desde el proveedor gestionado.",
+                "Restauració completada",
+                "La còpia PostgreSQL s'ha restaurat correctament. "
+                "Tanca i torna a obrir l'aplicació abans de continuar treballant.",
             )
+            return
+
+        if engine.url.get_backend_name() != "sqlite":
+            QMessageBox.information(self, "Restauració no disponible", "Aquest motor no és compatible.")
             return
 
         db_location = engine.url.database

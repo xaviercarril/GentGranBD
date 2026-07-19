@@ -106,6 +106,24 @@ En la pantalla inicial solo se introducen los datos de la app:
 
 El usuario/password tecnico de PostgreSQL debe configurarse fuera de la pantalla de login, por ejemplo con `DATABASE_URL` o `GENTGRAN_DATABASE_URL`.
 
+## Copias de seguridad desde la aplicacion
+
+Al conectar con DigitalOcean, un usuario de la aplicacion con rol `ADMIN` puede
+usar `Arxiu > Copia de seguretat de la BD`. La aplicacion crea un archivo
+PostgreSQL en formato custom (`.dump`) usando la conexion activa, incluidas las
+opciones SSL. La accion no aparece para usuarios normales y vuelve a comprobar
+el rol antes de empezar la copia.
+
+Las versiones distribuidas de GentGranBD llevan `pg_dump` y sus librerias
+encapsulados tanto en macOS como en Windows; el usuario final no debe instalar
+nada adicional. La maquina de compilacion es la que debe proporcionar una
+version de las herramientas cliente igual o posterior a la version PostgreSQL
+del cluster.
+El mismo menú permite restaurar un archivo `.dump` en la conexión DigitalOcean
+activa. La restauración elimina y recrea las tablas existentes, por lo que
+requiere una confirmación explícita y conviene cerrar y volver a abrir la
+aplicación al terminar.
+
 En `logs/app-startup.log` debe aparecer:
 
 ```text

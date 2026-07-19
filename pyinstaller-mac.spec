@@ -3,9 +3,18 @@
 
 import os
 import sys
+import importlib.util
 from pathlib import Path
 import subprocess
 from PyInstaller.utils.hooks import collect_dynamic_libs, collect_submodules
+
+_helper_path = Path(SPECPATH) / "scripts" / "pyinstaller_postgresql.py"
+_helper_spec = importlib.util.spec_from_file_location("gentgran_pyinstaller_postgresql", _helper_path)
+if _helper_spec is None or _helper_spec.loader is None:
+    raise RuntimeError(f"Cannot load PostgreSQL packaging helper: {_helper_path}")
+_helper_module = importlib.util.module_from_spec(_helper_spec)
+_helper_spec.loader.exec_module(_helper_module)
+postgresql_binaries = _helper_module.postgresql_binaries
 block_cipher = None
 
 app_script = os.path.join('src', 'ui', 'app.py')
@@ -16,7 +25,7 @@ datas = [
     (os.path.join('src', 'extra'), 'extra'),
 ]
 
-binaries = collect_dynamic_libs('psycopg_binary')
+binaries = collect_dynamic_libs('psycopg_binary') + postgresql_binaries()
 
 hiddenimports = [
     'PySide6.QtCore',

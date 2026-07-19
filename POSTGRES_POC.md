@@ -39,7 +39,7 @@ python src/ui/app.py
 
 ## Limitaciones del POC
 
-- El backup/restore integrado de la UI solo sirve para SQLite. En PostgreSQL se debe usar `pg_dump`, `pg_restore` o backups gestionados.
+- La UI permite a los administradores crear y restaurar copias PostgreSQL `.dump`. Las versiones distribuidas incluyen `pg_dump` y `pg_restore`; las compilaciones requieren que las herramientas cliente estén disponibles.
 - La migración inicial desde SQLite se puede ejecutar con `scripts/migrate_sqlite_to_postgres.py`.
 - La importación masiva desde `LARGO Borrador para bbdd.csv` es un paso separado.
 

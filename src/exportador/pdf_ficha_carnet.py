@@ -13,6 +13,8 @@ from models import Socio
 PAGE_W, PAGE_H = A4
 CUT_MARK = 6 * mm
 CUT_GAP = 1.5 * mm
+SHEET_MARGIN = 12 * mm
+CUT_SIDES = ("left", "right", "bottom", "top")
 
 
 def _draw_cut_guides(
@@ -79,16 +81,16 @@ def generar_hoja_ficha_carnet_socio(
     c = canvas.Canvas(ruta_pdf, pagesize=A4)
     c.setTitle(f"Fitxa i carnet soci {soci.id:06d}")
 
-    ficha_x = 0
-    ficha_y = PAGE_H - FICHA_H
-    carnet_x = PAGE_W - CARD_W
-    carnet_y = 0
+    ficha_x = SHEET_MARGIN
+    ficha_y = PAGE_H - SHEET_MARGIN - FICHA_H
+    carnet_x = PAGE_W - SHEET_MARGIN - CARD_W
+    carnet_y = SHEET_MARGIN
 
     dibujar_ficha_socio(c, soci, ficha_x, ficha_y, logo_path=logo_path)
     dibujar_carnet_socio(c, soci, carnet_x, carnet_y, logo_path=logo_path)
 
-    _draw_cut_guides(c, ficha_x, ficha_y, FICHA_W, FICHA_H, ("right", "bottom"))
-    _draw_cut_guides(c, carnet_x, carnet_y, CARD_W, CARD_H, ("left", "top"))
+    _draw_cut_guides(c, ficha_x, ficha_y, FICHA_W, FICHA_H, CUT_SIDES)
+    _draw_cut_guides(c, carnet_x, carnet_y, CARD_W, CARD_H, CUT_SIDES)
 
     c.showPage()
     c.save()

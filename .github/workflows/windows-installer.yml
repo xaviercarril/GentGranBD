@@ -25,6 +25,20 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
+      - name: Prepare embedded PostgreSQL client
+        shell: pwsh
+        run: |
+          $pgDump = Get-Command pg_dump.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+          if (-not $pgDump) {
+            $pgDump = Get-ChildItem "$env:ProgramFiles\PostgreSQL" -Filter pg_dump.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          }
+          if (-not $pgDump) {
+            choco install postgresql -y --no-progress --params "'/Password:GentGranBuildOnly'"
+            $pgDump = Get-ChildItem "$env:ProgramFiles\PostgreSQL" -Filter pg_dump.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          }
+          if (-not $pgDump) { Write-Error 'pg_dump could not be prepared for embedding'; exit 1 }
+          "GENTGRAN_PG_DUMP=$pgDump" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build Windows app (one-file)
         run: pyinstaller pyinstaller-win.spec --noconfirm
 
