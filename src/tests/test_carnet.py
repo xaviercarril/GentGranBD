@@ -1,5 +1,5 @@
 import os
-from exportador.pdf_carnet import CARD_W, MARGE, _story, _styles, generar_carnet_socio
+from exportador.pdf_carnet import FOTO_H, FOTO_W, _story, _styles, generar_carnet_socio
 from datetime import date
 from models import Socio
 
@@ -22,7 +22,7 @@ def test_generar_carnet(tmp_path, session):
     assert os.stat(outfile).st_size > 0
 
 
-def test_carnet_sin_foto_no_reserva_columna_de_foto():
+def test_carnet_sin_foto_reserva_el_hueco_de_la_foto():
     socio = Socio(
         id=7,
         dniNie="XYZ002",
@@ -35,5 +35,7 @@ def test_carnet_sin_foto_no_reserva_columna_de_foto():
     story = _story(socio, _styles())
     table = story[1]
 
-    assert len(table._colWidths) == 1
-    assert table._colWidths[0] == CARD_W - 2 * MARGE
+    assert len(table._colWidths) == 2
+    foto_placeholder = table._cellvalues[0][0]
+    assert foto_placeholder.width == FOTO_W
+    assert foto_placeholder.height == FOTO_H

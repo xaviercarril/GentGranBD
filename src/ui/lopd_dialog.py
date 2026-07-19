@@ -312,7 +312,7 @@ class LOPDFirmaDialog(QDialog):
         self._qr_label.setStyleSheet(f"border: 1px solid {Palette.BORDER}; border-radius: 6px; background: {Palette.SURFACE_ALT};")
         self._qr_label.hide()
 
-        self._btn_view = QPushButton("Obrir document signat")
+        self._btn_view = QPushButton("Obrir document")
         self._btn_delete = QPushButton("Eliminar document")
         self._btn_config_tablet = QPushButton("Configurar connexió tablet")
         self._btn_copy_link = QPushButton("Copiar enllaç")
@@ -397,11 +397,23 @@ class LOPDFirmaDialog(QDialog):
             self._btn_delete.setEnabled(True)
         else:
             self._status_label.setText("No hi ha cap document signat.")
-            self._btn_view.setEnabled(False)
+            self._btn_view.setEnabled(True)
             self._btn_delete.setEnabled(False)
 
     # ------------------------------------------------------------------
     def _abrir_documento_guardado(self) -> None:
+        info = consultar_firma_LOPD(self._socio_id)
+        if not info or not info.get("tieneDocumento"):
+            try:
+                tmp_path = Path(self._generar_pdf_temporal())
+            except Exception as exc:
+                QMessageBox.warning(self, "Error", f"No s'ha pogut preparar el PDF:\n{exc}")
+                return
+
+            self._temp_view_files.append(tmp_path)
+            self._open_file(tmp_path)
+            return
+
         try:
             data, _fecha = obtener_documento_firma_LOPD(self._socio_id)
         except Exception as exc:

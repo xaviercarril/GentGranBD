@@ -28,6 +28,20 @@ jobs:
           python -m pip install -r requirements.txt
           python -m pip install pyinstaller
 
+      - name: Prepare embedded PostgreSQL client
+        shell: pwsh
+        run: |
+          $pgDump = Get-Command pg_dump.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+          if (-not $pgDump) {
+            $pgDump = Get-ChildItem "$env:ProgramFiles\PostgreSQL" -Filter pg_dump.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          }
+          if (-not $pgDump) {
+            choco install postgresql -y --no-progress --params "'/Password:GentGranBuildOnly'"
+            $pgDump = Get-ChildItem "$env:ProgramFiles\PostgreSQL" -Filter pg_dump.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          }
+          if (-not $pgDump) { Write-Error 'pg_dump could not be prepared for embedding'; exit 1 }
+          "GENTGRAN_PG_DUMP=$pgDump" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Set app version from tag
         shell: pwsh
         run: |
@@ -100,6 +114,11 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install -r requirements.txt
           python3 -m pip install pyinstaller
+
+      - name: Prepare embedded PostgreSQL client
+        run: |
+          brew install libpq
+          echo "GENTGRAN_PG_DUMP=$(brew --prefix libpq)/bin/pg_dump" >> "$GITHUB_ENV"
 
       - name: Set app version from tag
         run: |

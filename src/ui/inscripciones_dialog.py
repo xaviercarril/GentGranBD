@@ -324,9 +324,13 @@ class InscripcionesDialog(QDialog):
         self.btn_afegir_pago.clicked.connect(self._afegir_pagament)
         self.btn_eliminar_pago = QPushButton("Eliminar pagament")
         self.btn_eliminar_pago.clicked.connect(self._eliminar_pagament)
+        self.btn_imprimir_pago = QPushButton("Imprimir donatiu")
+        self.btn_imprimir_pago.clicked.connect(self._imprimir_rebut)
         set_button_variant(self.btn_afegir_pago, "primary")
         set_button_variant(self.btn_eliminar_pago, "danger")
+        set_button_variant(self.btn_imprimir_pago, "secondary")
         self.btn_pagos_layout.addWidget(self.btn_afegir_pago)
+        self.btn_pagos_layout.addWidget(self.btn_imprimir_pago)
         self.btn_pagos_layout.addWidget(self.btn_eliminar_pago)
 
         pagos_layout = QVBoxLayout()
@@ -549,3 +553,28 @@ class InscripcionesDialog(QDialog):
                 self._carregar_pagos(idx_inscripcio)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"No s'ha pogut eliminar el pagament: {e}")
+
+    def _imprimir_rebut(self):
+        idx_inscripcio = self.lista_inscripciones.currentRow()
+        idx_pago = self.pagos_table.currentIndex().row()
+        if idx_inscripcio < 0 or idx_inscripcio >= len(self._inscripcions):
+            QMessageBox.warning(self, "Error", "Selecciona una inscripció primer.")
+            return
+        if idx_pago < 0:
+            QMessageBox.warning(self, "Error", "Selecciona un pagament per imprimir.")
+            return
+
+        inscripcio = self._inscripcions[idx_inscripcio]
+        try:
+            pagos = listar_pagos_por_InscripcionSocio(inscripcio["id"])
+            if idx_pago >= len(pagos):
+                raise ValueError("Pagament seleccionat invàlid.")
+            socio = consultar_socio(self.socio_id)
+            actividad = consultar_actividad(inscripcio["actividadID"])
+            if not socio or not actividad:
+                raise ValueError("No s'han pogut recuperar les dades del donatiu.")
+
+            from ui.rebut_pagament import imprimir_rebut
+            imprimir_rebut(self, pagos[idx_pago], socio, actividad)
+        except Exception as e:
+            QMessageBox.warning(self, "Error d'impressió", f"No s'ha pogut imprimir el donatiu: {e}")

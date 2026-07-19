@@ -85,12 +85,14 @@ def _story(soci, styles):
     ]
 
     if soci.foto:
-        foto_buf = _resize_photo(soci.foto)
-        table_data = [[Image(foto_buf, width=FOTO_W, height=FOTO_H), text_flow]]
-        col_widths = [FOTO_W + 2 * mm, CARD_W - FOTO_W - 3 * MARGE]
+        foto_flow = Image(_resize_photo(soci.foto), width=FOTO_W, height=FOTO_H)
     else:
-        table_data = [[text_flow]]
-        col_widths = [CARD_W - 2 * MARGE]
+        # Conserva el hueco de la foto para que el texto mantenga siempre
+        # la misma posicion, aunque el socio no tenga imagen.
+        foto_flow = Spacer(FOTO_W, FOTO_H)
+
+    table_data = [[foto_flow, text_flow]]
+    col_widths = [FOTO_W + 2 * mm, CARD_W - FOTO_W - 3 * MARGE]
 
     table = Table(table_data, colWidths=col_widths, hAlign="LEFT")
     table.setStyle(TableStyle([
