@@ -2,6 +2,7 @@
 # Build with: pyinstaller pyinstaller.spec
 
 import os
+import sys
 import subprocess
 import importlib.util
 from pathlib import Path
@@ -23,6 +24,14 @@ app_script = os.path.join('src', 'ui', 'app.py')
 
 datas = []
 binaries = collect_dynamic_libs('psycopg_binary') + postgresql_binaries()
+if sys.platform == 'darwin':
+    for libusb_path in (
+        Path('/opt/homebrew/lib/libusb-1.0.dylib'),
+        Path('/usr/local/lib/libusb-1.0.dylib'),
+    ):
+        if libusb_path.exists():
+            binaries.append((str(libusb_path.resolve()), '.'))
+            break
 
 # Minimal hidden imports for PySide6 (avoid pulling entire Qt stack)
 hiddenimports = [

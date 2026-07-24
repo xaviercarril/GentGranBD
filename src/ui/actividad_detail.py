@@ -230,7 +230,9 @@ class ActividadDetailWidget(QWidget):
         enable_table_copy(self.inscrits_table)
         self.inscrits_table.setAlternatingRowColors(True)
         self.inscrits_table.setSortingEnabled(True)
-        self.inscrits_table.setMinimumHeight(300)
+        # Keep the participants table scrollable without forcing the whole
+        # activities view to be taller than the application window.
+        self.inscrits_table.setMinimumHeight(140)
 
         self.inscrits_panel = QWidget()
         self.inscrits_panel.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
