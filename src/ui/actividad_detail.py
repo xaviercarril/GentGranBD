@@ -16,6 +16,7 @@ from controladores.pagos import modificar_pago, registrar_pago
 from controladores.personal import listar_personal
 from controladores.socios import consultar_socio
 from exportador.pdf_inscripciones import generar_pdf_matriculados_actividad
+from inscripcion_columns import COURSE_INSCRIPTION_COLUMNS, TRIP_INSCRIPTION_COLUMNS
 from models import EstadoInscripcion
 from ui.seleccionar_socio_dialog import SeleccionarSocioDialog
 from ui.table_models import DictTableModel
@@ -24,7 +25,13 @@ from ui.theme import Palette, fit_combo_popup_to_contents, set_button_variant
 
 
 class InscripcionesActividadTableModel(QAbstractTableModel):
-    EDITABLE_KEYS = {"fechaInscripcion", "observaciones", "pagat"}
+    EDITABLE_KEYS = {
+        "fechaInscripcion",
+        "observaciones",
+        "pagat",
+        "asiento",
+        "lugarRecogida",
+    }
 
     def __init__(self, rows, headers, inscription_changed_callback, parent=None):
         super().__init__(parent)
@@ -325,23 +332,10 @@ class ActividadDetailWidget(QWidget):
     def _load_inscrits_table(self):
         try:
             inscripciones = listar_inscripciones_detalle_por_Actividad(self._actividadID)
-            headers = [
-                ("ID", "id"),
-                ("Num Soci", "esSocio"),
-                ("Primer Cognom", "apellido1"),
-                ("Segon Cognom", "apellido2"),
-                ("Nom", "nombre"),
-                ("Telf. Movil", "telefonoMovil"),
-            ]
-            if self._tipo_actividad == "VIATGE":
-                headers.append(("DNI", "dniNie"))
-                headers.append(("Pagat", "pagat"))
-            headers.extend(
-                [
-                    ("Data Inscripció", "fechaInscripcion"),
-                    ("Estat", "estado"),
-                    ("Observacions", "observaciones"),
-                ]
+            headers = list(
+                TRIP_INSCRIPTION_COLUMNS
+                if self._tipo_actividad == "VIATGE"
+                else COURSE_INSCRIPTION_COLUMNS
             )
             for inscripcion in inscripciones:
                 inscripcion["estado"] = self._estado_value(inscripcion["estado"])
@@ -545,6 +539,7 @@ class ActividadDetailWidget(QWidget):
         if self._actividadID is None:
             return
 
+        inscripcion_ids = self._current_inscription_ids()
         nombre = re.sub(r"[^A-Za-z0-9._-]+", "_", self.nombre.text()).strip("_") or "activitat"
         try:
             with tempfile.NamedTemporaryFile(
@@ -553,7 +548,11 @@ class ActividadDetailWidget(QWidget):
                 delete=False,
             ) as tmp:
                 ruta = tmp.name
-            generar_pdf_matriculados_actividad(self._actividadID, ruta)
+            generar_pdf_matriculados_actividad(
+                self._actividadID,
+                ruta,
+                inscripcion_ids=inscripcion_ids,
+            )
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(ruta)):
                 QMessageBox.warning(
                     self,
@@ -562,6 +561,14 @@ class ActividadDetailWidget(QWidget):
                 )
         except Exception as e:
             QMessageBox.critical(self, "Error", f"No s'ha pogut generar el PDF:\n{e}")
+
+    def _current_inscription_ids(self):
+        model = self.inscrits_table.model()
+        return [
+            row["id"]
+            for row in getattr(model, "rows", [])
+            if row.get("id") is not None
+        ]
 
     def _exportar_excel(self):
         if self._actividadID is None:

@@ -82,10 +82,13 @@ class ActividadesTab(QWidget):
     set_button_variant(self.btn_eliminar_actividad, "danger")
     self.btn_exportar_activitats = QPushButton("Exportar PDF")
     set_button_icon(self.btn_exportar_activitats, "ui/assets/pdf.svg")
+    self.btn_exportar_excel_cursos = QPushButton("Exportar Excel")
+    set_button_icon(self.btn_exportar_excel_cursos, "ui/assets/excel.svg")
 
     self.btn_nova_actividad.clicked.connect(self._dialog_nova_actividad)
     self.btn_eliminar_actividad.clicked.connect(self._eliminar_actividad)
     self.btn_exportar_activitats.clicked.connect(self._exportar_activitats_pdf)
+    self.btn_exportar_excel_cursos.clicked.connect(self._exportar_activitats_excel)
 
     main_layout = QVBoxLayout(self)
     self.subtabs = QTabWidget()
@@ -104,6 +107,7 @@ class ActividadesTab(QWidget):
     top_buttons.addWidget(self.btn_nova_actividad)
     top_buttons.addWidget(self.btn_eliminar_actividad)
     top_buttons.addWidget(self.btn_exportar_activitats)
+    top_buttons.addWidget(self.btn_exportar_excel_cursos)
     top_buttons.addStretch()
 
     self._content_widget = QWidget()
@@ -336,6 +340,31 @@ class ActividadesTab(QWidget):
     except Exception as e:
       QMessageBox.critical(self, "Error", f"No s'ha pogut generar el PDF:\n{e}")
 
+  def _exportar_activitats_excel(self):
+    if self._tipo_actual != "CURS":
+      return
+
+    from exportador.excel_actividades import generar_excel_actividades_curso
+
+    curso_nombre = self._curso_selector.currentText()
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", curso_nombre).strip("_") or "cursos"
+    try:
+      with tempfile.NamedTemporaryFile(
+        prefix=f"cursos-{safe_name}-",
+        suffix=".xlsx",
+        delete=False,
+      ) as tmp:
+        ruta = tmp.name
+      generar_excel_actividades_curso(curso_nombre, self._current_export_rows, ruta)
+      if not QDesktopServices.openUrl(QUrl.fromLocalFile(ruta)):
+        QMessageBox.warning(
+          self,
+          "Avís",
+          f"No s'ha pogut obrir l'Excel del sistema.\nFitxer temporal: {ruta}",
+        )
+    except Exception as e:
+      QMessageBox.critical(self, "Error", f"No s'ha pogut generar l'Excel:\n{e}")
+
   def _actualizar_cursos(self):
     self._curso_selector.blockSignals(True)
     curso_actual = self._curso_selector.currentData()
@@ -376,6 +405,7 @@ class ActividadesTab(QWidget):
     target_tab.layout().addWidget(self._content_widget)
     self.btn_nova_actividad.setText("Nou Viatge" if is_viatge else "Nou Curs")
     self.btn_eliminar_actividad.setText("Eliminar Viatge" if is_viatge else "Eliminar Curs")
+    self.btn_exportar_excel_cursos.setVisible(not is_viatge)
     self._search_box.setPlaceholderText("Cerca viatges..." if is_viatge else "Cerca cursos...")
     self.detail_actividad.set_tipo_actividad(self._tipo_actual)
     self.detail_actividad.load(None)

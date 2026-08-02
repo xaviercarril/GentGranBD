@@ -13,6 +13,8 @@ from uuid import uuid4
 
 from sqlalchemy.engine import Engine, URL
 
+_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+
 
 class BackupError(RuntimeError):
     """Raised when a database backup cannot be completed."""
@@ -20,6 +22,10 @@ class BackupError(RuntimeError):
 
 class BackupPermissionError(BackupError):
     """Raised when a non-administrator requests a backup."""
+
+
+def _is_windows() -> bool:
+    return os.name == "nt"
 
 
 def backup_extension(engine: Engine) -> str:
@@ -159,12 +165,27 @@ def _postgres_environment(url: URL) -> dict[str, str]:
     return environment
 
 
+def _postgres_tool_environment(url: URL, tool: str) -> dict[str, str]:
+    environment = _postgres_environment(url)
+    if _is_windows():
+        # pg_dump's DLLs are embedded beside the executable. Explicitly put
+        # that directory first so transitive DLL loads do not resolve against
+        # another PostgreSQL installation (or fail on machines without one).
+        tool_directory = str(Path(tool).resolve().parent)
+        current_path = environment.get("PATH", "")
+        environment["PATH"] = (
+            tool_directory + (os.pathsep + current_path if current_path else "")
+        )
+    return environment
+
+
 def _backup_postgresql(url: URL, temporary_path: Path) -> None:
     if not url.host or not url.database:
         raise BackupError("La connexió PostgreSQL no indica el servidor o la base de dades.")
 
+    pg_dump = _find_pg_dump()
     command = [
-        _find_pg_dump(),
+        pg_dump,
         "--format=custom",
         "--no-password",
         "--file",
@@ -180,17 +201,29 @@ def _backup_postgresql(url: URL, temporary_path: Path) -> None:
         command.extend(["--username", url.username])
 
     run_options = {
-        "env": _postgres_environment(url),
+        "env": _postgres_tool_environment(url, pg_dump),
         "capture_output": True,
         "text": True,
+        "errors": "replace",
         "check": False,
     }
-    if os.name == "nt":
-        run_options["creationflags"] = subprocess.CREATE_NO_WINDOW
+    if _is_windows():
+        run_options["creationflags"] = _CREATE_NO_WINDOW
 
-    result = subprocess.run(command, **run_options)
+    try:
+        result = subprocess.run(command, **run_options)
+    except OSError as exc:
+        raise BackupError(
+            "Windows no ha pogut iniciar pg_dump. Torna a instal·lar l'última "
+            f"versió de GentGranBD.\nDetall: {exc}"
+        ) from exc
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "Error desconegut de pg_dump").strip()
+        if "server version:" in detail and "pg_dump version:" in detail:
+            detail += (
+                "\nLa versió de pg_dump inclosa és més antiga que el servidor. "
+                "Actualitza GentGranBD a l'última versió."
+            )
         raise BackupError(f"pg_dump no ha pogut crear la còpia:\n{detail}")
     if not temporary_path.is_file() or temporary_path.stat().st_size == 0:
         raise BackupError("pg_dump ha finalitzat sense crear un arxiu de còpia vàlid.")
@@ -243,8 +276,8 @@ def _restore_postgresql(url: URL, source_path: Path) -> None:
         "text": True,
         "check": False,
     }
-    if os.name == "nt":
-        run_options["creationflags"] = subprocess.CREATE_NO_WINDOW
+    if _is_windows():
+        run_options["creationflags"] = _CREATE_NO_WINDOW
     result = subprocess.run(command, **run_options)
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "Error desconegut de pg_restore").strip()

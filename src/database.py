@@ -337,6 +337,10 @@ def ensure_schema_updates() -> None:
         statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioEmail" VARCHAR(100)')
     if "inscripciones" in table_names and "noSocioObservaciones" not in inscripcion_columns:
         statements.append('ALTER TABLE inscripciones ADD COLUMN "noSocioObservaciones" TEXT')
+    if "inscripciones" in table_names and "asiento" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN asiento VARCHAR(20)')
+    if "inscripciones" in table_names and "lugarRecogida" not in inscripcion_columns:
+        statements.append('ALTER TABLE inscripciones ADD COLUMN "lugarRecogida" VARCHAR(255)')
     if "actividades" in table_names and "tipo" not in actividad_columns:
         statements.append("ALTER TABLE actividades ADD COLUMN tipo VARCHAR(6) NOT NULL DEFAULT 'CURS'")
     rebuild_pagos_sqlite = (
@@ -378,7 +382,15 @@ def ensure_schema_updates() -> None:
             for statement in statements:
                 conn.execute(text(statement))
             if "actividades" in table_names:
-                conn.execute(text("UPDATE actividades SET tipo = 'CURS' WHERE tipo IS NULL OR tipo = ''"))
+                # PostgreSQL tries to coerce '' to the native enum before it can
+                # evaluate the OR. Comparing the textual representation keeps
+                # this backfill valid for both native enums and legacy VARCHARs.
+                conn.execute(
+                    text(
+                        "UPDATE actividades SET tipo = 'CURS' "
+                        "WHERE tipo IS NULL OR CAST(tipo AS TEXT) = ''"
+                    )
+                )
             if (
                 "matricula_pagos" in table_names
                 and "inscripcionID" not in pago_columns

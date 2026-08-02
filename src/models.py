@@ -238,6 +238,8 @@ class InscripcionSocio(Base):
     noSocioTelefono = Column(String(50))
     noSocioEmail = Column(String(100))
     noSocioObservaciones = Column(Text)
+    asiento = Column(String(20))
+    lugarRecogida = Column(String(255))
 
     fechaInscripcion = Column(Date, nullable=False)
     fechaBaja = Column(Date)

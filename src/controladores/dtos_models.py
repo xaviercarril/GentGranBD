@@ -85,6 +85,8 @@ class InscripcionSocioDTO(BaseModel):
     noSocioTelefono: str | None = None
     noSocioEmail: str | None = None
     noSocioObservaciones: str | None = None
+    asiento: str | None = None
+    lugarRecogida: str | None = None
     fechaInscripcion: date
     estado: EstadoInscripcion = EstadoInscripcion.RESERVA
     observaciones: str | None = None
@@ -100,6 +102,8 @@ class InscripcionSocioUpdateDTO(BaseModel):
     noSocioTelefono: str | None = None
     noSocioEmail: str | None = None
     noSocioObservaciones: str | None = None
+    asiento: str | None = None
+    lugarRecogida: str | None = None
     fechaInscripcion: date | None = None
     estado: EstadoInscripcion | None = None
     observaciones: str | None = None

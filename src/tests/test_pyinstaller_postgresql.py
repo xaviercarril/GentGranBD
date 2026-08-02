@@ -1,6 +1,8 @@
 from pathlib import Path
+from types import SimpleNamespace
 
-from scripts.pyinstaller_postgresql import _binary_entries
+from scripts import pyinstaller_postgresql
+from scripts.pyinstaller_postgresql import _binary_entries, _pg_dump_version
 
 
 def test_windows_bundle_includes_pg_dump_and_runtime_dlls(tmp_path):
@@ -37,3 +39,30 @@ def test_macos_bundle_only_declares_pg_dump_and_pyinstaller_collects_dylibs(tmp_
         (str(pg_restore), "postgresql/bin"),
         (str(psql), "postgresql/bin"),
     ]
+
+
+def test_pg_dump_versions_are_compared_numerically(monkeypatch, tmp_path):
+    old_client = tmp_path / "PostgreSQL" / "9.6" / "bin" / "pg_dump.exe"
+    new_client = tmp_path / "PostgreSQL" / "18" / "bin" / "pg_dump.exe"
+    old_client.parent.mkdir(parents=True)
+    new_client.parent.mkdir(parents=True)
+    old_client.write_bytes(b"exe")
+    new_client.write_bytes(b"exe")
+
+    def fake_run(command, **options):
+        version = "9.6.24" if command[0] == str(old_client) else "18.1"
+        return SimpleNamespace(returncode=0, stdout=f"pg_dump (PostgreSQL) {version}", stderr="")
+
+    monkeypatch.setattr(pyinstaller_postgresql.subprocess, "run", fake_run)
+
+    assert _pg_dump_version(new_client) > _pg_dump_version(old_client)
+
+
+def test_windows_bundle_includes_uppercase_dll_extension(tmp_path):
+    tools = [tmp_path / name for name in ("pg_dump.exe", "pg_restore.exe", "psql.exe")]
+    for tool in tools:
+        tool.write_bytes(b"exe")
+    uppercase_dll = tmp_path / "LIBPQ.DLL"
+    uppercase_dll.write_bytes(b"dll")
+
+    assert (str(uppercase_dll), "postgresql/bin") in _binary_entries(tools, windows=True)

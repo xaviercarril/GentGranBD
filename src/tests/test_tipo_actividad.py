@@ -79,3 +79,30 @@ def test_ensure_schema_updates_rellena_tipo_en_actividades_legacy(monkeypatch):
         tipo = conn.execute(text("SELECT tipo FROM actividades WHERE id = 1")).scalar_one()
 
     assert tipo == "CURS"
+
+
+def test_ensure_schema_updates_rellena_tipo_vacio_en_columna_legacy(monkeypatch):
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE socios (id INTEGER PRIMARY KEY)"))
+        conn.execute(
+            text(
+                "CREATE TABLE actividades ("
+                "id INTEGER PRIMARY KEY, nombre VARCHAR(100) NOT NULL, tipo VARCHAR(6)"
+                ")"
+            )
+        )
+        conn.execute(
+            text(
+                "INSERT INTO actividades (id, nombre, tipo) "
+                "VALUES (1, 'Legacy', '')"
+            )
+        )
+
+    monkeypatch.setattr("database.engine", engine)
+    ensure_schema_updates()
+
+    with engine.connect() as conn:
+        tipo = conn.execute(text("SELECT tipo FROM actividades WHERE id = 1")).scalar_one()
+
+    assert tipo == "CURS"

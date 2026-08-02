@@ -107,16 +107,17 @@ def _worksheet_xml(title: str, headers: list[str], rows: list[list]) -> str:
                 cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{_xml_text(value)}</t></is></c>')
         sheet_rows.append(f'<row r="{row_idx}">{"".join(cells)}</row>')
 
-    widths = [18, 18, 18, 14, 10, 16, 16, 12, 10, 16, 10, 34]
+    widths = [18, 18, 18, 14, 10, 16, 16, 12, 10, 12, 28, 16, 10, 34]
     cols = "".join(
         f'<col min="{idx}" max="{idx}" width="{width}" customWidth="1"/>'
         for idx, width in enumerate(widths, start=1)
     )
     max_row = max(3, len(rows) + 3)
+    last_column = _COLS[len(headers) - 1]
     return f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
- <dimension ref="A1:L{max_row}"/>
+ <dimension ref="A1:{last_column}{max_row}"/>
  <sheetViews>
   <sheetView workbookViewId="0">
    <pane ySplit="3" topLeftCell="A4" activePane="bottomLeft" state="frozen"/>
@@ -125,8 +126,8 @@ def _worksheet_xml(title: str, headers: list[str], rows: list[list]) -> str:
  </sheetViews>
  <cols>{cols}</cols>
  <sheetData>{''.join(sheet_rows)}</sheetData>
- <autoFilter ref="A3:L{max_row}"/>
- <mergeCells count="1"><mergeCell ref="A1:L1"/></mergeCells>
+ <autoFilter ref="A3:{last_column}{max_row}"/>
+ <mergeCells count="1"><mergeCell ref="A1:{last_column}1"/></mergeCells>
 </worksheet>"""
 
 
@@ -234,6 +235,8 @@ def generar_excel_participantes_viaje_session(session: Session, actividadID: int
         "Data inscripció",
         "Estat",
         "Pagat",
+        "Seient",
+        "Lloc de recollida",
         "Data pagament",
         "Import",
         "Observacions",
@@ -253,6 +256,8 @@ def generar_excel_participantes_viaje_session(session: Session, actividadID: int
                 _fmt_date(inscripcion.fechaInscripcion),
                 _estado_value(inscripcion.estado),
                 _pagat_text(pago),
+                inscripcion.asiento or "",
+                inscripcion.lugarRecogida or "",
                 _fmt_date(pago.fecha) if pago else "",
                 float(pago.importe) if pago else "",
                 inscripcion.observaciones

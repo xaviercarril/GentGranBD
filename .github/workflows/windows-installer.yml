@@ -28,15 +28,37 @@ jobs:
       - name: Prepare embedded PostgreSQL client
         shell: pwsh
         run: |
-          $pgDump = Get-Command pg_dump.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
-          if (-not $pgDump) {
-            $pgDump = Get-ChildItem "$env:ProgramFiles\PostgreSQL" -Filter pg_dump.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+          function Find-NewestPgDump {
+            $candidates = @()
+            foreach ($root in @("$env:ProgramFiles\PostgreSQL", "${env:ProgramFiles(x86)}\PostgreSQL")) {
+              if (Test-Path $root) {
+                $candidates += Get-ChildItem $root -Filter pg_dump.exe -Recurse -File -ErrorAction SilentlyContinue
+              }
+            }
+            $fromPath = Get-Command pg_dump.exe -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -First 1
+            if ($fromPath) { $candidates += Get-Item $fromPath }
+
+            $usable = foreach ($candidate in $candidates | Sort-Object FullName -Unique) {
+              $bin = $candidate.DirectoryName
+              if (-not (Test-Path (Join-Path $bin 'pg_restore.exe')) -or
+                  -not (Test-Path (Join-Path $bin 'psql.exe')) -or
+                  -not (Test-Path (Join-Path $bin 'libpq.dll'))) { continue }
+              $versionText = & $candidate.FullName --version 2>$null
+              $match = [regex]::Match("$versionText", '\d+(?:\.\d+){0,3}')
+              if ($LASTEXITCODE -eq 0 -and $match.Success) {
+                [pscustomobject]@{ Path = $candidate.FullName; Version = [version]$match.Value }
+              }
+            }
+            $usable | Sort-Object Version -Descending | Select-Object -ExpandProperty Path -First 1
           }
+
+          $pgDump = Find-NewestPgDump
           if (-not $pgDump) {
             choco install postgresql -y --no-progress --params "'/Password:GentGranBuildOnly'"
-            $pgDump = Get-ChildItem "$env:ProgramFiles\PostgreSQL" -Filter pg_dump.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName -First 1
+            $pgDump = Find-NewestPgDump
           }
           if (-not $pgDump) { Write-Error 'pg_dump could not be prepared for embedding'; exit 1 }
+          Write-Host "Embedding $(& $pgDump --version) from $pgDump"
           "GENTGRAN_PG_DUMP=$pgDump" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build Windows app (one-file)

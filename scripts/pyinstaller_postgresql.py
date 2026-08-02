@@ -3,9 +3,39 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
+
+
+def _pg_dump_version(path: Path) -> tuple[int, ...]:
+    """Return the client version, keeping unusable executables at the end."""
+    try:
+        result = subprocess.run(
+            [str(path), "--version"],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            check=False,
+        )
+    except OSError:
+        return ()
+    if result.returncode != 0:
+        return ()
+    match = re.search(r"\b(\d+(?:\.\d+){0,3})\b", result.stdout or result.stderr)
+    return tuple(int(part) for part in match.group(1).split(".")) if match else ()
+
+
+def _is_complete_windows_client(pg_dump: Path) -> bool:
+    if os.name != "nt":
+        return True
+    directory = pg_dump.parent
+    return all(
+        (directory / name).is_file()
+        for name in ("pg_restore.exe", "psql.exe", "libpq.dll")
+    )
 
 
 def _pg_dump_candidates() -> list[Path]:
@@ -15,10 +45,6 @@ def _pg_dump_candidates() -> list[Path]:
     configured = os.getenv("GENTGRAN_PG_DUMP", "").strip()
     if configured:
         candidates.append(Path(configured))
-
-    discovered = shutil.which(executable_name)
-    if discovered:
-        candidates.append(Path(discovered))
 
     if sys.platform == "darwin":
         candidates.extend(
@@ -32,18 +58,25 @@ def _pg_dump_candidates() -> list[Path]:
             )
         )
     elif os.name == "nt":
+        installed: list[Path] = []
         for variable in ("ProgramFiles", "ProgramFiles(x86)"):
             root = os.getenv(variable)
             if not root:
                 continue
             postgresql_root = Path(root) / "PostgreSQL"
             if postgresql_root.is_dir():
-                candidates.extend(
-                    sorted(
-                        postgresql_root.glob("*/bin/pg_dump.exe"),
-                        reverse=True,
-                    )
-                )
+                installed.extend(postgresql_root.glob("*/bin/pg_dump.exe"))
+
+        # pg_dump refuses to dump a server from a newer major release. Prefer
+        # the newest installed client; lexicographical path sorting gets e.g.
+        # PostgreSQL 9.6 and 18 in the wrong order.
+        candidates.extend(
+            sorted(installed, key=lambda path: _pg_dump_version(path), reverse=True)
+        )
+
+    discovered = shutil.which(executable_name)
+    if discovered:
+        candidates.append(Path(discovered))
     return candidates
 
 
@@ -53,13 +86,25 @@ def _binary_entries(tools: list[Path], *, windows: bool) -> list[tuple[str, str]
         # PostgreSQL's Windows distribution keeps the runtime DLL dependency
         # set beside pg_dump.exe. Embedding all of them avoids relying on a
         # PostgreSQL installation on the end user's computer.
-        entries.extend((str(path), "postgresql/bin") for path in tools[0].parent.glob("*.dll"))
+        dlls = (
+            path
+            for path in tools[0].parent.iterdir()
+            if path.is_file() and path.suffix.lower() == ".dll"
+        )
+        entries.extend((str(path), "postgresql/bin") for path in dlls)
     return entries
 
 
 def postgresql_binaries() -> list[tuple[str, str]]:
     """Return PyInstaller entries for embedded PostgreSQL backup tools."""
-    pg_dump = next((path for path in _pg_dump_candidates() if path.is_file()), None)
+    pg_dump = next(
+        (
+            path
+            for path in _pg_dump_candidates()
+            if path.is_file() and _is_complete_windows_client(path)
+        ),
+        None,
+    )
     if pg_dump is None:
         raise SystemExit(
             "Cannot build GentGranBD: pg_dump was not found. Install libpq/PostgreSQL "

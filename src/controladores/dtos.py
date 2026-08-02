@@ -59,6 +59,8 @@ def inscripcion_to_dto(inscripcion: InscripcionSocio) -> InscripcionSocioDTO:
         noSocioTelefono=normalize_phone(inscripcion.noSocioTelefono),
         noSocioEmail=inscripcion.noSocioEmail,
         noSocioObservaciones=inscripcion.noSocioObservaciones,
+        asiento=inscripcion.asiento,
+        lugarRecogida=inscripcion.lugarRecogida,
         fechaInscripcion=inscripcion.fechaInscripcion,
         estado=inscripcion.estado,
         observaciones=inscripcion.observaciones,
