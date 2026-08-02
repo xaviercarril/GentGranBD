@@ -181,9 +181,9 @@ def test_excel_del_viaje_incluye_asiento_y_lugar_de_recogida(session, tmp_path):
 
     ws = load_workbook(output)["Participants"]
     headers = [cell.value for cell in ws[3]]
-    assert headers[8:10] == ["Seient", "Lloc de recollida"]
-    assert ws["I4"].value == "5B"
-    assert ws["J4"].value == "Estació"
+    assert headers[9:11] == ["Seient", "Lloc de recollida"]
+    assert ws["J4"].value == "5B"
+    assert ws["K4"].value == "Estació"
 
 
 def test_pdf_del_viaje_incluye_asiento_y_lugar_de_recogida():
