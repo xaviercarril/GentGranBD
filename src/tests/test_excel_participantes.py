@@ -77,9 +77,12 @@ def test_generar_excel_participantes_viaje_incluye_no_socios_y_pagat(session, tm
     ws = wb["Participants"]
     assert ws["A1"].value == "Participants - Viatge Tarragona"
     assert ws["D3"].value == "DNI"
-    assert ws["H5"].value == "Sí"
+    assert ws["I5"].value == "Sí"
     assert ws["D5"].value == "Y999"
     assert "Soci" not in [cell.value for cell in ws[3]]
+    assert ws["E3"].value == "Num soci"
+    assert ws["E4"].value == str(socio.id)
+    assert ws["E5"].value == "-"
 
 
 def test_generar_excel_inscritos_curso_incluye_socios_y_no_socios(session, tmp_path):
