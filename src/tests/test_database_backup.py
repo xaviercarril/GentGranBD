@@ -1,3 +1,4 @@
+import os
 import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
@@ -95,6 +96,48 @@ def test_failed_postgresql_backup_leaves_no_output(tmp_path, monkeypatch):
 
     assert not target.exists()
     assert not list(tmp_path.glob("*.part"))
+
+
+def test_postgresql_backup_explains_client_server_version_mismatch(tmp_path, monkeypatch):
+    engine = create_engine("postgresql+psycopg://user:secret@db.example/gentgran")
+    monkeypatch.setattr(database_backup, "_find_pg_dump", lambda: "/fake/pg_dump")
+    monkeypatch.setattr(
+        database_backup.subprocess,
+        "run",
+        lambda *args, **kwargs: SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr=(
+                "pg_dump: error: server version: 18.1; "
+                "pg_dump version: 16.4\npg_dump: error: aborting because of server version mismatch"
+            ),
+        ),
+    )
+
+    with pytest.raises(BackupError, match="Actualitza GentGranBD"):
+        create_database_backup(engine, tmp_path / "failed.dump", user_role="ADMIN")
+
+
+def test_windows_pg_dump_prefers_its_embedded_dll_directory(tmp_path, monkeypatch):
+    engine = create_engine("postgresql+psycopg://user:secret@db.example/gentgran")
+    pg_dump = tmp_path / "postgresql" / "bin" / "pg_dump.exe"
+    pg_dump.parent.mkdir(parents=True)
+    pg_dump.write_bytes(b"exe")
+    monkeypatch.setattr(database_backup, "_find_pg_dump", lambda: str(pg_dump))
+    monkeypatch.setattr(database_backup, "_is_windows", lambda: True)
+    monkeypatch.setenv("PATH", "C:\\Windows\\System32")
+    captured = {}
+
+    def fake_run(command, **options):
+        captured.update(options)
+        Path(command[command.index("--file") + 1]).write_bytes(b"PGDMP-test")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(database_backup.subprocess, "run", fake_run)
+    create_database_backup(engine, tmp_path / "copy.dump", user_role="ADMIN")
+
+    assert captured["env"]["PATH"].split(os.pathsep, 1)[0] == str(pg_dump.parent)
+    assert captured["creationflags"] == database_backup._CREATE_NO_WINDOW
 
 
 def test_backup_extensions():

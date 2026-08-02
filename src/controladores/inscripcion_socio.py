@@ -25,6 +25,8 @@ def registrar_inscripcion(data: dict) -> int:
         noSocioTelefono=dto.noSocioTelefono,
         noSocioEmail=dto.noSocioEmail,
         noSocioObservaciones=dto.noSocioObservaciones,
+        asiento=dto.asiento,
+        lugarRecogida=dto.lugarRecogida,
         fechaInscripcion=dto.fechaInscripcion,
         estado=dto.estado,
         observaciones=dto.observaciones,

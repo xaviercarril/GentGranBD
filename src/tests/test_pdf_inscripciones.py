@@ -1,6 +1,14 @@
 from datetime import date
 
-from exportador.pdf_inscripciones import _build_table, _pago_text, _ultimo_pago, generar_pdf_inscripciones
+from exportador.pdf_inscripciones import (
+    COURSE_HEADERS,
+    TRIP_HEADERS,
+    _build_table,
+    _ordered_inscripciones,
+    _pago_text,
+    _ultimo_pago,
+    generar_pdf_inscripciones,
+)
 from models import (
     Actividad,
     CursoAcademico,
@@ -86,8 +94,40 @@ def test_generar_pdf_inscripciones(session, tmp_path):
     assert output_file.stat().st_size > 0
 
 
-def test_tabla_pdf_viatge_incluye_dni():
+def test_tabla_pdf_curso_coincide_con_campos_visibles():
     socio = Socio(
+        dniNie="X1234567A",
+        nombre="Anna",
+        apellido1="Garcia",
+        apellido2="Serra",
+        telefonoMovil="600111222",
+        fechaAlta=date.today(),
+    )
+    inscripcion = InscripcionSocio(
+        socio=socio,
+        fechaInscripcion=date.today(),
+        estado=EstadoInscripcion.INSCRIT,
+        observaciones="Prefereix primera fila",
+    )
+
+    table = _build_table([inscripcion], include_dni=False)
+
+    assert [cell.getPlainText() for cell in table._cellvalues[0]] == COURSE_HEADERS
+    assert [cell.getPlainText() for cell in table._cellvalues[1]] == [
+        "-",
+        "Garcia",
+        "Serra",
+        "Anna",
+        "600111222",
+        date.today().strftime("%d/%m/%Y"),
+        "INSCRIT",
+        "Prefereix primera fila",
+    ]
+
+
+def test_tabla_pdf_viatge_añade_dni_y_pagat():
+    socio = Socio(
+        id=42,
         dniNie="X1234567A",
         nombre="Anna",
         apellido1="Garcia",
@@ -95,14 +135,28 @@ def test_tabla_pdf_viatge_incluye_dni():
     )
     inscripcion = InscripcionSocio(
         socio=socio,
+        socioID=42,
         fechaInscripcion=date.today(),
         estado=EstadoInscripcion.INSCRIT,
     )
 
-    table = _build_table([inscripcion], row_count=1, numbered=True, include_dni=True)
+    table = _build_table([inscripcion], include_dni=True)
 
-    assert "DNI" in table._cellvalues[0]
-    assert "X1234567A" in table._cellvalues[1]
+    assert [cell.getPlainText() for cell in table._cellvalues[0]] == TRIP_HEADERS
+    assert [cell.getPlainText() for cell in table._cellvalues[1]][5:7] == ["X1234567A", "No"]
+
+
+def test_pdf_respeta_el_orden_de_inscripciones_recibido():
+    actividad = Actividad(nombre="Gimnàstica")
+    actividad.inscripciones = [
+        InscripcionSocio(id=1, fechaInscripcion=date(2026, 1, 1), estado=EstadoInscripcion.INSCRIT),
+        InscripcionSocio(id=2, fechaInscripcion=date(2026, 1, 2), estado=EstadoInscripcion.INSCRIT),
+        InscripcionSocio(id=3, fechaInscripcion=date(2026, 1, 3), estado=EstadoInscripcion.INSCRIT),
+    ]
+
+    ordenadas = _ordered_inscripciones(actividad, [3, 1, 2])
+
+    assert [inscripcion.id for inscripcion in ordenadas] == [3, 1, 2]
 
 
 def test_pdf_usa_pago_por_inscripcion_en_persona_no_socia(session):
