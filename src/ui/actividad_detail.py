@@ -6,14 +6,20 @@ from PySide6.QtCore import QAbstractTableModel, QModelIndex, QTimer, Qt, Signal
 from PySide6.QtGui import QColor, QDesktopServices, QIcon, QPixmap
 from PySide6.QtCore import QUrl
 from PySide6.QtWidgets import (
-    QWidget, QFormLayout, QLineEdit, QSpinBox, QMessageBox, QVBoxLayout,
+    QWidget, QAbstractItemView, QDialog, QDialogButtonBox, QFormLayout, QFrame, QHeaderView, QLineEdit, QSpinBox, QMessageBox, QVBoxLayout,
     QTextEdit, QComboBox, QDoubleSpinBox, QTableView, QLabel, QPushButton,
-    QHBoxLayout, QSizePolicy, QStyledItemDelegate
+    QHBoxLayout, QSizePolicy, QStyledItemDelegate, QTableWidget, QTableWidgetItem
 )
 from controladores.actividades import consultar_actividad, modificar_actividad, listar_inscripciones_detalle_por_Actividad, actualizar_estados_inscripciones
 from controladores.inscripcion_socio import eliminar_inscripcion, modificar_inscripcion, registrar_inscripcion
 from controladores.pagos import modificar_pago, registrar_pago
 from controladores.personal import listar_personal
+from controladores.punto_recogida import (
+    consultar_puntos_recogida,
+    eliminar_punto_recogida,
+    modificar_punto_recogida,
+    registrar_punto_recogida,
+)
 from controladores.socios import consultar_socio
 from exportador.pdf_inscripciones import generar_pdf_matriculados_actividad
 from inscripcion_columns import COURSE_INSCRIPTION_COLUMNS, TRIP_INSCRIPTION_COLUMNS
@@ -90,7 +96,7 @@ class InscripcionesActividadTableModel(QAbstractTableModel):
             elif key == "pagat":
                 new_value = self._parse_pagat(value)
             else:
-                text = str(value).strip()
+                text = str(value).strip() if value is not None else ""
                 new_value = text or None
             self._inscription_changed_callback(inscripcion["id"], key, new_value)
             inscripcion[key] = new_value
@@ -147,20 +153,294 @@ class PagatDelegate(QStyledItemDelegate):
         model.setData(index, editor.currentText(), Qt.EditRole)
 
 
-class ActividadDetailWidget(QWidget):
-    saved = Signal()
+class PuntoRecogidaDelegate(QStyledItemDelegate):
+    """Shows the saved pickup points when editing a trip participant."""
+
+    OTROS = "Altres (Observacions)"
+
+    def __init__(self, nombres, parent=None):
+        super().__init__(parent)
+        self.nombres = list(nombres)
+
+    def createEditor(self, parent, option, index):
+        combo = QComboBox(parent)
+        combo.addItem("Sense assignar", None)
+        combo.addItem(self.OTROS, self.OTROS)
+        for nombre in self.nombres:
+            if nombre == self.OTROS:
+                continue
+            combo.addItem(nombre, nombre)
+        fit_combo_popup_to_contents(combo)
+        return combo
+
+    def setEditorData(self, editor, index):
+        value = str(index.model().data(index, Qt.EditRole) or "").strip()
+        pos = editor.findData(value or None)
+        if pos < 0 and value:
+            editor.addItem(value, value)
+            pos = editor.count() - 1
+        editor.setCurrentIndex(max(0, pos))
+
+    def setModelData(self, editor, model, index):
+        model.setData(index, editor.currentData(), Qt.EditRole)
+
+
+class PuntosRecogidaDialog(QDialog):
+    """Inline, auto-saving editor for the pickup-point catalog."""
+
+    changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._loading = False
+        self.setWindowTitle("Llocs de recollida")
+        self.resize(700, 430)
+        self.setMinimumSize(600, 360)
+
+        self.table = QTableWidget(0, 2, self)
+        self.table.setObjectName("pickupList")
+        self.table.verticalHeader().hide()
+        self.table.setHorizontalHeaderLabels(["Nom", "Adreça / indicacions"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.setSelectionBehavior(QTableWidget.SelectItems)
+        self.table.setSelectionMode(QTableWidget.SingleSelection)
+        self.table.setEditTriggers(
+            QAbstractItemView.CurrentChanged
+            | QAbstractItemView.SelectedClicked
+            | QAbstractItemView.DoubleClicked
+            | QAbstractItemView.EditKeyPressed
+        )
+        self.table.setShowGrid(False)
+        self.table.setFocusPolicy(Qt.StrongFocus)
+        self.table.setToolTip("Fes clic en una cel·la per editar-la. Els canvis es guarden automàticament.")
+
+        self.btn_nuevo = QPushButton("+")
+        self.btn_nuevo.setObjectName("pickupAdd")
+        self.btn_nuevo.setToolTip("Afegir un lloc de recollida")
+        self.btn_eliminar = QPushButton("−")
+        self.btn_eliminar.setObjectName("pickupRemove")
+        self.btn_eliminar.setToolTip("Eliminar el lloc seleccionat")
+        self.btn_eliminar.setEnabled(False)
+        save_state = QLabel("Guardat automàtic")
+        save_state.setObjectName("pickupSaveState")
+
+        toolbar = QFrame()
+        toolbar.setObjectName("pickupToolbar")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(0, 0, 0, 0)
+        toolbar_layout.setSpacing(0)
+        toolbar_layout.addWidget(self.btn_nuevo)
+        toolbar_layout.addWidget(self.btn_eliminar)
+        toolbar_layout.addStretch()
+        toolbar_layout.addWidget(save_state)
+
+        list_panel = QFrame()
+        list_panel.setObjectName("pickupListPanel")
+        list_layout = QVBoxLayout(list_panel)
+        list_layout.setContentsMargins(0, 0, 0, 0)
+        list_layout.setSpacing(0)
+        list_layout.addWidget(self.table, 1)
+        list_layout.addWidget(toolbar)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.button(QDialogButtonBox.Close).setText("Tancar")
+        set_button_variant(buttons.button(QDialogButtonBox.Close), "secondary")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 18, 20, 18)
+        layout.setSpacing(12)
+        title = QLabel("Llocs de recollida")
+        title.setStyleSheet("font-size: 20px; font-weight: 700;")
+        subtitle = QLabel("Edita directament la llista. Prem + per afegir un lloc nou.")
+        subtitle.setProperty("role", "muted")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+        layout.addWidget(list_panel, 1)
+        layout.addWidget(buttons)
+
+        self.setStyleSheet(
+            f"""
+            QFrame#pickupListPanel {{
+                background: {Palette.SURFACE};
+                border: 1px solid {Palette.BORDER};
+                border-radius: 9px;
+            }}
+            QTableWidget#pickupList {{
+                background: transparent;
+                border: none;
+                border-top-left-radius: 9px;
+                border-top-right-radius: 9px;
+                outline: 0;
+                gridline-color: transparent;
+            }}
+            QTableWidget#pickupList::item {{
+                padding: 8px 10px;
+                border-bottom: 1px solid {Palette.BORDER};
+            }}
+            QTableWidget#pickupList::item:selected {{
+                background: {Palette.PRIMARY};
+                color: white;
+            }}
+            QFrame#pickupToolbar {{
+                background: #edf2e7;
+                border: none;
+                border-top: 1px solid {Palette.BORDER};
+                border-bottom-left-radius: 9px;
+                border-bottom-right-radius: 9px;
+            }}
+            QPushButton#pickupAdd, QPushButton#pickupRemove {{
+                background: transparent;
+                color: {Palette.TEXT_MUTED};
+                border: none;
+                border-right: 1px solid {Palette.BORDER};
+                border-radius: 0;
+                padding: 0;
+                min-width: 40px;
+                max-width: 40px;
+                min-height: 32px;
+                max-height: 32px;
+                font-size: 21px;
+                font-weight: 400;
+            }}
+            QPushButton#pickupAdd:hover, QPushButton#pickupRemove:hover {{
+                background: {Palette.PRIMARY_SOFT};
+                color: {Palette.TEXT};
+            }}
+            QPushButton#pickupRemove:disabled {{
+                background: transparent;
+                color: #aeb5a8;
+            }}
+            QLabel#pickupSaveState {{
+                background: transparent;
+                color: {Palette.TEXT_MUTED};
+                padding-right: 10px;
+                font-size: 12px;
+            }}
+            """
+        )
+
+        self.table.itemSelectionChanged.connect(self._update_delete_action)
+        self.table.itemChanged.connect(self._save_item)
+        self.btn_nuevo.clicked.connect(self._new)
+        self.btn_eliminar.clicked.connect(self._delete)
+        buttons.rejected.connect(self.accept)
+        self._refresh()
+
+    def _refresh(self, selected_id=None):
+        self._loading = True
+        puntos = consultar_puntos_recogida()
+        self.table.setRowCount(len(puntos))
+        for row, punto in enumerate(puntos):
+            nombre = QTableWidgetItem(punto["nombre"])
+            nombre.setData(Qt.UserRole, punto["id"])
+            direccion = QTableWidgetItem(punto.get("direccion") or "")
+            self.table.setItem(row, 0, nombre)
+            self.table.setItem(row, 1, direccion)
+            self.table.setRowHeight(row, 38)
+            if punto["id"] == selected_id:
+                self.table.setCurrentCell(row, 0)
+        self._loading = False
+        self._update_delete_action()
+
+    def _new(self):
+        for row in range(self.table.rowCount()):
+            if self.table.item(row, 0).data(Qt.UserRole) is None:
+                self.table.setCurrentCell(row, 0)
+                self.table.editItem(self.table.item(row, 0))
+                return
+
+        self._loading = True
+        row = self.table.rowCount()
+        self.table.insertRow(row)
+        self.table.setItem(row, 0, QTableWidgetItem(""))
+        self.table.setItem(row, 1, QTableWidgetItem(""))
+        self.table.setRowHeight(row, 38)
+        self._loading = False
+        self.table.setCurrentCell(row, 0)
+        self.table.editItem(self.table.item(row, 0))
+        self._update_delete_action()
+
+    def _save_item(self, item):
+        if self._loading:
+            return
+        row = item.row()
+        nombre_item = self.table.item(row, 0)
+        direccion_item = self.table.item(row, 1)
+        punto_id = nombre_item.data(Qt.UserRole)
+        nombre = nombre_item.text().strip()
+        direccion = direccion_item.text().strip()
+
+        if punto_id is None and not nombre:
+            return
+
+        try:
+            if punto_id is None:
+                punto_id = registrar_punto_recogida(
+                    {"nombre": nombre, "direccion": direccion}
+                )
+                self._loading = True
+                nombre_item.setData(Qt.UserRole, punto_id)
+                self._loading = False
+            else:
+                cambios = (
+                    {"nombre": nombre}
+                    if item.column() == 0
+                    else {"direccion": direccion}
+                )
+                modificar_punto_recogida(punto_id, cambios)
+            self.changed.emit()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Error", str(exc))
+            self._refresh(punto_id)
+
+    def _update_delete_action(self):
+        self.btn_eliminar.setEnabled(self.table.currentRow() >= 0)
+
+    def _delete(self):
+        row = self.table.currentRow()
+        if row < 0 or not self.table.item(row, 0):
+            QMessageBox.warning(self, "Error", "Selecciona un lloc de recollida.")
+            return
+        punto_id = self.table.item(row, 0).data(Qt.UserRole)
+        if punto_id is None:
+            self.table.removeRow(row)
+            self._update_delete_action()
+            return
+        reply = QMessageBox.question(
+            self,
+            "Confirmació",
+            "Vols eliminar aquest lloc del catàleg? Les assignacions existents es conservaran.",
+            QMessageBox.Yes | QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+        try:
+            eliminar_punto_recogida(punto_id)
+            self.changed.emit()
+            self._refresh()
+        except ValueError as exc:
+            QMessageBox.warning(self, "Error", str(exc))
+
+
+class ActividadDetailWidget(QWidget):
+    saved = Signal()
+
+    def __init__(self, parent=None, *, show_details=True, show_inscriptions=True):
+        super().__init__(parent)
         self._actividadID = None
+        self._cursoAcademicoID = None
         self._loading = False
         self._inscripciones = []
         self._tipo_actividad = "CURS"
+        self._show_details = show_details
+        self._show_inscriptions = show_inscriptions
 
         self.nombre = QLineEdit()
         self.personal = QComboBox()
         self.personal.setMinimumWidth(180)
-        self._refresh_personal()
+        if self._show_details:
+            self._refresh_personal()
         self.numMaxAlumnos = QSpinBox()
         self.numMaxAlumnos.setMinimum(0)
         self.numMaxAlumnos.setMaximum(999)
@@ -197,7 +477,6 @@ class ActividadDetailWidget(QWidget):
         details_layout.setSpacing(6)
         top_layout = QHBoxLayout()
         top_layout.addLayout(form, stretch=1)
-        top_layout.addWidget(self.socio_preview, alignment=Qt.AlignTop | Qt.AlignRight)
         details_layout.addLayout(top_layout)
         self.label_descripcio = QLabel("Descripció:")
         details_layout.addWidget(self.label_descripcio)
@@ -211,21 +490,25 @@ class ActividadDetailWidget(QWidget):
         self.btn_afegir_soci = QPushButton("Afegir soci")
         self.btn_eliminar_inscripcio = QPushButton("Eliminar inscripció")
         self.btn_refrescar = QPushButton("Refrescar")
+        self.btn_asistencia = QPushButton("Assistència")
         self.btn_exportar_pdf = QPushButton("Exportar PDF")
         self.btn_exportar_excel = QPushButton("Exportar Excel")
         self.btn_afegir_soci.setIcon(QIcon("ui/assets/plus.svg"))
         self.btn_eliminar_inscripcio.setIcon(QIcon("ui/assets/minus.svg"))
         self.btn_refrescar.setIcon(QIcon("ui/assets/refresh.svg"))
+        self.btn_asistencia.setIcon(QIcon("ui/assets/id-card.svg"))
         self.btn_exportar_pdf.setIcon(QIcon("ui/assets/pdf.svg"))
         self.btn_exportar_excel.setIcon(QIcon("ui/assets/excel.svg"))
         set_button_variant(self.btn_afegir_soci, "primary")
         set_button_variant(self.btn_eliminar_inscripcio, "danger")
         set_button_variant(self.btn_refrescar, "secondary")
+        set_button_variant(self.btn_asistencia, "secondary")
         set_button_variant(self.btn_exportar_pdf, "secondary")
         set_button_variant(self.btn_exportar_excel, "secondary")
         btn_layout.addWidget(self.btn_afegir_soci)
         btn_layout.addWidget(self.btn_eliminar_inscripcio)
         btn_layout.addWidget(self.btn_refrescar)
+        btn_layout.addWidget(self.btn_asistencia)
         btn_layout.addWidget(self.btn_exportar_pdf)
         btn_layout.addWidget(self.btn_exportar_excel)
         btn_layout.addStretch()
@@ -247,9 +530,25 @@ class ActividadDetailWidget(QWidget):
         inscrits_layout.setContentsMargins(0, 0, 0, 0)
         inscrits_layout.addWidget(self.label_inscrits)
         inscrits_layout.addLayout(btn_layout)
-        inscrits_layout.addWidget(self.inscrits_table)
-        layout.addWidget(self.inscrits_panel)
-        layout.addStretch()
+        table_photo_layout = QHBoxLayout()
+        table_photo_layout.setSpacing(12)
+        table_photo_layout.addWidget(self.inscrits_table, 1)
+        photo_layout = QVBoxLayout()
+        self.socio_preview_name = QLabel("Selecciona un soci")
+        self.socio_preview_name.setWordWrap(True)
+        self.socio_preview_name.setAlignment(Qt.AlignCenter)
+        self.socio_preview_name.setProperty("role", "muted")
+        photo_layout.addWidget(self.socio_preview_name)
+        photo_layout.addWidget(self.socio_preview, alignment=Qt.AlignTop | Qt.AlignHCenter)
+        photo_layout.addStretch()
+        table_photo_layout.addLayout(photo_layout)
+        inscrits_layout.addLayout(table_photo_layout, 1)
+        layout.addWidget(self.inscrits_panel, 1 if show_inscriptions else 0)
+        if not show_inscriptions:
+            layout.addStretch()
+
+        self.details_panel.setVisible(show_details)
+        self.inscrits_panel.setVisible(show_inscriptions)
 
         self.nombre.editingFinished.connect(self._on_editing_finished)
         self.descripcion.focusOutEvent = self._wrap_focus_out(self.descripcion.focusOutEvent)
@@ -259,6 +558,7 @@ class ActividadDetailWidget(QWidget):
         self.btn_afegir_soci.clicked.connect(self._afegir_soci)
         self.btn_eliminar_inscripcio.clicked.connect(self._eliminar_inscripcio)
         self.btn_refrescar.clicked.connect(self._refresh_inscripcions)
+        self.btn_asistencia.clicked.connect(self._abrir_asistencia)
         self.btn_exportar_pdf.clicked.connect(self._exportar_pdf)
         self.btn_exportar_excel.clicked.connect(self._exportar_excel)
         self._set_inscription_actions_enabled(False)
@@ -279,16 +579,19 @@ class ActividadDetailWidget(QWidget):
         self.label_preu.setText("Preu viatge:" if is_viatge else "Preu matrícula:")
         self.label_descripcio.setText("Descripció / itinerari:" if is_viatge else "Descripció:")
         self.btn_afegir_soci.setText("Afegir participant" if is_viatge else "Afegir soci")
-        self.btn_exportar_excel.setVisible(is_viatge)
+        self.btn_asistencia.setVisible(not is_viatge)
+        self.btn_asistencia.setToolTip(
+            "Obrir el control d'assistència del viatge"
+            if is_viatge
+            else "Obrir el control d'assistència del curs"
+        )
+        self.btn_exportar_excel.setVisible(True)
         self._update_inscrits_counter()
-
-    def set_top_section_height(self, height):
-        fixed_overhead = self.details_panel.sizeHint().height() - self.descripcion.height()
-        self.descripcion.setFixedHeight(max(80, height - fixed_overhead))
 
     def load(self, actividadID):
         self._loading = True
         self._actividadID = actividadID
+        self._cursoAcademicoID = None
 
         if actividadID is None:
             self._clear()
@@ -303,16 +606,18 @@ class ActividadDetailWidget(QWidget):
             return
 
         self.set_tipo_actividad(act.get("tipo"))
+        self._cursoAcademicoID = act.get("cursoAcademico_id")
         self.nombre.setText(act.get("nombre", ""))
 
-        self._refresh_personal()
-        personalID = act.get("personalID")
-        if personalID is None:
-            self.personal.setCurrentText("Desconegut")
-        else:
-            index = self.personal.findData(personalID)
-            if index >= 0:
-                self.personal.setCurrentIndex(index)
+        if self._show_details:
+            self._refresh_personal()
+            personalID = act.get("personalID")
+            if personalID is None:
+                self.personal.setCurrentText("Desconegut")
+            else:
+                index = self.personal.findData(personalID)
+                if index >= 0:
+                    self.personal.setCurrentIndex(index)
 
         numMaxAlumnos = act.get("numMaxAlumnos")
         if numMaxAlumnos is None:
@@ -325,8 +630,9 @@ class ActividadDetailWidget(QWidget):
         self.preuMatricula.setMaximum(999.99)
         self.descripcion.setText(act.get("descripcion", ""))
 
-        self._load_inscrits_table()
-        self._set_inscription_actions_enabled(True)
+        if self._show_inscriptions:
+            self._load_inscrits_table()
+            self._set_inscription_actions_enabled(True)
         self._loading = False
 
     def _load_inscrits_table(self):
@@ -354,12 +660,24 @@ class ActividadDetailWidget(QWidget):
                 pagat_col = model.keys.index("pagat") if model and "pagat" in model.keys else -1
                 if pagat_col >= 0:
                     self.inscrits_table.setItemDelegateForColumn(pagat_col, PagatDelegate(self.inscrits_table))
+                recogida_col = model.keys.index("lugarRecogida") if model and "lugarRecogida" in model.keys else -1
+                if recogida_col >= 0:
+                    nombres = self._nombres_puntos_recogida()
+                    self.inscrits_table.setItemDelegateForColumn(
+                        recogida_col,
+                        PuntoRecogidaDelegate(nombres, self.inscrits_table),
+                    )
+                    self.inscrits_table.setToolTip(
+                        "Fes doble clic a 'Lloc de recollida' per assignar un punt guardat."
+                    )
             self.inscrits_table.hideColumn(0)
             self.inscrits_table.resizeColumnsToContents()
+            self._clear_socio_preview()
             selection_model = self.inscrits_table.selectionModel()
             if selection_model:
                 selection_model.currentRowChanged.connect(self._update_selected_socio_photo)
-            self._clear_socio_preview()
+            if self._inscripciones:
+                self.inscrits_table.selectRow(0)
         except Exception as e:
             QMessageBox.warning(self, "Error", f"No s'han pogut carregar les inscripcions: {e}")
 
@@ -370,7 +688,8 @@ class ActividadDetailWidget(QWidget):
         self._inscripciones = []
         label = "PARTICIPANTS" if self._tipo_actividad == "VIATGE" else "INSCRITS"
         self.label_inscrits.setText(f"{label}: 0/0")
-        self.inscrits_table.setModel(DictTableModel([], []))
+        if self._show_inscriptions:
+            self.inscrits_table.setModel(DictTableModel([], []))
         self._clear_socio_preview()
         self._set_inscription_actions_enabled(False)
 
@@ -401,7 +720,8 @@ class ActividadDetailWidget(QWidget):
         try:
             modificar_actividad(self._actividadID, data)
             actualizar_estados_inscripciones(self._actividadID)
-            self._load_inscrits_table()
+            if self._show_inscriptions:
+                self._load_inscrits_table()
             self.saved.emit()
         except ValueError as e:
             QMessageBox.warning(self, "Error", str(e))
@@ -492,6 +812,25 @@ class ActividadDetailWidget(QWidget):
         self._load_inscrits_table()
         self.saved.emit()
 
+    def _abrir_asistencia(self):
+        if self._actividadID is None or self._cursoAcademicoID is None:
+            return
+        from ui.asistencia_dialog import AsistenciaDialog
+
+        dialog = AsistenciaDialog(self._actividadID, self._cursoAcademicoID, self)
+        dialog.exec()
+
+    def _nombres_puntos_recogida(self):
+        try:
+            guardados = [punto["nombre"] for punto in consultar_puntos_recogida()]
+        except Exception:
+            guardados = []
+        heredados = [
+            str(inscripcion.get("lugarRecogida") or "").strip()
+            for inscripcion in self._inscripciones
+        ]
+        return sorted({nombre for nombre in guardados + heredados if nombre}, key=str.casefold)
+
     def _update_inscripcion_field(self, inscripcion_id, field, value):
         if field == "pagat":
             self._update_pagat_field(inscripcion_id, value)
@@ -574,17 +913,24 @@ class ActividadDetailWidget(QWidget):
         if self._actividadID is None:
             return
 
-        nombre = re.sub(r"[^A-Za-z0-9._-]+", "_", self.nombre.text()).strip("_") or "viatge"
+        is_viatge = self._tipo_actividad == "VIATGE"
+        nombre = re.sub(r"[^A-Za-z0-9._-]+", "_", self.nombre.text()).strip("_") or "activitat"
         try:
-            from exportador.excel_participantes import generar_excel_participantes_viaje
+            from exportador.excel_participantes import (
+                generar_excel_inscritos_curso,
+                generar_excel_participantes_viaje,
+            )
 
             with tempfile.NamedTemporaryFile(
-                prefix=f"participants-{nombre}-",
+                prefix=f"{'participants' if is_viatge else 'inscrits'}-{nombre}-",
                 suffix=".xlsx",
                 delete=False,
             ) as tmp:
                 ruta = tmp.name
-            generar_excel_participantes_viaje(self._actividadID, ruta)
+            if is_viatge:
+                generar_excel_participantes_viaje(self._actividadID, ruta)
+            else:
+                generar_excel_inscritos_curso(self._actividadID, ruta)
             if not QDesktopServices.openUrl(QUrl.fromLocalFile(ruta)):
                 QMessageBox.warning(
                     self,
@@ -606,6 +952,7 @@ class ActividadDetailWidget(QWidget):
         self.btn_afegir_soci.setEnabled(enabled)
         self.btn_eliminar_inscripcio.setEnabled(enabled)
         self.btn_refrescar.setEnabled(enabled)
+        self.btn_asistencia.setEnabled(enabled)
         self.btn_exportar_pdf.setEnabled(enabled)
         self.btn_exportar_excel.setEnabled(enabled)
 
@@ -623,14 +970,23 @@ class ActividadDetailWidget(QWidget):
             return
 
         socio_id = model.rows[current.row()].get("socioID")
+        nombre = " ".join(
+            part for part in (
+                model.rows[current.row()].get("nombre"),
+                model.rows[current.row()].get("apellido1"),
+                model.rows[current.row()].get("apellido2"),
+            )
+            if part
+        )
+        self.socio_preview_name.setText(nombre or "Participant")
         if not socio_id:
-            self._clear_socio_preview("No soci")
+            self._clear_socio_preview("No soci", reset_name=False)
             return
 
         socio = consultar_socio(socio_id)
         foto = socio.get("foto") if socio else None
         if not foto:
-            self._clear_socio_preview()
+            self._clear_socio_preview(reset_name=False)
             return
 
         pix = QPixmap()
@@ -640,9 +996,11 @@ class ActividadDetailWidget(QWidget):
             pix.scaled(self.socio_preview.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         )
 
-    def _clear_socio_preview(self, text="Sense foto"):
+    def _clear_socio_preview(self, text="Sense foto", *, reset_name=True):
         self.socio_preview.setPixmap(QPixmap())
         self.socio_preview.setText(text)
+        if reset_name:
+            self.socio_preview_name.setText("Selecciona un soci")
 
     def _refresh_personal(self):
         """Actualiza la lista de personal en el combo box."""
@@ -661,3 +1019,45 @@ class ActividadDetailWidget(QWidget):
                 self._save()
             return original_focus_out(event)
         return new_focus_out
+
+
+class InscripcionesActividadDialog(QDialog):
+    changed = Signal()
+
+    def __init__(self, actividadID, parent=None):
+        super().__init__(parent)
+        self.actividadID = actividadID
+        actividad = consultar_actividad(actividadID) or {}
+        nombre = actividad.get("nombre") or "Activitat"
+        tipo = getattr(actividad.get("tipo"), "value", actividad.get("tipo"))
+        participantes = "participants" if tipo == "VIATGE" else "inscrits"
+
+        self.setWindowTitle(f"Gestió d'{participantes} - {nombre}")
+        self.resize(1180, 680)
+        self.setMinimumSize(900, 540)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(18, 16, 18, 18)
+        title = QLabel(nombre)
+        title.setProperty("role", "sectionTitle")
+        title.setStyleSheet("font-size: 20px; font-weight: 700;")
+        subtitle = QLabel("Participants i inscripcions de l'activitat")
+        subtitle.setProperty("role", "muted")
+        layout.addWidget(title)
+        layout.addWidget(subtitle)
+
+        self.inscripciones = ActividadDetailWidget(
+            self,
+            show_details=False,
+            show_inscriptions=True,
+        )
+        self.inscripciones.saved.connect(self.changed.emit)
+        layout.addWidget(self.inscripciones, 1)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Close)
+        buttons.button(QDialogButtonBox.Close).setText("Tancar")
+        set_button_variant(buttons.button(QDialogButtonBox.Close), "secondary")
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self.inscripciones.load(actividadID)

@@ -131,8 +131,16 @@ def _worksheet_xml(title: str, headers: list[str], rows: list[list]) -> str:
 </worksheet>"""
 
 
-def _write_xlsx(path: Path, title: str, headers: list[str], rows: list[list]) -> None:
+def _write_xlsx(
+    path: Path,
+    title: str,
+    headers: list[str],
+    rows: list[list],
+    *,
+    sheet_name: str = "Participants",
+) -> None:
     worksheet = _worksheet_xml(title, headers, rows)
+    safe_sheet_name = _xml_text(sheet_name)
     with ZipFile(path, "w", ZIP_DEFLATED) as zf:
         zf.writestr(
             "[Content_Types].xml",
@@ -158,10 +166,10 @@ def _write_xlsx(path: Path, title: str, headers: list[str], rows: list[list]) ->
         )
         zf.writestr(
             "xl/workbook.xml",
-            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
- <sheets><sheet name="Participants" sheetId="1" r:id="rId1"/></sheets>
+ <sheets><sheet name="{safe_sheet_name}" sheetId="1" r:id="rId1"/></sheets>
 </workbook>""",
         )
         zf.writestr(
@@ -192,9 +200,9 @@ def _write_xlsx(path: Path, title: str, headers: list[str], rows: list[list]) ->
         zf.writestr("xl/worksheets/sheet1.xml", worksheet)
         zf.writestr(
             "docProps/core.xml",
-            """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+            f"""<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
- xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Participants</dc:title></cp:coreProperties>""",
+ xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>{_xml_text(title)}</dc:title></cp:coreProperties>""",
         )
         zf.writestr(
             "docProps/app.xml",
@@ -230,7 +238,6 @@ def generar_excel_participantes_viaje_session(session: Session, actividadID: int
         "Primer cognom",
         "Segon cognom",
         "DNI",
-        "Soci",
         "Telèfon",
         "Data inscripció",
         "Estat",
@@ -243,7 +250,7 @@ def generar_excel_participantes_viaje_session(session: Session, actividadID: int
     ]
     rows = []
     for inscripcion in inscripciones:
-        nombre, apellido1, apellido2, dni, es_socio, telefono = _nom_participant(inscripcion)
+        nombre, apellido1, apellido2, dni, _es_socio, telefono = _nom_participant(inscripcion)
         pago = _ultimo_pago(session, inscripcion)
         rows.append(
             [
@@ -251,7 +258,6 @@ def generar_excel_participantes_viaje_session(session: Session, actividadID: int
                 apellido1,
                 apellido2,
                 dni,
-                es_socio,
                 telefono,
                 _fmt_date(inscripcion.fechaInscripcion),
                 _estado_value(inscripcion.estado),
@@ -270,3 +276,55 @@ def generar_excel_participantes_viaje_session(session: Session, actividadID: int
     output = Path(ruta_xlsx)
     output.parent.mkdir(parents=True, exist_ok=True)
     _write_xlsx(output, title, headers, rows)
+
+
+def generar_excel_inscritos_curso(actividadID: int, ruta_xlsx: str) -> None:
+    with SessionLocal() as session:
+        generar_excel_inscritos_curso_session(session, actividadID, ruta_xlsx)
+
+
+def generar_excel_inscritos_curso_session(session: Session, actividadID: int, ruta_xlsx: str) -> None:
+    actividad = session.get(Actividad, actividadID)
+    if not actividad:
+        raise ValueError("Curs no trobat.")
+
+    inscripciones = sorted(
+        actividad.inscripciones or [],
+        key=lambda ins: (
+            ins.fechaInscripcion,
+            (ins.socio.apellido1 if ins.socio else ins.noSocioApellido1) or "",
+            (ins.socio.apellido2 if ins.socio else ins.noSocioApellido2) or "",
+            (ins.socio.nombre if ins.socio else ins.noSocioNombre) or "",
+        ),
+    )
+
+    title = f"Inscrits - {actividad.nombre}"
+    headers = [
+        "Num soci",
+        "Primer cognom",
+        "Segon cognom",
+        "Nom",
+        "Telèfon mòbil",
+        "Data inscripció",
+        "Estat",
+        "Observacions",
+    ]
+    rows = []
+    for inscripcion in inscripciones:
+        nombre, apellido1, apellido2, _dni, _es_socio, telefono = _nom_participant(inscripcion)
+        rows.append(
+            [
+                str(inscripcion.socioID) if inscripcion.socioID else "-",
+                apellido1,
+                apellido2,
+                nombre,
+                telefono,
+                _fmt_date(inscripcion.fechaInscripcion),
+                _estado_value(inscripcion.estado),
+                inscripcion.observaciones or inscripcion.noSocioObservaciones or "",
+            ]
+        )
+
+    output = Path(ruta_xlsx)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    _write_xlsx(output, title, headers, rows, sheet_name="Inscrits")

@@ -274,10 +274,18 @@ def ensure_schema_updates() -> None:
     """Apply schema updates for existing installations."""
     inspector = inspect(engine)
     table_names = inspector.get_table_names()
+    created_puntos_recogida = False
     if "usuarios" not in table_names:
         from models import Usuario
 
         Usuario.__table__.create(bind=engine, checkfirst=True)
+        inspector = inspect(engine)
+        table_names = inspector.get_table_names()
+    if "puntos_recogida" not in table_names:
+        from models import PuntoRecogida
+
+        PuntoRecogida.__table__.create(bind=engine, checkfirst=True)
+        created_puntos_recogida = True
         inspector = inspect(engine)
         table_names = inspector.get_table_names()
     if "socios" not in table_names:
@@ -417,6 +425,29 @@ def ensure_schema_updates() -> None:
 
     if rebuild_pagos_sqlite:
         _rebuild_matricula_pagos_sqlite_for_inscripcion_id()
+
+    # Los valores libres usados por versiones anteriores pasan a estar
+    # disponibles inmediatamente en el nuevo catálogo, sin perder el texto
+    # guardado en cada inscripción.
+    if created_puntos_recogida and "inscripciones" in table_names:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO puntos_recogida (nombre)
+                    SELECT MIN(TRIM(i."lugarRecogida"))
+                    FROM inscripciones i
+                    WHERE i."lugarRecogida" IS NOT NULL
+                      AND TRIM(i."lugarRecogida") <> ''
+                      AND NOT EXISTS (
+                          SELECT 1
+                          FROM puntos_recogida p
+                          WHERE LOWER(p.nombre) = LOWER(TRIM(i."lugarRecogida"))
+                      )
+                    GROUP BY LOWER(TRIM(i."lugarRecogida"))
+                    """
+                )
+            )
 
     if not statements and "dniNie" not in personal_columns:
         return

@@ -118,6 +118,17 @@ class LugarUpdateDTO(BaseModel):
     nombre: str | None = None
     direccion: str | None = None
 
+
+class PuntoRecogidaDTO(BaseModel):
+    id: int | None = None
+    nombre: str
+    direccion: str | None = None
+
+
+class PuntoRecogidaUpdateDTO(BaseModel):
+    nombre: str | None = None
+    direccion: str | None = None
+
 class PagoDTO(BaseModel):
     id: int | None = None
     socioID: int | None = None

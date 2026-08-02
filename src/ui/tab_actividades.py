@@ -1,5 +1,6 @@
 import re
 import tempfile
+from pathlib import Path
 
 from controladores.actividades import eliminar_actividad, listar_actividades_resumen
 from controladores.curso_academico import listar_cursosA
@@ -7,14 +8,17 @@ from PySide6.QtWidgets import (
   QWidget, QVBoxLayout, QHBoxLayout, QTableView,
   QPushButton, QMessageBox, QLineEdit, QComboBox, QSizePolicy, QTabWidget, QMenu, QLabel
 )
-from PySide6.QtGui import QDesktopServices, QIcon
-from PySide6.QtCore import QSize, QModelIndex, QItemSelectionModel, Qt, QUrl, QTimer
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtCore import QModelIndex, QItemSelectionModel, Qt, QUrl, QTimer
 from exportador.pdf_actividades import generar_pdf_actividades_curso
 from ui.actividad_dialog import ActividadDialog
-from ui.actividad_detail import ActividadDetailWidget
+from ui.actividad_detail import (
+  ActividadDetailWidget,
+  InscripcionesActividadDialog,
+  PuntosRecogidaDialog,
+)
 from ui.table_models import DictTableModel
 from ui.table_utils import add_table_copy_actions, enable_table_copy
-from ui.asistencia_dialog import AsistenciaDialog
 from ui.curso_academico_preferences import obtener_curso_academico_predeterminado
 from ui.theme import set_button_icon, set_button_variant
 
@@ -60,19 +64,17 @@ class ActividadesTab(QWidget):
     self.table_activitats.setAlternatingRowColors(True)
     self.table_activitats.setContextMenuPolicy(Qt.CustomContextMenu)
     self.table_activitats.customContextMenuRequested.connect(self._show_actividad_context_menu)
-    self.table_activitats.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+    self.table_activitats.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
     header = self.table_activitats.horizontalHeader()
     header.setSectionsClickable(True)
     header.sectionClicked.connect(self._sort_by_header)
-    self.table_activitats.doubleClicked.connect(self._abrir_asistencia)
+    self.table_activitats.doubleClicked.connect(self._abrir_inscripciones)
 
-    self.detail_actividad = ActividadDetailWidget()
+    self.detail_actividad = ActividadDetailWidget(show_inscriptions=False)
     self.detail_actividad.saved.connect(self._refresh_activitats)
-    self.detail_actividad.setMinimumWidth(460)
-    self.detail_actividad.setMaximumWidth(620)
+    self.detail_actividad.setMinimumWidth(360)
+    self.detail_actividad.setMaximumWidth(500)
     self.detail_actividad.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
-    self.inscrits_panel = self.detail_actividad.inscrits_panel
-    self.inscrits_panel.setParent(self)
 
     self.btn_nova_actividad = QPushButton("Nou Curs")
     set_button_icon(self.btn_nova_actividad, "ui/assets/plus.svg")
@@ -84,11 +86,19 @@ class ActividadesTab(QWidget):
     set_button_icon(self.btn_exportar_activitats, "ui/assets/pdf.svg")
     self.btn_exportar_excel_cursos = QPushButton("Exportar Excel")
     set_button_icon(self.btn_exportar_excel_cursos, "ui/assets/excel.svg")
+    self.btn_puntos_recogida = QPushButton("Llocs de recollida")
+    set_button_icon(
+      self.btn_puntos_recogida,
+      str(Path(__file__).resolve().parent / "assets" / "pin.svg"),
+    )
+    set_button_variant(self.btn_puntos_recogida, "secondary")
+    self.btn_puntos_recogida.setVisible(False)
 
     self.btn_nova_actividad.clicked.connect(self._dialog_nova_actividad)
     self.btn_eliminar_actividad.clicked.connect(self._eliminar_actividad)
     self.btn_exportar_activitats.clicked.connect(self._exportar_activitats_pdf)
     self.btn_exportar_excel_cursos.clicked.connect(self._exportar_activitats_excel)
+    self.btn_puntos_recogida.clicked.connect(self._gestionar_puntos_recogida)
 
     main_layout = QVBoxLayout(self)
     self.subtabs = QTabWidget()
@@ -108,6 +118,7 @@ class ActividadesTab(QWidget):
     top_buttons.addWidget(self.btn_eliminar_actividad)
     top_buttons.addWidget(self.btn_exportar_activitats)
     top_buttons.addWidget(self.btn_exportar_excel_cursos)
+    top_buttons.addWidget(self.btn_puntos_recogida)
     top_buttons.addStretch()
 
     self._content_widget = QWidget()
@@ -123,18 +134,13 @@ class ActividadesTab(QWidget):
     mid_layout = QHBoxLayout()
     mid_layout.setContentsMargins(0, 0, 0, 0)
     mid_layout.setSpacing(12)
-    mid_layout.addWidget(self.table_activitats, stretch=4)
-    mid_layout.addWidget(self.detail_actividad, stretch=3)
+    mid_layout.addWidget(self.table_activitats, stretch=5)
+    mid_layout.addWidget(self.detail_actividad, stretch=2, alignment=Qt.AlignTop)
     top_content = QWidget()
     top_content.setLayout(mid_layout)
-    top_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-    top_height = self.detail_actividad.sizeHint().height()
-    top_content.setFixedHeight(top_height)
-    self.table_activitats.setFixedHeight(top_height)
-    self.detail_actividad.set_top_section_height(top_height)
+    top_content.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-    content_layout.addWidget(top_content, 0)
-    content_layout.addWidget(self.inscrits_panel, 2)
+    content_layout.addWidget(top_content, 1)
     self.cursos_tab.layout().addWidget(self._content_widget)
 
     self._refresh_activitats()
@@ -251,12 +257,14 @@ class ActividadesTab(QWidget):
     actividadID = self.table_activitats.model().rows[current.row()]["id"]
     self.detail_actividad.load(actividadID)
 
-  def _abrir_asistencia(self, index: QModelIndex):
+  def _abrir_inscripciones(self, index: QModelIndex):
     if not index.isValid():
         return
     actividad = self.table_activitats.model().rows[index.row()]
-    dlg = AsistenciaDialog(actividad["id"], actividad["cursoAcademico_id"], self)
+    dlg = InscripcionesActividadDialog(actividad["id"], self)
+    dlg.changed.connect(self._refresh_activitats)
     dlg.exec()
+    self._refresh_activitats()
 
   def _show_actividad_context_menu(self, pos):
     index = self.table_activitats.indexAt(pos)
@@ -272,9 +280,9 @@ class ActividadesTab(QWidget):
     menu = QMenu(self)
     add_table_copy_actions(menu, self.table_activitats, index)
     menu.addSeparator()
-    asistencia_action = menu.addAction("Obrir assistència")
-    asistencia_action.triggered.connect(
-      lambda _checked=False, idx=index: self._abrir_asistencia(idx)
+    inscripciones_action = menu.addAction("Obrir inscripcions")
+    inscripciones_action.triggered.connect(
+      lambda _checked=False, idx=index: self._abrir_inscripciones(idx)
     )
     menu.exec(self.table_activitats.viewport().mapToGlobal(pos))
 
@@ -293,6 +301,9 @@ class ActividadesTab(QWidget):
     dlg = ActividadDialog(self, cursoAcademico_id=curso_id, tipo=self._tipo_actual)
     if dlg.exec():
         self._refresh_activitats()
+
+  def _gestionar_puntos_recogida(self):
+    PuntosRecogidaDialog(self).exec()
 
   def _eliminar_actividad(self):
     sel = self.table_activitats.selectionModel().selectedRows()
@@ -406,6 +417,7 @@ class ActividadesTab(QWidget):
     self.btn_nova_actividad.setText("Nou Viatge" if is_viatge else "Nou Curs")
     self.btn_eliminar_actividad.setText("Eliminar Viatge" if is_viatge else "Eliminar Curs")
     self.btn_exportar_excel_cursos.setVisible(not is_viatge)
+    self.btn_puntos_recogida.setVisible(is_viatge)
     self._search_box.setPlaceholderText("Cerca viatges..." if is_viatge else "Cerca cursos...")
     self.detail_actividad.set_tipo_actividad(self._tipo_actual)
     self.detail_actividad.load(None)

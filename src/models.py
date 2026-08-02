@@ -149,6 +149,16 @@ class Lugar(Base):
 
     actividades = relationship("Actividad", back_populates="lugar")
 
+
+class PuntoRecogida(Base):
+    """Reusable pickup point for trip participants."""
+
+    __tablename__ = "puntos_recogida"
+
+    id = Column(Integer, primary_key=True)
+    nombre = Column(String(255), nullable=False, unique=True)
+    direccion = Column(String(255))
+
 # ---------------------------------------------
 # ACADEMIC YEAR & TERM
 # ---------------------------------------------
