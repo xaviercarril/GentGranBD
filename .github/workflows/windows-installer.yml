@@ -28,6 +28,8 @@ jobs:
       - name: Prepare embedded PostgreSQL client
         shell: pwsh
         run: |
+          $requiredMajor = 18
+
           function Find-NewestPgDump {
             $candidates = @()
             foreach ($root in @("$env:ProgramFiles\PostgreSQL", "${env:ProgramFiles(x86)}\PostgreSQL")) {
@@ -46,7 +48,10 @@ jobs:
               $versionText = & $candidate.FullName --version 2>$null
               $match = [regex]::Match("$versionText", '\d+(?:\.\d+){0,3}')
               if ($LASTEXITCODE -eq 0 -and $match.Success) {
-                [pscustomobject]@{ Path = $candidate.FullName; Version = [version]$match.Value }
+                $version = [version]$match.Value
+                if ($version.Major -ge $requiredMajor) {
+                  [pscustomobject]@{ Path = $candidate.FullName; Version = $version }
+                }
               }
             }
             $usable | Sort-Object Version -Descending | Select-Object -ExpandProperty Path -First 1
@@ -54,12 +59,13 @@ jobs:
 
           $pgDump = Find-NewestPgDump
           if (-not $pgDump) {
-            choco install postgresql -y --no-progress --params "'/Password:GentGranBuildOnly'"
+            choco install postgresql18 -y --no-progress --params "'/Password:GentGranBuildOnly /NoPath'"
             $pgDump = Find-NewestPgDump
           }
-          if (-not $pgDump) { Write-Error 'pg_dump could not be prepared for embedding'; exit 1 }
+          if (-not $pgDump) { Write-Error "pg_dump $requiredMajor or newer could not be prepared for embedding"; exit 1 }
           Write-Host "Embedding $(& $pgDump --version) from $pgDump"
           "GENTGRAN_PG_DUMP=$pgDump" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "GENTGRAN_MIN_PG_DUMP_MAJOR=$requiredMajor" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Build Windows app (one-file)
         run: pyinstaller pyinstaller-win.spec --noconfirm

@@ -38,6 +38,18 @@ def _is_complete_windows_client(pg_dump: Path) -> bool:
     )
 
 
+def _meets_minimum_client_major(pg_dump: Path) -> bool:
+    configured = os.getenv("GENTGRAN_MIN_PG_DUMP_MAJOR", "").strip()
+    if not configured:
+        return True
+    try:
+        minimum_major = int(configured)
+    except ValueError as exc:
+        raise SystemExit("GENTGRAN_MIN_PG_DUMP_MAJOR must be an integer.") from exc
+    version = _pg_dump_version(pg_dump)
+    return bool(version) and version[0] >= minimum_major
+
+
 def _pg_dump_candidates() -> list[Path]:
     executable_name = "pg_dump.exe" if os.name == "nt" else "pg_dump"
     candidates: list[Path] = []
@@ -101,13 +113,19 @@ def postgresql_binaries() -> list[tuple[str, str]]:
         (
             path
             for path in _pg_dump_candidates()
-            if path.is_file() and _is_complete_windows_client(path)
+            if (
+                path.is_file()
+                and _is_complete_windows_client(path)
+                and _meets_minimum_client_major(path)
+            )
         ),
         None,
     )
     if pg_dump is None:
+        minimum_major = os.getenv("GENTGRAN_MIN_PG_DUMP_MAJOR", "").strip()
+        requirement = f" version {minimum_major} or newer" if minimum_major else ""
         raise SystemExit(
-            "Cannot build GentGranBD: pg_dump was not found. Install libpq/PostgreSQL "
+            f"Cannot build GentGranBD: pg_dump{requirement} was not found. Install libpq/PostgreSQL "
             "client tools or set GENTGRAN_PG_DUMP to the executable path."
         )
     suffix = ".exe" if os.name == "nt" else ""

@@ -2,7 +2,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from scripts import pyinstaller_postgresql
-from scripts.pyinstaller_postgresql import _binary_entries, _pg_dump_version
+from scripts.pyinstaller_postgresql import (
+    _binary_entries,
+    _meets_minimum_client_major,
+    _pg_dump_version,
+)
 
 
 def test_windows_bundle_includes_pg_dump_and_runtime_dlls(tmp_path):
@@ -66,3 +70,23 @@ def test_windows_bundle_includes_uppercase_dll_extension(tmp_path):
     uppercase_dll.write_bytes(b"dll")
 
     assert (str(uppercase_dll), "postgresql/bin") in _binary_entries(tools, windows=True)
+
+
+def test_packaging_rejects_client_older_than_required_server_major(monkeypatch, tmp_path):
+    pg_dump = tmp_path / "pg_dump"
+    pg_dump.write_bytes(b"binary")
+    monkeypatch.setenv("GENTGRAN_MIN_PG_DUMP_MAJOR", "18")
+    monkeypatch.setattr(
+        pyinstaller_postgresql,
+        "_pg_dump_version",
+        lambda path: (17, 10),
+    )
+
+    assert not _meets_minimum_client_major(pg_dump)
+
+    monkeypatch.setattr(
+        pyinstaller_postgresql,
+        "_pg_dump_version",
+        lambda path: (18, 4),
+    )
+    assert _meets_minimum_client_major(pg_dump)
